@@ -32,3 +32,22 @@ Avaliações no Google, estoque de materiais de consumo e checklist semanal por 
 ## Estratégia de evolução
 
 Desenvolver de forma incremental, preservando o que já funciona no HTML atual. Antes de publicar uma versão para uso real, serão necessários autenticação segura, permissões no servidor, armazenamento centralizado, cópias de segurança e cuidados de privacidade.
+
+## Publicação da demonstração com GitHub Pages
+
+Este repositório já contém `index.html` e `.nojekyll`, preparados para hospedagem estática.
+
+Para ativar o GitHub Pages, um administrador do repositório deve abrir [Settings → Pages](https://github.com/josecarlosdelpi/portal_uma/settings/pages) e escolher:
+
+- **Source:** `Deploy from a branch`
+- **Branch:** `main`
+- **Folder:** `/(root)`
+- Clicar em **Save**.
+
+Após a implantação pelo GitHub, o endereço previsto será:
+
+**https://josecarlosdelpi.github.io/portal_uma/**
+
+A ativação em Settings é obrigatória. Ter os arquivos no GitHub não significa que o site já está no ar. A atualização do `index.html` no branch `main` será publicada automaticamente após habilitar o Pages.
+
+**Atenção:** trata-se de uma demonstração pública sem autenticação real. Nunca preencher com dados reais de clientes, documentos, valores sensíveis ou senhas.
