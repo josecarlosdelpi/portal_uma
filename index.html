@@ -35,12 +35,12 @@
       <h1>Portal UMA • Acesso demonstrativo</h1>
       <p>Prova de conceito para apresenta&ccedil;&atilde;o gerencial. Use as credenciais de demonstra&ccedil;&atilde;o para acessar o painel.</p>
     </div>
-    <form id="loginForm" class="auth-form">
+    <form id="loginForm" class="auth-form" autocomplete="off">
       <label>Usu&aacute;rio
-        <input id="loginUser" type="text" autocomplete="username" placeholder="Digite o usu&aacute;rio" value="Admin">
+        <input id="loginUser" type="text" autocomplete="off" placeholder="Digite o usu&aacute;rio">
       </label>
       <label>Senha
-        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Digite a senha" value="Admin">
+        <input id="loginPassword" type="password" autocomplete="off" placeholder="Digite a senha">
       </label>
       <button type="submit" class="auth-submit">Entrar no Portal UMA</button>
       <div id="authError" class="auth-error" aria-live="polite"></div>
@@ -59,17 +59,20 @@
     <button type="button" class="nav-item active" data-view="overview"><span class="nav-icon">&#9638;</span><span>Vis&atilde;o geral</span></button>
     <button type="button" class="nav-item" data-view="sales"><span class="nav-icon">&#8599;</span><span>Vendas</span></button>
     <button type="button" class="nav-item" data-view="contacts"><span class="nav-icon">&#9742;</span><span>Telemarketing</span></button>
+    <button type="button" class="nav-item" data-view="google"><span class="nav-icon">★</span><span>Avaliações Google</span></button>
+    <button type="button" class="nav-item" data-view="supplies"><span class="nav-icon">▣</span><span>Materiais e insumos</span></button>
+    <button type="button" class="nav-item" data-view="checklist"><span class="nav-icon">☑</span><span>Checklist semanal</span></button>
     <button type="button" class="nav-item" data-view="procedures"><span class="nav-icon">&#9776;</span><span>Padr&otilde;es &amp; treinamento</span></button>
     <button type="button" class="nav-item" data-view="management"><span class="nav-icon">&#9678;</span><span>GR gerencial</span></button>
   </nav>
   <div class="side-spacer"></div>
   <div class="sidebar-note"><span class="sidebar-pill">AMBIENTE DE DEMO</span><strong>Apresenta&ccedil;&atilde;o para a dire&ccedil;&atilde;o</strong><p>Nenhum dado aqui representa o desempenho real dos funcion&aacute;rios ou das lojas. Tudo &eacute; ilustrativo.</p></div>
-  <div class="sidebar-bottom">Prot&oacute;tipo local v0.3<br>Sem conex&atilde;o com ERP ou site da UMA</div>
+  <div class="sidebar-bottom">Prot&oacute;tipo demonstrativo v0.4<br>Sem conex&atilde;o com ERP ou site da UMA</div>
 </aside>
 <main class="main">
   <header class="topbar"><div class="breadcrumb">Universo das Mangueiras <span style="margin:0 7px;color:#adc0c6">/</span> <strong id="breadcrumbCurrent">Vis&atilde;o geral</strong></div><div class="topbar-right"><span class="topbar-note">Um lugar para transformar informa&ccedil;&atilde;o em decis&atilde;o</span><span class="profile-chip" id="profileLabel">Admin · demonstração</span><span class="avatar">UMA</span><button type="button" id="logoutBtn" class="logout-btn">Sair</button></div></header>
   <div class="workspace">
-    <div class="demo-ribbon"><span class="demo-mark">!</span><span><strong>Dados 100% fict&iacute;cios.</strong> Este prot&oacute;tipo demonstra como vendas fictícias e a carteira de televendas podem alimentar indicadores de acompanhamento. N&atilde;o h&aacute; sincroniza&ccedil;&atilde;o com o ERP, autentica&ccedil;&atilde;o segura ou compartilhamento entre computadores.</span></div>
+    <div class="demo-ribbon"><span class="demo-mark">!</span><span><strong>Dados 100% fict&iacute;cios.</strong> Este prot&oacute;tipo demonstra televendas, avalia&ccedil;&otilde;es no Google, insumos e checklist com exemplos ilustrativos. N&atilde;o h&aacute; sincroniza&ccedil;&atilde;o com o ERP ou o Google, autentica&ccedil;&atilde;o segura ou compartilhamento entre computadores.</span></div>
 
     <section class="view active" id="view-overview" aria-label="Visao geral">
       <div class="page-header"><div><div class="eyebrow">VIS&Atilde;O DEMONSTRATIVA</div><h1>Decis&otilde;es melhores come&ccedil;am com dados.</h1><p>O que cada loja vendeu, quais atividades comerciais ocorreram e que compromissos precisam ser acompanhados.</p></div><span class="mini-pill">&#9679; PROVA DE CONCEITO</span></div>
@@ -145,6 +148,52 @@
       </div>
       <article class="panel tele-spacing" id="teleAuditPanel"><div class="panel-head"><div><h3>Histórico de correções</h3><p>Registro demonstrativo de alterações de ligações e compras anteriores</p></div><span class="soft-label">AUDITORIA LOCAL</span></div><div id="teleAuditList" class="tele-audit"></div></article>
     </section>
+
+    <!-- Portal UMA v4: módulos complementares (todos os dados fictícios) -->
+    <section class="view" id="view-google" aria-label="Avaliações no Google">
+      <div class="page-header"><div><div class="eyebrow">VISIBILIDADE DIGITAL • DEMONSTRAÇÃO</div><h1>Avaliações no Google</h1><p>Controle mensal por loja. Cada vendedor da unidade recebe um brinde quando a equipe atinge a meta, sem prêmios cumulativos.</p></div><span class="mini-pill">META POR LOJA</span></div>
+      <div class="extra-headnote"><strong>Como funciona nesta versão:</strong> a Milena confere as avaliações do mês no Google e registra a quantidade aqui. <strong>Não há consulta automática ao Google nesta demonstração.</strong> Histórico e entrega de brindes ficam salvos somente neste navegador.</div>
+      <div class="extra-filters"><div class="field"><label for="extraReviewMonth">Mês de referência</label><input id="extraReviewMonth" type="month"></div><div class="extra-help">Metas: <strong>10 avaliações</strong> = brinde simbólico para cada vendedor da loja; <strong>20 avaliações</strong> = somente um brinde maior para cada vendedor.</div></div>
+      <div class="kpi-grid extra-kpis" id="extraReviewsKPIs"></div>
+      <div class="extra-storecards" id="extraReviewsCards"></div>
+      <div class="extra-two">
+        <article class="panel extra-admin-only" id="extraReviewsAdminPanel"><div class="panel-head"><div><h3>Conferência mensal da Milena</h3><p>Registre o total conferido e a entrega da premiação coletiva por loja.</p></div><span class="soft-label">ADMINISTRADOR</span></div>
+          <form id="extraReviewForm" class="extra-form"><div class="field-grid"><div class="field"><label for="extraReviewStore">Loja *</label><select id="extraReviewStore" required></select></div><div class="field"><label for="extraReviewCount">Avaliações do mês *</label><input id="extraReviewCount" type="number" min="0" max="9999" required></div><div class="field"><label for="extraReviewChecked">Data da conferência *</label><input id="extraReviewChecked" type="date" required></div><div class="field"><label for="extraReviewDelivered">Data de entrega dos brindes</label><input id="extraReviewDelivered" type="date"></div><div class="field wide"><label for="extraReviewNote">Observação (opcional)</label><input id="extraReviewNote" maxlength="200" placeholder="Ex.: quantidade verificada no perfil da loja"></div></div><p class="extra-tip">Deixe a entrega em branco quando o prêmio estiver pendente. Se a faixa de premiação mudar, confira novamente a entrega.</p><div class="form-actions"><button class="btn btn-primary" type="submit">Salvar acompanhamento</button></div></form>
+        </article>
+        <article class="panel"><div class="panel-head"><div><h3>Histórico mensal por loja</h3><p>Visualização dos períodos anteriores e status da entrega.</p></div></div><div class="table-wrap"><table><thead><tr><th>Mês</th><th>Loja</th><th>Avaliações</th><th>Premiação por vendedor</th><th>Entrega</th></tr></thead><tbody id="extraReviewsHistory"></tbody></table></div></article>
+      </div>
+    </section>
+
+    <section class="view" id="view-supplies" aria-label="Estoque de insumos">
+      <div class="page-header"><div><div class="eyebrow">ROTINA OPERACIONAL • DEMONSTRAÇÃO</div><h1>Materiais e insumos</h1><p>Acompanhe café, bobinas, papel, limpeza e itens de escritório. Entradas administradas pela Milena, retiradas registradas pelos funcionários.</p></div><span class="mini-pill">ESTOQUE POR LOJA</span></div>
+      <div class="extra-headnote">Este controle é <strong>independente do estoque comercial do ERP</strong>. Cada unidade possui saldo e estoque mínimo próprios. Alertas ajudam a planejar novas compras; não há transferências entre lojas.</div>
+      <div class="extra-filters"><div class="field"><label for="extraStockStore">Visualizar unidade</label><select id="extraStockStore"></select></div><div class="extra-help">Cada retirada reduz o saldo da loja e fica registrada no histórico local.</div></div>
+      <div class="kpi-grid extra-kpis" id="extraStockKPIs"></div>
+      <article class="panel extra-section"><div class="panel-head"><div><h3>Disponibilidade por item</h3><p id="extraStockSubtitle">Saldos fictícios e alertas de reposição</p></div><span class="soft-label">SALDO ATUAL</span></div><div class="table-wrap"><table><thead><tr><th>Unidade</th><th>Material</th><th>Saldo</th><th>Mínimo</th><th>Situação</th></tr></thead><tbody id="extraStockTable"></tbody></table></div></article>
+      <div class="extra-two extra-section">
+        <article class="panel"><div class="panel-head"><div><h3>Movimentar insumos</h3><p id="extraMoveCaption">Entradas somente pela Milena; retiradas pela equipe.</p></div></div>
+          <form class="extra-form" id="extraMoveForm"><div class="field-grid"><div class="field"><label for="extraMoveKind">Tipo de movimentação *</label><select id="extraMoveKind" required><option value="retirada">Retirada / consumo</option><option value="entrada">Entrada / reposição</option></select></div><div class="field"><label for="extraMoveStore">Unidade *</label><select id="extraMoveStore" required></select></div><div class="field wide"><label for="extraMoveMaterial">Material *</label><select id="extraMoveMaterial" required></select></div><div class="field"><label for="extraMoveQty">Quantidade *</label><input id="extraMoveQty" type="number" min="1" max="9999" step="1" required></div><div class="field"><label for="extraMoveBy">Responsável</label><input id="extraMoveBy" readonly></div><div class="field wide"><label for="extraMoveNote">Observação</label><input id="extraMoveNote" maxlength="180" placeholder="Ex.: reposição da semana ou uso na loja"></div></div><p class="extra-tip">Não é permitido retirar mais unidades do que o saldo disponível.</p><div class="form-actions"><button class="btn btn-primary" type="submit">Registrar movimentação</button></div></form>
+        </article>
+        <article class="panel extra-admin-only" id="extraMaterialPanel"><div class="panel-head"><div><h3>Cadastro de materiais e mínimos</h3><p>Somente Milena pode cadastrar e ajustar mínimos de cada loja.</p></div></div>
+          <form class="extra-form" id="extraMaterialForm"><input type="hidden" id="extraMaterialEdit"><div class="field-grid"><div class="field wide"><label for="extraMaterialName">Nome do material *</label><input id="extraMaterialName" maxlength="80" required placeholder="Ex.: Papel higiênico"></div><div class="field"><label for="extraMaterialUnit">Unidade *</label><select id="extraMaterialUnit"><option>unidade</option><option>pacote</option><option>caixa</option><option>rolo</option><option>frasco</option><option>resma</option></select></div><div class="field"><label for="extraMinJoi">Mínimo em Joinville</label><input id="extraMinJoi" type="number" min="0" max="9999" required></div><div class="field"><label for="extraMinTub">Mínimo em Tubarão</label><input id="extraMinTub" type="number" min="0" max="9999" required></div><div class="field"><label for="extraMinIta">Mínimo em Itajaí</label><input id="extraMinIta" type="number" min="0" max="9999" required></div></div><div class="form-actions"><button class="btn btn-primary" id="extraMaterialSubmit" type="submit">Cadastrar material</button><button class="btn btn-outline" id="extraMaterialCancel" type="button">Limpar</button></div></form>
+          <div class="hr"></div><h4 class="extra-subtitle">Materiais cadastrados</h4><div id="extraMaterialList" class="extra-material-list"></div>
+        </article>
+      </div>
+      <article class="panel extra-section"><div class="panel-head"><div><h3>Histórico de entradas e retiradas</h3><p>Registros ilustrativos com loja, data, quantidade e responsável.</p></div></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Loja</th><th>Material</th><th>Operação</th><th>Qtd.</th><th>Responsável</th><th>Observação</th></tr></thead><tbody id="extraMovementsTable"></tbody></table></div></article>
+    </section>
+
+    <section class="view" id="view-checklist" aria-label="Checklist semanal">
+      <div class="page-header"><div><div class="eyebrow">EXECUÇÃO • DEMONSTRAÇÃO</div><h1>Checklist semanal</h1><p>Rotinas recorrentes e tarefas extraordinárias por loja. Somente a Milena valida o cumprimento das tarefas.</p></div><span class="mini-pill">CONTROLE SEMANAL</span></div>
+      <div class="extra-headnote"><strong>Metas de ligações:</strong> quantidade calculada automaticamente a partir dos contatos registrados em <strong>Telemarketing</strong>, por loja e semana. A Milena decide se a meta foi oficialmente concluída. Os demais itens também são validados por ela.</div>
+      <div class="extra-filters"><div class="field"><label for="extraWeekPick">Selecione uma data da semana</label><input type="date" id="extraWeekPick"></div><div class="field"><label for="extraWeekStore">Visualizar unidade</label><select id="extraWeekStore"></select></div><div class="extra-help" id="extraWeekLabel"></div></div>
+      <div class="kpi-grid extra-kpis" id="extraWeeklyKPIs"></div>
+      <article class="panel extra-section"><div class="panel-head"><div><h3>Metas comerciais — ligações</h3><p>A contagem é automática; a conclusão precisa ser validada pela Milena.</p></div><span class="soft-label">INTEGRADO AO TELEVENDAS</span></div><div id="extraWeeklyGoals" class="extra-goals"></div></article>
+      <article class="panel extra-section"><div class="panel-head"><div><h3>Tarefas da semana</h3><p>Rotinas e demandas por unidade com histórico de validação.</p></div></div><div id="extraTaskList" class="extra-task-list"></div></article>
+      <article class="panel extra-section extra-admin-only" id="extraTasksAdminPanel"><div class="panel-head"><div><h3 id="extraTaskFormTitle">Nova tarefa / atividade</h3><p>Crie demandas recorrentes ou exclusivas desta semana. Editar uma rotina gera uma nova versão e mantém o histórico anterior.</p></div><span class="soft-label">ADMINISTRADOR</span></div>
+        <form id="extraTaskForm" class="extra-form"><input id="extraTaskEdit" type="hidden"><div class="field-grid"><div class="field wide"><label for="extraTaskTitle">Tarefa *</label><input id="extraTaskTitle" maxlength="100" required placeholder="Ex.: Limpeza básica da loja"></div><div class="field wide"><label for="extraTaskDetails">Especificação / orientações</label><textarea id="extraTaskDetails" maxlength="350" rows="3" placeholder="Ex.: varrer, passar pano, limpar banheiro e tirar pó"></textarea></div><div class="field"><label for="extraTaskFrequency">Frequência</label><select id="extraTaskFrequency"><option value="weekly">Toda semana</option><option value="once">Somente na semana escolhida</option></select></div><div class="field"><label for="extraTaskDay">Dia programado</label><select id="extraTaskDay"><option value="1">Segunda-feira</option><option value="2">Terça-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sábado</option><option value="0">Domingo</option></select></div><div class="field wide"><label>Aplicar nas lojas *</label><div class="extra-checkstores"><label><input type="checkbox" id="extraTaskJoi" checked> Joinville</label><label><input type="checkbox" id="extraTaskTub" checked> Tubarão</label><label><input type="checkbox" id="extraTaskIta" checked> Itajaí</label></div></div></div><div class="form-actions"><button type="submit" class="btn btn-primary" id="extraTaskSubmit">Adicionar tarefa</button><button type="button" class="btn btn-outline" id="extraTaskCancel">Cancelar edição</button></div></form>
+      </article>
+    </section>
+
     <section class="view" id="view-procedures" aria-label="Padroes e treinamento">
       <div class="page-header"><div><div class="eyebrow">CLAREZA E CAPACITA&Ccedil;&Atilde;O</div><h1>Processos escritos. Equipe preparada.</h1><p>O vendedor precisa saber qual &eacute; o padr&atilde;o esperado, receber treinamento, praticar e ter feedback.</p></div><span class="mini-pill">EXEMPLOS DE POPS</span></div>
       <div class="training-banner"><span style="font-size:28px">&#10003;</span><div><h3>Uma assinatura n&atilde;o &eacute; a mesma coisa que aprendizado.</h3><p>O processo real deve registrar documento e vers&atilde;o, instrutor, participantes, data, ci&ecirc;ncia/assinatura e verifica&ccedil;&atilde;o pr&aacute;tica. A lista de presen&ccedil;a comprova participa&ccedil;&atilde;o, mas n&atilde;o garante aplica&ccedil;&atilde;o correta.</p></div></div>
@@ -189,7 +238,7 @@ const SELLERS = [
 ];
 const OUTCOMES = {sem_resposta:'N\u00e3o atendeu',apresentacao:'Apresenta\u00e7\u00e3o',interesse:'Demonstrou interesse',sem_interesse:'Sem interesse agora'};
 const TRAINING_STAGES = {participou:'Apresentado',pratica:'Pr\u00e1tica verificada'};
-const VIEWS = {overview:'Vis\u00e3o geral',sales:'Vendas',contacts:'Telemarketing',procedures:'Padr\u00f5es e treinamento',management:'GR gerencial'};
+const VIEWS = {overview:'Vis\u00e3o geral',sales:'Vendas',contacts:'Telemarketing',procedures:'Padr\u00f5es e treinamento',management:'GR gerencial',google:'Avaliações Google',supplies:'Materiais e insumos',checklist:'Checklist semanal'};
 const today = dayISO(new Date());
 let db;
 let currentView = 'overview';
@@ -288,13 +337,14 @@ function renderActions() {
   const actions=[...db.actions].sort((a,b)=>Number(a.done)-Number(b.done)||a.due.localeCompare(b.due));
   el('actionsList').innerHTML=actions.map(a=>'<div class="action-row"><div class="action-info"><strong>'+esc(a.what)+'</strong><small>'+esc(a.owner)+' &middot; Prazo '+shortDate(a.due)+'</small><div class="meta">'+(a.done?'Conclu\u00eddo (simulado)':'Aguardando verifica\u00e7\u00e3o')+'</div></div><div class="action-status"><span class="tag '+(a.done?'done':a.due<today?'late':'pending')+'">'+(a.done?'Feita':a.due<today?'Vencida':'Aberta')+'</span>'+(a.done?'':'<button type="button" class="btn btn-soft btn-small" data-done-action="'+esc(a.id)+'">Concluir</button>')+'</div></div>').join('')||'<div class="empty-msg">Sem a\u00e7\u00f5es registradas.</div>';
 }
-function renderAll() {renderOverview();renderSales();renderContacts();renderTraining();renderActions();}
+function renderAll() {renderOverview();renderSales();renderContacts();renderTraining();renderActions();extraRenderAll();}
 function setView(v) {
-  if(!VIEWS[v]||(!teleIsAdmin()&&v!=='contacts'))return;
+  if(!VIEWS[v]||(!teleIsAdmin()&&!['contacts','google','supplies','checklist'].includes(v)))return;
   currentView=v;
   document.querySelectorAll('.view').forEach(section=>section.classList.toggle('active',section.id==='view-'+v));
   document.querySelectorAll('[data-view]').forEach(btn=>{const active=btn.dataset.view===v;btn.classList.toggle('active',active);btn.setAttribute('aria-current',active?'page':'false');});
   el('breadcrumbCurrent').textContent=VIEWS[v];
+   if(['google','supplies','checklist'].includes(v))extraRenderAll();
   window.scrollTo({top:0,behavior:'instant'});
 }
 function toast(message) {const t=el('toast');t.textContent=message;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3200);}
@@ -324,7 +374,7 @@ function bindEvents() {
     if(remove){if(!window.confirm('Excluir esta venda fict\u00edcia do prot\u00f3tipo?'))return;db.sales=db.sales.filter(s=>s.id!==remove.dataset.deleteSale);save();renderAll();toast('Venda de demonstra\u00e7\u00e3o exclu\u00edda.');return;}
   });
   el('exportSales').addEventListener('click',()=>downloadCSV('vendas'));
-  const reset=document.createElement('button');reset.className='reset-demo';reset.type='button';reset.textContent='\u21bb Reiniciar dados fict\u00edcios';reset.addEventListener('click',()=>{if(window.confirm('Reiniciar TODOS os dados fict\u00edcios desta prova de conceito? Suas altera\u00e7\u00f5es locais ser\u00e3o apagadas.')){db=seedData();save();tele=teleSeed();teleSave();teleUI.clientId=null;teleResetCallForm();teleResetPurchaseForm();renderAll();toast('Dados fict\u00edcios reiniciados.');}});document.querySelector('.sidebar-note').append(reset);
+  const reset=document.createElement('button');reset.className='reset-demo';reset.type='button';reset.textContent='\u21bb Reiniciar dados fict\u00edcios';reset.addEventListener('click',()=>{if(window.confirm('Reiniciar TODOS os dados fict\u00edcios desta prova de conceito? Suas altera\u00e7\u00f5es locais ser\u00e3o apagadas.')){db=seedData();save();tele=teleSeed();teleSave();extra=extraSeed();extraSave();extraUI.reviewMonth=today.slice(0,7);el('extraReviewMonth').value=extraUI.reviewMonth;extraUI.weekDate=today;el('extraWeekPick').value=today;teleUI.clientId=null;teleResetCallForm();teleResetPurchaseForm();renderAll();toast('Dados fict\u00edcios reiniciados.');}});document.querySelector('.sidebar-note').append(reset);
 }
 function csvSafe(value) {let text=String(value??'');if(/^[=+@-]/.test(text.trim()))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
 function downloadCSV(kind) {
@@ -336,6 +386,8 @@ function downloadCSV(kind) {
 
 function setupAuth(){
   const form=el('loginForm'),user=el('loginUser'),pwd=el('loginPassword'),error=el('authError');
+  user.value='';pwd.value='';
+  window.addEventListener('pageshow',()=>{if(!document.body.classList.contains('is-auth')){user.value='';pwd.value='';}});
   function open(role,sellerId){
     document.body.classList.add('is-auth');teleSetRole(role,sellerId);
     if(!teleIsAdmin())setView('contacts');
@@ -356,7 +408,7 @@ function setupAuth(){
   });
   el('logoutBtn').addEventListener('click',()=>{
     try{sessionStorage.removeItem('portalUMAAuthV3');sessionStorage.removeItem('portalUMAAuth');}catch(e){}
-    document.body.classList.remove('is-auth');user.focus();
+    document.body.classList.remove('is-auth');user.value='';pwd.value='';error.textContent='';user.focus();
   });
 }
 
@@ -549,11 +601,12 @@ function teleSetRole(role,sellerId){
  const stores=teleStoresForRole();
  teleChoice('teleStoreFilter',teleIsAdmin()?[{id:'all',label:'Todas as lojas'},...STORES.map(s=>({id:s.id,label:s.name}))]:stores.map(s=>({id:s.id,label:s.name})),teleUI.store);
  teleChoice('teleNewStore',stores.map(s=>({id:s.id,label:s.name})),teleUI.store==='all'?'joi':teleUI.store);
- document.querySelectorAll('.side-nav [data-view]').forEach(b=>b.classList.toggle('hidden',!teleIsAdmin()&&b.dataset.view!=='contacts'));
+ document.querySelectorAll('.side-nav [data-view]').forEach(b=>b.classList.toggle('hidden',!teleIsAdmin()&&!['contacts','google','supplies','checklist'].includes(b.dataset.view)));
  document.querySelector('.reset-demo')?.classList.toggle('hidden',!teleIsAdmin());
  el('profileLabel').textContent=profile.label;
  if(!teleIsAdmin())setView('contacts');
  teleRender();
+ if(extra)extraRoleChanged();
 }
 function teleValidateName(store,name,erpId,idToIgnore){
  const normName=normKey(name),normErp=normKey(erpId);
@@ -840,7 +893,358 @@ async function teleReadXlsx(buffer){
  return rows;
 }
 
-function init() {load();initSelectors();teleInitUI();bindEvents();teleBindUI();renderAll();setupAuth();}
+/* Portal UMA v4 — Google, insumos e checklist. Apenas prova de conceito local. */
+const EXTRA_KEY='portal_uma_extra_v4_demo';
+let extra;
+let extraUI={reviewMonth:today.slice(0,7),reviewStore:'joi',stockStore:'all',weekStore:'all',weekDate:today,materialEdit:null,taskEdit:null};
+const EXTRA_DAYS={0:'Domingo',1:'Segunda-feira',2:'Terça-feira',3:'Quarta-feira',4:'Quinta-feira',5:'Sexta-feira',6:'Sábado'};
+const extraNewId=()=>freshId();
+function extraWeekStart(date){const d=new Date((date||today)+'T12:00:00');if(Number.isNaN(d.getTime()))return extraWeekStart(today);const off=(d.getDay()+6)%7;d.setDate(d.getDate()-off);return dayISO(d);}
+function extraWeek(){return extraWeekStart(extraUI.weekDate);}
+function extraStoreRole(){return SELLERS.find(x=>x.id===profile.sellerId)?.store||'joi';}
+function extraStores(){return teleIsAdmin()?STORES:STORES.filter(s=>s.id===extraStoreRole());}
+function extraStockSelected(){return teleIsAdmin()?extraUI.stockStore:extraStoreRole();}
+function extraWeekSelected(){return teleIsAdmin()?extraUI.weekStore:extraStoreRole();}
+function extraDateLong(v){if(!v)return '—';return new Intl.DateTimeFormat('pt-BR').format(new Date(v+'T12:00:00'));}
+function extraMonthLong(v){return new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(new Date(v+'-15T12:00:00'));}
+function extraQty(n){return integer(Number(n)||0);}
+function extraInt(v){const n=Number(v);return Number.isInteger(n)&&n>=0&&n<=9999?n:null;}
+function extraMsgBad(message){toast(message);return false;}
+function extraSeed(){
+ const thisMonth=today.slice(0,7),previous=monthBefore(thisMonth),week=extraWeekStart(today);
+ const reviews=[
+  {id:'review-j',store:'joi',month:thisMonth,count:12,checkedAt:today,deliveredAt:'',note:'Exemplo fictício; sem consulta automática'},
+  {id:'review-t',store:'tub',month:thisMonth,count:21,checkedAt:today,deliveredAt:addDays(today,-1),note:'Brinde maior entregue (exemplo)'},
+  {id:'review-i',store:'ita',month:thisMonth,count:7,checkedAt:today,deliveredAt:'',note:'Acompanhamento demonstrativo'},
+  {id:'review-jp',store:'joi',month:previous,count:18,checkedAt:previous+'-28',deliveredAt:previous+'-28',note:'Mês anterior fictício'},
+  {id:'review-tp',store:'tub',month:previous,count:8,checkedAt:previous+'-28',deliveredAt:'',note:''},
+  {id:'review-ip',store:'ita',month:previous,count:23,checkedAt:previous+'-28',deliveredAt:previous+'-28',note:'Premiação fictícia'}
+ ];
+ const definitions=[
+  ['cafe','Café','pacote',[3,2,2],[5,1,4]],
+  ['acucar','Açúcar','pacote',[2,2,2],[2,4,1]],
+  ['bobinas','Bobinas de impressora','rolo',[5,3,3],[8,2,4]],
+  ['papel','Papel higiênico','pacote',[3,3,2],[6,5,1]],
+  ['toalha','Papel-toalha','pacote',[3,2,2],[5,3,3]],
+  ['limpeza','Produto de limpeza','frasco',[2,2,2],[4,2,5]],
+  ['canetas','Canetas','unidade',[4,3,2],[8,5,4]]
+ ];
+ const materials=definitions.map(x=>({id:x[0],name:x[1],unit:x[2],min:{joi:x[3][0],tub:x[3][1],ita:x[3][2]},active:true}));
+ const stocks={joi:{},tub:{},ita:{}},moves=[];
+ for(const def of definitions){for(let i=0;i<STORES.length;i++){
+  const store=STORES[i].id,qty=def[4][i];stocks[store][def[0]]=qty;
+  moves.push({id:'opening-'+store+'-'+def[0],date:addDays(today,-7),store,materialId:def[0],kind:'entrada',qty,by:'Saldo inicial fictício',note:'Estoque demonstrativo de abertura'});
+ }}
+ const tasks=[
+  {id:'task-limpeza',title:'Limpeza básica da loja',details:'Varrer, passar pano, limpar banheiros e tirar pó.',frequency:'weekly',day:5,stores:['joi','tub','ita'],startWeek:addDays(week,-28),endWeek:'',cancelled:false},
+  {id:'task-organizacao',title:'Conferir organização do balcão',details:'Verificar disposição dos materiais e organização do atendimento.',frequency:'weekly',day:1,stores:['joi','tub','ita'],startWeek:addDays(week,-28),endWeek:'',cancelled:false}
+ ];
+ const checks={};
+ const lastWeek=addDays(week,-7);
+ for(const store of ['joi','tub','ita']){
+  checks['task-limpeza|'+store+'|'+lastWeek]={done:store!=='ita',checkedAt:addDays(today,-7),by:'Milena (exemplo)'};
+  checks['task-organizacao|'+store+'|'+lastWeek]={done:true,checkedAt:addDays(today,-7),by:'Milena (exemplo)'};
+ }
+ return {version:4,reviews,materials,stocks,moves,tasks,checks,weekGoals:{},goalChecks:{}};
+}
+function extraLoad(){
+ try{const raw=localStorage.getItem(EXTRA_KEY);if(raw){const p=JSON.parse(raw);if(p&&p.version===4&&Array.isArray(p.reviews)&&Array.isArray(p.materials)&&Array.isArray(p.tasks)&&p.stocks&&Array.isArray(p.moves)&&p.checks&&p.weekGoals&&p.goalChecks){extra=p;return;}}}catch(err){console.warn('Falha ao ler módulos extras:',err);}
+ extra=extraSeed();extraSave();
+}
+function extraSave(){try{localStorage.setItem(EXTRA_KEY,JSON.stringify(extra));return true;}catch(e){console.warn('Erro ao salvar módulos extras:',e);toast('Armazenamento local indisponível ou cheio.');return false;}}
+function extraRoleChanged(){
+ for(const id of ['extraReviewsAdminPanel','extraMaterialPanel','extraTasksAdminPanel'])el(id).classList.toggle('hidden',!teleIsAdmin());
+ const active=teleIsAdmin()?'all':extraStoreRole();
+ extraUI.stockStore=active;extraUI.weekStore=active;extraUI.reviewStore=teleIsAdmin()?'joi':active;
+ extraSelectStore('extraStockStore',true,extraUI.stockStore);
+ extraSelectStore('extraWeekStore',true,extraUI.weekStore);
+ extraSelectStore('extraMoveStore',false,teleIsAdmin()?'joi':active);
+ extraSelectStore('extraReviewStore',false,extraUI.reviewStore);
+ el('extraMoveKind').value=teleIsAdmin()?'entrada':'retirada';
+ el('extraMoveKind').replaceChildren();
+ el('extraMoveKind').append(makeOption('retirada','Retirada / consumo'));
+ if(teleIsAdmin())el('extraMoveKind').append(makeOption('entrada','Entrada / reposição'));
+ el('extraMoveKind').value=teleIsAdmin()?'entrada':'retirada';
+ el('extraMoveBy').value=teleIsAdmin()?'Milena / Admin (demonstração)':sellerName(profile.sellerId);
+ extraRenderAll();
+}
+function extraSelectStore(id,allowAll,selected){
+ const select=el(id);select.replaceChildren();if(allowAll&&teleIsAdmin())select.append(makeOption('all','Todas as lojas'));
+ extraStores().forEach(s=>select.append(makeOption(s.id,s.name)));
+ if([...select.options].some(o=>o.value===selected))select.value=selected;
+}
+function extraKPICard(label,value,note){return '<article class="kpi"><div class="kpi-top"><div class="kpi-label">'+esc(label)+'</div><div class="kpi-icon">•</div></div><div class="kpi-value">'+esc(String(value))+'</div><div class="kpi-note">'+esc(note)+'</div></article>';}
+function extraPremio(count){return count>=20?{tier:20,label:'Brinde maior',detail:'1 brinde maior por vendedor'}:count>=10?{tier:10,label:'Brinde simbólico',detail:'1 brinde simbólico por vendedor'}:{tier:0,label:'Aguardando meta',detail:'Nenhum brinde previsto'};}
+
+/* Avaliações Google: preenchimento mensal manual, por unidade. */
+function extraReviewGet(month,store){return extra.reviews.find(r=>r.month===month&&r.store===store)||null;}
+function extraReviewsSync(){
+ const r=extraReviewGet(extraUI.reviewMonth,extraUI.reviewStore);
+ el('extraReviewCount').value=r?r.count:0;
+ el('extraReviewChecked').value=r?.checkedAt||today;
+ el('extraReviewDelivered').value=r?.deliveredAt||'';
+ el('extraReviewNote').value=r?.note||'';
+}
+function extraReviewsRender(){
+ const month=extraUI.reviewMonth;
+ const stores=extraStores();
+ const rows=stores.map(s=>({store:s,record:extraReviewGet(month,s.id)}));
+ const achieved10=rows.filter(r=>(r.record?.count||0)>=10).length;
+ const achieved20=rows.filter(r=>(r.record?.count||0)>=20).length;
+ const pending=rows.filter(r=>(r.record?.count||0)>=10&&!r.record?.deliveredAt).length;
+ const total=rows.reduce((n,r)=>n+(r.record?.count||0),0);
+ el('extraReviewsKPIs').innerHTML=[
+  extraKPICard('Avaliações no mês',extraQty(total),'Somente lojas visíveis'),
+  extraKPICard('Lojas com 10+',extraQty(achieved10),'Meta de brinde atingida'),
+  extraKPICard('Lojas com 20+',extraQty(achieved20),'Faixa de brinde maior'),
+  extraKPICard('Entregas pendentes',extraQty(pending),'Lojas com brinde a entregar')
+ ].join('');
+ el('extraReviewsCards').innerHTML=rows.map(({store,record})=>{
+  const count=record?.count||0,award=extraPremio(count);
+  const sellers=SELLERS.filter(s=>s.store===store.id).length;
+  const status=award.tier?(record?.deliveredAt?'<span class="extra-status ok">✓ Premiação entregue</span>':'<span class="extra-status warn">• Aguardando entrega</span>'):'<span class="extra-status muted">• Meta não atingida</span>';
+  return '<div class="extra-storecard"><h3>'+esc(store.name)+'</h3><p>'+esc(extraMonthLong(month))+'</p><div class="extra-count">'+extraQty(count)+' <small>avaliações</small></div><div class="extra-meter"><span style="width:'+Math.min(100,(count/20)*100)+'%"></span></div><div class="extra-details"><b>'+esc(award.label)+'</b> · '+esc(award.detail)+'<br>'+extraQty(sellers)+' vendedor(es) demonstrativo(s)</div><div style="margin-top:12px">'+status+'</div><div class="extra-details">'+(record?'Conferido em '+esc(extraDateLong(record.checkedAt)):(teleIsAdmin()?'Aguardando lançamento da Milena':'Ainda sem registro neste mês'))+(record?.deliveredAt?' · Entregue em '+esc(extraDateLong(record.deliveredAt)):'')+'</div></div>';
+ }).join('');
+ const history=extra.reviews.filter(r=>stores.some(s=>s.id===r.store)).sort((a,b)=>b.month.localeCompare(a.month)||a.store.localeCompare(b.store));
+ el('extraReviewsHistory').innerHTML=history.slice(0,36).map(r=>{
+  const premio=extraPremio(r.count);return '<tr><td>'+esc(extraMonthLong(r.month))+'</td><td>'+esc(storeName(r.store))+'</td><td>'+extraQty(r.count)+'</td><td>'+esc(premio.label)+'</td><td>'+(premio.tier?(r.deliveredAt?'<span class="extra-status ok">'+esc(extraDateLong(r.deliveredAt))+'</span>':'<span class="extra-status warn">Pendente</span>'):'—')+'</td></tr>';
+ }).join('')||'<tr><td colspan="5">Sem registros neste período.</td></tr>';
+ if(teleIsAdmin())extraReviewsSync();
+}
+function extraReviewSubmit(e){
+ e.preventDefault();if(!teleIsAdmin())return extraMsgBad('Somente Milena pode lançar as avaliações.');
+ const store=el('extraReviewStore').value,month=extraUI.reviewMonth,count=extraInt(el('extraReviewCount').value);
+ const checkedAt=el('extraReviewChecked').value,deliveredAt=el('extraReviewDelivered').value;
+ if(!STORES.some(s=>s.id===store)||count===null||!/^\d{4}-\d{2}$/.test(month)||month>today.slice(0,7))return extraMsgBad('Confira loja, mês e quantidade.');
+ if(!checkedAt||checkedAt>today||checkedAt.slice(0,7)<month)return extraMsgBad('A data da conferência precisa ser válida e não pode ser futura.');
+ if(deliveredAt&&(deliveredAt>today||count<10))return extraMsgBad('Somente metas atingidas podem ter entrega registrada, em data não futura.');
+ const previous=extraReviewGet(month,store);
+ const oldTier=extraPremio(previous?.count||0).tier,newTier=extraPremio(count).tier;
+ if(previous&&oldTier!==newTier&&previous.deliveredAt&&deliveredAt===previous.deliveredAt){return extraMsgBad('A faixa de brinde mudou. Limpe ou atualize a data de entrega após conferir a premiação.');}
+ const item={id:previous?.id||extraNewId(),store,month,count,checkedAt,deliveredAt,note:el('extraReviewNote').value.trim()};
+ if(previous)Object.assign(previous,item);else extra.reviews.push(item);
+ if(extraSave()){extraReviewsRender();toast('Avaliações da loja registradas.');}
+}
+
+/* Materiais e insumos: saldos independentes por unidade; sem transferências. */
+function extraMaterial(id){return extra.materials.find(m=>m.id===id)||null;}
+function extraBalance(store,materialId){return Number(extra.stocks[store]?.[materialId])||0;}
+function extraStockRender(){
+ const stores=STORES.filter(s=>extraStockSelected()==='all'||s.id===extraStockSelected());
+ const materials=extra.materials.filter(m=>m.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+ const lines=stores.flatMap(s=>materials.map(m=>({store:s.id,material:m,balance:extraBalance(s.id,m.id),min:Number(m.min?.[s.id]||0)})));
+ const low=lines.filter(r=>r.balance<=r.min),zero=lines.filter(r=>r.balance===0);
+ el('extraStockKPIs').innerHTML=[
+  extraKPICard('Materiais no catálogo',extraQty(materials.length),'Itens ativos de consumo'),
+  extraKPICard('Posições monitoradas',extraQty(lines.length),'Materiais × lojas filtradas'),
+  extraKPICard('Em estoque baixo',extraQty(low.length),'Saldo igual ou abaixo do mínimo'),
+  extraKPICard('Sem estoque',extraQty(zero.length),'Itens com saldo zerado')
+ ].join('');
+ el('extraStockTable').innerHTML=lines.map(r=>'<tr><td>'+esc(storeName(r.store))+'</td><td><strong>'+esc(r.material.name)+'</strong><div class="extra-muted">'+esc(r.material.unit)+'</div></td><td><strong>'+extraQty(r.balance)+'</strong></td><td>'+extraQty(r.min)+'</td><td><span class="extra-status '+(r.balance===0?'bad':r.balance<=r.min?'warn':'ok')+'">'+(r.balance===0?'Sem estoque':r.balance<=r.min?'Repor':'Adequado')+'</span></td></tr>').join('')||'<tr><td colspan="5">Nenhum material cadastrado.</td></tr>';
+ el('extraStockSubtitle').textContent=low.length?'Atenção: '+low.length+' posição(ões) precisam de reposição.':'Todos os itens filtrados estão acima do mínimo.';
+ // Seletores do formulário preservam escolha atual sem permitir lojas fora da permissão demonstrativa.
+ extraSelectStore('extraMoveStore',false,el('extraMoveStore').value||extraStoreRole());
+ const movMat=el('extraMoveMaterial'),previous=movMat.value;movMat.replaceChildren();
+ materials.forEach(m=>movMat.append(makeOption(m.id,m.name+' ('+m.unit+')')));
+ if(materials.some(m=>m.id===previous))movMat.value=previous;
+ const moves=extra.moves.filter(m=>stores.some(s=>s.id===m.store)).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)).slice(0,55);
+ el('extraMovementsTable').innerHTML=moves.map(m=>{const material=extraMaterial(m.materialId);return '<tr><td>'+esc(extraDateLong(m.date))+'</td><td>'+esc(storeName(m.store))+'</td><td>'+esc(material?.name||'(material arquivado)')+'</td><td><span class="extra-status '+(m.kind==='entrada'?'ok':'warn')+'">'+esc(m.kind==='entrada'?'Entrada':'Retirada')+'</span></td><td>'+extraQty(m.qty)+' '+esc(material?.unit||'')+'</td><td>'+esc(m.by)+'</td><td>'+esc(m.note||'—')+'</td></tr>';}).join('')||'<tr><td colspan="7">Nenhuma movimentação encontrada.</td></tr>';
+ const catalog=el('extraMaterialList');
+ catalog.innerHTML=extra.materials.filter(m=>m.active).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(m=>'<div class="extra-material-row"><div><strong>'+esc(m.name)+'</strong><small>'+esc(m.unit)+' · Mínimos: Joi '+extraQty(m.min.joi)+' / Tub '+extraQty(m.min.tub)+' / Ita '+extraQty(m.min.ita)+'</small></div><div class="extra-itemactions"><button type="button" data-extra-material-edit="'+esc(m.id)+'">Editar</button><button type="button" data-extra-material-archive="'+esc(m.id)+'">Arquivar</button></div></div>').join('')||'<div class="extra-empty">Sem materiais ativos.</div>';
+}
+function extraMovementSubmit(e){
+ e.preventDefault();const kind=el('extraMoveKind').value,store=el('extraMoveStore').value,materialId=el('extraMoveMaterial').value,qty=extraInt(el('extraMoveQty').value);
+ const material=extraMaterial(materialId);
+ if(!material?.active||qty===null||qty===0||!STORES.some(s=>s.id===store))return extraMsgBad('Selecione um material, loja e quantidade válida.');
+ if(!teleIsAdmin()&&(kind!=='retirada'||store!==extraStoreRole()))return extraMsgBad('Funcionários podem retirar materiais somente da própria loja.');
+ if(!['entrada','retirada'].includes(kind)||(!teleIsAdmin()&&kind==='entrada'))return extraMsgBad('A entrada de materiais é exclusiva da Milena.');
+ const current=extraBalance(store,materialId);
+ if(kind==='retirada'&&qty>current)return extraMsgBad('Retirada acima do saldo disponível ('+current+' '+material.unit+').');
+ const newBalance=current+(kind==='entrada'?qty:-qty);
+ extra.stocks[store][materialId]=newBalance;
+ extra.moves.push({id:extraNewId(),date:today,store,materialId,kind,qty,by:teleIsAdmin()?'Milena / Admin (demo)':sellerName(profile.sellerId),note:el('extraMoveNote').value.trim()});
+ if(extraSave()){
+  el('extraMoveQty').value='';el('extraMoveNote').value='';extraStockRender();toast((kind==='entrada'?'Entrada':'Retirada')+' registrada. Novo saldo: '+newBalance+'.');
+ }
+}
+function extraMaterialReset(){
+ el('extraMaterialEdit').value='';el('extraMaterialName').value='';el('extraMaterialUnit').value='unidade';
+ for(const id of ['extraMinJoi','extraMinTub','extraMinIta'])el(id).value='0';
+ el('extraMaterialSubmit').textContent='Cadastrar material';
+}
+function extraMaterialEdit(id){
+ if(!teleIsAdmin())return;const m=extraMaterial(id);if(!m)return;
+ el('extraMaterialEdit').value=id;el('extraMaterialName').value=m.name;el('extraMaterialUnit').value=m.unit;
+ el('extraMinJoi').value=m.min.joi;el('extraMinTub').value=m.min.tub;el('extraMinIta').value=m.min.ita;
+ el('extraMaterialSubmit').textContent='Salvar material';
+ el('extraMaterialPanel').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function extraMaterialSubmit(e){
+ e.preventDefault();if(!teleIsAdmin())return extraMsgBad('Somente Milena cadastra materiais.');
+ const name=el('extraMaterialName').value.trim(),unit=el('extraMaterialUnit').value;
+ const values=['extraMinJoi','extraMinTub','extraMinIta'].map(id=>extraInt(el(id).value));
+ if(name.length<2||values.some(v=>v===null))return extraMsgBad('Verifique nome e estoque mínimo (número inteiro de 0 a 9999).');
+ const id=el('extraMaterialEdit').value;
+ if(extra.materials.some(m=>m.active&&m.id!==id&&normKey(m.name)===normKey(name)))return extraMsgBad('Já existe material ativo com esse nome.');
+ const min={joi:values[0],tub:values[1],ita:values[2]};
+ if(id){const current=extraMaterial(id);if(!current)return;Object.assign(current,{name,unit,min});}
+ else{const key=extraNewId();extra.materials.push({id:key,name,unit,min,active:true});for(const s of STORES)extra.stocks[s.id][key]=0;}
+ if(extraSave()){extraMaterialReset();extraStockRender();toast(id?'Material atualizado.':'Material cadastrado. Registre entradas para abastecer as lojas.');}
+}
+function extraMaterialArchive(id){
+ if(!teleIsAdmin())return;const m=extraMaterial(id);if(!m||!m.active)return;
+ if(STORES.some(s=>extraBalance(s.id,id)>0))return extraMsgBad('Para arquivar, os saldos das três lojas precisam estar zerados.');
+ if(!window.confirm('Arquivar o material '+m.name+'? O histórico de movimentação será preservado.'))return;
+ m.active=false;extraSave();extraStockRender();toast('Material arquivado. Histórico mantido.');
+}
+
+/* Checklist: versões das rotinas preservam semanas passadas; validação somente Milena. */
+function extraTaskRelevant(t,store,week){
+ return !t.cancelled&&t.stores.includes(store)&&t.startWeek<=week&&(!t.endWeek||week<=t.endWeek)&&(t.frequency==='weekly'||t.startWeek===week);
+}
+function extraTaskStatus(t,store,week){return extra.checks[t.id+'|'+store+'|'+week]||null;}
+function extraGoalKey(store,week){return store+'|'+week;}
+function extraTarget(store,week){const entry=extra.weekGoals[extraGoalKey(store,week)];return Number.isInteger(entry)&&entry>=1?entry:({joi:20,tub:12,ita:10}[store]||10);}
+function extraCallsWeek(store,week){const end=addDays(week,6);return tele.calls.filter(c=>c.date>=week&&c.date<=end&&(c.store||teleStoreForClient(c.clientId))===store);}
+function extraWeekRender(){
+ const week=extraWeek(),weekEnd=addDays(week,6),stores=STORES.filter(s=>extraWeekSelected()==='all'||s.id===extraWeekSelected());
+ el('extraWeekLabel').textContent='Semana: '+extraDateLong(week)+' até '+extraDateLong(weekEnd);
+ let totalTasks=0,completed=0,calls=0,goalsValidated=0;
+ const entries=[];
+ for(const s of stores){
+  const c=extraCallsWeek(s.id,week);calls+=c.length;
+  if(extra.goalChecks[extraGoalKey(s.id,week)]?.done)goalsValidated++;
+  for(const task of extra.tasks.filter(t=>extraTaskRelevant(t,s.id,week))){
+   totalTasks++;
+   if(extraTaskStatus(task,s.id,week)?.done)completed++;
+   entries.push({task,store:s.id,week});
+  }
+ }
+ el('extraWeeklyKPIs').innerHTML=[
+  extraKPICard('Tarefas previstas',extraQty(totalTasks),'Lojas selecionadas'),
+  extraKPICard('Tarefas validadas',extraQty(completed),'Concluídas pela Milena'),
+  extraKPICard('Ligações registradas',extraQty(calls),'Contagem real dos registros fictícios'),
+  extraKPICard('Metas validadas',extraQty(goalsValidated)+' / '+stores.length,'Validação administrativa')
+ ].join('');
+ const future=week>extraWeekStart(today);
+ el('extraWeeklyGoals').innerHTML=stores.map(s=>{
+  const relevant=extraCallsWeek(s.id,week),target=extraTarget(s.id,week),mark=extra.goalChecks[extraGoalKey(s.id,week)];
+  const reached=relevant.length>=target,percent=Math.min(100,relevant.length/target*100);
+  const bySeller=SELLERS.filter(p=>p.store===s.id).map(p=>sellerName(p.id)+': '+relevant.filter(c=>c.seller===p.id).length).join(' · ');
+  return '<div class="extra-goal"><h4>'+esc(s.name)+'</h4><div><strong>'+extraQty(relevant.length)+' / '+extraQty(target)+'</strong> <small>ligações na semana</small></div><div class="extra-meter"><span style="width:'+percent+'%"></span></div><span class="extra-status '+(reached?'ok':'warn')+'">'+(reached?'✓ Meta numérica atingida':'• Abaixo da meta')+'</span><p>'+esc(bySeller||'Sem vendedores cadastrados')+'</p><div class="extra-goal-actions">'+(teleIsAdmin()?'<label>Meta da semana<input type="number" min="1" max="9999" step="1" data-extra-target-input="'+esc(s.id)+'" value="'+target+'"></label><div class="extra-itemactions"><button type="button" data-extra-target-save="'+esc(s.id)+'">Salvar meta</button><button type="button" data-extra-goal-toggle="'+esc(s.id)+'" '+(future?'disabled title="Semana futura"':'')+'>'+(mark?.done?'Reabrir':'Validar')+'</button></div>':'')+'</div><p>Validação: <b>'+((mark?.done)?'Concluída em '+esc(extraDateLong(mark.checkedAt)):'Pendente da Milena')+'</b></p></div>';
+ }).join('');
+ entries.sort((a,b)=>a.store.localeCompare(b.store)||a.task.day-b.task.day||a.task.title.localeCompare(b.task.title,'pt-BR'));
+ el('extraTaskList').innerHTML=entries.map(({task:t,store})=>{
+  const mark=extraTaskStatus(t,store,week),checked=!!mark?.done;
+  return '<div class="extra-task-row"><div class="extra-task-main"><div class="extra-task-meta"><small>'+esc(storeName(store))+' · '+esc(EXTRA_DAYS[t.day]||'')+'</small><span class="extra-status '+(checked?'ok':'warn')+'">'+(checked?'✓ Concluída':'• Pendente')+'</span><span class="extra-status muted">'+(t.frequency==='weekly'?'Semanal':'Extra')+'</span></div><strong>'+esc(t.title)+'</strong>'+(t.details?'<p>'+esc(t.details)+'</p>':'')+(checked?'<p>Validada em '+esc(extraDateLong(mark.checkedAt))+' por Milena (demonstração)</p>':'')+'</div>'+(teleIsAdmin()?'<div class="extra-itemactions"><button type="button" data-extra-task-toggle="'+esc(t.id)+'" data-extra-task-store="'+esc(store)+'" '+(future?'disabled title="Semana futura"':'')+'>'+(checked?'Reabrir':'Concluir')+'</button><button type="button" data-extra-task-edit="'+esc(t.id)+'">Editar</button><button type="button" data-extra-task-archive="'+esc(t.id)+'">Excluir futura</button></div>':'')+'</div>';
+ }).join('')||'<div class="extra-empty">Nenhuma tarefa cadastrada para as lojas nesta semana.</div>';
+}
+function extraTaskReset(){
+ el('extraTaskEdit').value='';el('extraTaskTitle').value='';el('extraTaskDetails').value='';el('extraTaskFrequency').value='weekly';el('extraTaskDay').value='5';
+ for(const id of ['extraTaskJoi','extraTaskTub','extraTaskIta'])el(id).checked=true;
+ el('extraTaskSubmit').textContent='Adicionar tarefa';el('extraTaskFormTitle').textContent='Nova tarefa / atividade';
+}
+function extraTaskEdit(id){
+ if(!teleIsAdmin())return;
+ const t=extra.tasks.find(x=>x.id===id);if(!t)return;
+ el('extraTaskEdit').value=id;el('extraTaskTitle').value=t.title;el('extraTaskDetails').value=t.details;el('extraTaskFrequency').value=t.frequency;el('extraTaskDay').value=String(t.day);
+ for(const s of STORES)el('extraTask'+({joi:'Joi',tub:'Tub',ita:'Ita'}[s.id])).checked=t.stores.includes(s.id);
+ el('extraTaskSubmit').textContent='Salvar alterações';el('extraTaskFormTitle').textContent='Editar tarefa / versão semanal';
+ el('extraTasksAdminPanel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function extraTaskSubmit(e){
+ e.preventDefault();if(!teleIsAdmin())return extraMsgBad('Somente Milena pode cadastrar e validar tarefas.');
+ const title=el('extraTaskTitle').value.trim(),details=el('extraTaskDetails').value.trim(),frequency=el('extraTaskFrequency').value,day=Number(el('extraTaskDay').value),week=extraWeek();
+ const stores=STORES.filter(s=>el('extraTask'+({joi:'Joi',tub:'Tub',ita:'Ita'}[s.id])).checked).map(s=>s.id);
+ if(title.length<3||!stores.length||!['weekly','once'].includes(frequency)||!Number.isInteger(day)||day<0||day>6)return extraMsgBad('Informe tarefa, frequência, dia e pelo menos uma loja.');
+ const id=el('extraTaskEdit').value,current=extra.tasks.find(t=>t.id===id);
+ if(current){
+  if(current.frequency==='weekly'){
+   // Nova versão a partir desta semana. Não apaga as conclusões das semanas anteriores.
+   if(week<current.startWeek)return extraMsgBad('Escolha uma semana igual ou posterior ao início desta rotina.');
+   current.endWeek=addDays(week,-7);if(current.endWeek<current.startWeek)current.cancelled=true;
+   extra.tasks.push({id:extraNewId(),title,details,frequency,day,stores,startWeek:week,endWeek:'',cancelled:false});
+  }else{Object.assign(current,{title,details,frequency,day,stores,startWeek:week,endWeek:'',cancelled:false});}
+ }else extra.tasks.push({id:extraNewId(),title,details,frequency,day,stores,startWeek:week,endWeek:'',cancelled:false});
+ if(extraSave()){extraTaskReset();extraWeekRender();toast(current?'Tarefa atualizada, preservando o histórico das versões anteriores.':'Tarefa cadastrada para a semana escolhida.');}
+}
+function extraTaskToggle(taskId,store){
+ if(!teleIsAdmin())return;const week=extraWeek(),t=extra.tasks.find(x=>x.id===taskId);
+ if(!t||!extraTaskRelevant(t,store,week)||week>extraWeekStart(today))return extraMsgBad('Não é possível validar esta tarefa neste período.');
+ const key=taskId+'|'+store+'|'+week,existing=extra.checks[key];
+ extra.checks[key]={done:!existing?.done,checkedAt:today,by:'Milena / Admin (demonstração)'};
+ if(extraSave()){extraWeekRender();toast('Situação da tarefa atualizada para '+storeName(store)+'.');}
+}
+function extraTaskArchive(id){
+ if(!teleIsAdmin())return;const t=extra.tasks.find(x=>x.id===id);if(!t)return;
+ if(!window.confirm('Excluir futuras ocorrências de "'+t.title+'"? As semanas anteriores ficam no histórico.'))return;
+ const week=extraWeek();
+ if(t.frequency==='weekly'){
+  if(week<=t.startWeek)t.cancelled=true;
+  else if(!t.endWeek||addDays(week,-7)<t.endWeek)t.endWeek=addDays(week,-7);
+ }else t.cancelled=true;
+ if(extraSave()){extraTaskReset();extraWeekRender();toast('Tarefa retirada da programação futura.');}
+}
+function extraGoalSave(store){
+ if(!teleIsAdmin()||!STORES.some(s=>s.id===store))return;
+ const field=document.querySelector('[data-extra-target-input="'+store+'"]');const target=extraInt(field?.value);
+ if(target===null||target===0)return extraMsgBad('A meta semanal precisa ser um inteiro maior que zero.');
+ extra.weekGoals[extraGoalKey(store,extraWeek())]=target;
+ if(extraSave()){extraWeekRender();toast('Meta de '+storeName(store)+' nesta semana atualizada.');}
+}
+function extraGoalToggle(store){
+ if(!teleIsAdmin()||extraWeek()>extraWeekStart(today))return;
+ const key=extraGoalKey(store,extraWeek()),prev=extra.goalChecks[key];
+ const achieved=extraCallsWeek(store,extraWeek()).length>=extraTarget(store,extraWeek());
+ if(!prev?.done&&!achieved){if(!window.confirm('A quantidade de ligações está abaixo da meta. Validar mesmo assim?'))return;}
+ extra.goalChecks[key]={done:!prev?.done,checkedAt:today,by:'Milena / Admin (demonstração)'};
+ if(extraSave()){extraWeekRender();toast('Validação da meta semanal alterada.');}
+}
+
+function extraRenderAll(){
+ if(!extra)return;
+ extraReviewsRender();extraStockRender();extraWeekRender();
+}
+function extraInitUI(){
+ extraLoad();
+ el('extraReviewMonth').value=extraUI.reviewMonth;el('extraReviewMonth').max=today.slice(0,7);
+ el('extraReviewChecked').max=today;el('extraReviewDelivered').max=today;
+ el('extraWeekPick').value=extraUI.weekDate;
+ extraMaterialReset();extraTaskReset();
+ extraRoleChanged();
+ el('extraReviewMonth').addEventListener('change',e=>{
+  const value=e.target.value;if(!value||value>today.slice(0,7)){e.target.value=extraUI.reviewMonth;toast('Selecione um mês atual ou anterior.');return;}
+  extraUI.reviewMonth=value;extraReviewsRender();
+ });
+ el('extraReviewStore').addEventListener('change',e=>{extraUI.reviewStore=e.target.value;extraReviewsSync();});
+ el('extraReviewForm').addEventListener('submit',extraReviewSubmit);
+ el('extraStockStore').addEventListener('change',e=>{extraUI.stockStore=teleIsAdmin()?e.target.value:extraStoreRole();extraStockRender();});
+ el('extraMoveForm').addEventListener('submit',extraMovementSubmit);
+ el('extraMaterialForm').addEventListener('submit',extraMaterialSubmit);
+ el('extraMaterialCancel').addEventListener('click',extraMaterialReset);
+ el('extraMaterialList').addEventListener('click',e=>{
+  const edit=e.target.closest('[data-extra-material-edit]'),archive=e.target.closest('[data-extra-material-archive]');
+  if(edit)extraMaterialEdit(edit.dataset.extraMaterialEdit);
+  if(archive)extraMaterialArchive(archive.dataset.extraMaterialArchive);
+ });
+ el('extraWeekPick').addEventListener('change',e=>{if(!e.target.value)return;extraUI.weekDate=e.target.value;extraTaskReset();extraWeekRender();});
+ el('extraWeekStore').addEventListener('change',e=>{extraUI.weekStore=teleIsAdmin()?e.target.value:extraStoreRole();extraWeekRender();});
+ el('extraTaskForm').addEventListener('submit',extraTaskSubmit);
+ el('extraTaskCancel').addEventListener('click',extraTaskReset);
+ el('extraTaskList').addEventListener('click',e=>{
+  const toggle=e.target.closest('[data-extra-task-toggle]'),edit=e.target.closest('[data-extra-task-edit]'),archive=e.target.closest('[data-extra-task-archive]');
+  if(toggle)extraTaskToggle(toggle.dataset.extraTaskToggle,toggle.dataset.extraTaskStore);
+  if(edit)extraTaskEdit(edit.dataset.extraTaskEdit);
+  if(archive)extraTaskArchive(archive.dataset.extraTaskArchive);
+ });
+ el('extraWeeklyGoals').addEventListener('click',e=>{
+  const save=e.target.closest('[data-extra-target-save]'),toggle=e.target.closest('[data-extra-goal-toggle]');
+  if(save)extraGoalSave(save.dataset.extraTargetSave);
+  if(toggle)extraGoalToggle(toggle.dataset.extraGoalToggle);
+ });
+}
+
+function init() {load();initSelectors();teleInitUI();extraInitUI();bindEvents();teleBindUI();renderAll();setupAuth();}
 init();
 })();
 </script>
@@ -903,6 +1307,90 @@ body:not(.is-auth) .shell{display:none} body.is-auth .auth-overlay{display:none}
 @media(max-width:650px){.sidebar .brand-logo-image{width:80px;height:43px}.sidebar .brand{min-width:165px}}
 .auth-seller-demo{display:block;font-size:11px;color:#e0dbbc;margin-top:4px}.auth-form .auth-seller-demo{font-weight:400}.auth-demo-box strong{line-height:1.4}
 @media(max-width:1050px){.profile-chip{display:none}}
+
+</style>
+<style>
+/* Portal UMA v4 | módulos de gestão demonstrativos */
+.extra-headnote{background:#fff9df;border:1px solid #f1de91;border-left:4px solid #e1bb04;border-radius:12px;color:#645623;padding:14px 18px;margin-bottom:20px;font-size:12px;line-height:1.65}
+.extra-headnote strong{color:#302904}
+.extra-filters{display:flex;align-items:end;flex-wrap:wrap;gap:14px;margin-bottom:19px}
+.extra-filters .field{min-width:200px;max-width:265px;flex:1}
+.extra-filters input,.extra-filters select{height:42px;border:1px solid #d9ce9a;border-radius:10px;background:#fff;color:#282516;padding:0 10px;width:100%}
+.extra-help{font-size:12px;color:#72663c;flex:2;min-width:230px;padding-bottom:6px}
+.extra-kpis .kpi{border-top:3px solid #e9c800;padding:15px 18px}
+.extra-kpis .kpi-top{margin-bottom:10px}
+.extra-two{display:grid;grid-template-columns:1fr 1.15fr;gap:18px;align-items:start}
+.extra-section{margin-bottom:19px}
+.extra-two.extra-section{margin-bottom:19px}
+.extra-two .panel{height:100%}
+.extra-storecards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.extra-storecard{background:#fff;border:1px solid #e9e2bc;border-radius:16px;box-shadow:var(--shadow);padding:20px;min-width:0}
+.extra-storecard h3{font-size:16px;margin:0}.extra-storecard p{color:#746f62;margin:4px 0 13px;font-size:11px}
+.extra-count{font-size:33px;line-height:1;font-weight:850;color:#191919;letter-spacing:-1px}
+.extra-count small{font-size:12px;font-weight:650;color:#777367;letter-spacing:0}
+.extra-meter{height:9px;border-radius:99px;background:#f3eed3;margin:13px 0 9px;overflow:hidden}
+.extra-meter>span{display:block;height:100%;background:linear-gradient(90deg,#d6b500,#ffd900);border-radius:99px;max-width:100%}
+.extra-status{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;font-size:10px;font-weight:800;border-radius:100px;background:#eee;color:#555}
+.extra-status.ok{background:#e5f4e9;color:#146235}.extra-status.warn{background:#fff1bd;color:#68540b}.extra-status.bad{background:#ffe9e6;color:#94423c}.extra-status.muted{background:#edf0f0;color:#66706b}
+.extra-details{margin-top:11px;font-size:11px;color:#6f6a5d;line-height:1.6}
+.extra-form .field-grid{gap:13px}.extra-form .field label{font-size:11px;color:#635c46;font-weight:780}
+.extra-form .field textarea,.extra-form .field input,.extra-form .field select{border-color:#dcd5b2;background:#fff}
+.extra-tip{background:#fffbeb;border:1px solid #eee6ba;border-radius:10px;color:#756c43;padding:9px 12px;font-size:11px;margin:12px 0 0}
+.extra-subtitle{font-size:13px;margin:0 0 10px}
+.extra-material-list{display:grid;gap:8px;max-height:265px;overflow:auto}
+.extra-material-row{padding:9px 10px;border:1px solid #eee6c9;border-radius:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.extra-material-row strong{font-size:12px}.extra-material-row small{font-size:10px;display:block;color:#80786b;margin-top:2px}
+.extra-itemactions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.extra-itemactions button{border:1px solid #dacc8a;background:#fff7d0;border-radius:8px;color:#4d4000;padding:6px 10px;font-weight:800;font-size:10px}
+.extra-itemactions button:hover{background:#ffe99c}
+.extra-itemactions button:disabled{opacity:.45;cursor:not-allowed}
+.extra-empty{padding:18px;background:#fffdf7;border:1px dashed #e6dab3;border-radius:11px;color:#81765b;font-size:12px;text-align:center}
+.extra-goals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.extra-goal{border:1px solid #e8e0ba;border-radius:13px;padding:16px;background:#fffdf7;min-width:0}
+.extra-goal h4{font-size:14px;margin:0 0 8px}.extra-goal strong{font-size:22px;color:#28240c}
+.extra-goal small{font-size:11px;color:#7d7156}
+.extra-goal p{font-size:11px;color:#746943;margin:9px 0}
+.extra-goal-actions{display:flex;gap:6px;align-items:end;justify-content:space-between;flex-wrap:wrap;margin-top:13px}
+.extra-goal-actions label{font-size:10px;color:#766c56;font-weight:760}
+.extra-goal-actions input{display:block;width:105px;padding:6px 7px;border-radius:8px;border:1px solid #d8cda2;margin-top:3px;max-width:100%}
+.extra-task-list{display:grid;gap:12px}
+.extra-task-row{display:flex;justify-content:space-between;align-items:center;gap:13px;background:#fffefa;border:1px solid #ebe5ce;border-radius:13px;padding:15px 17px}
+.extra-task-main{flex:1;min-width:0}
+.extra-task-main strong{font-size:13px}.extra-task-main p{font-size:11px;white-space:pre-line;line-height:1.55;color:#726f66;margin:5px 0 0}
+.extra-task-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:5px}
+.extra-task-meta small{font-size:10px;color:#84755a;font-weight:750}
+.extra-checkstores{display:flex;gap:17px;flex-wrap:wrap;align-items:center;border:1px solid #e4d8b0;border-radius:10px;background:#fffdf5;padding:10px 12px}
+.extra-checkstores label{display:flex;align-items:center;gap:7px;color:#433e2c;font-size:12px}
+.extra-checkstores input{width:auto!important;height:auto!important;accent-color:#c7a200}
+.extra-muted{font-size:11px;color:#887f70}
+@media(max-width:1250px){.extra-storecards,.extra-goals{grid-template-columns:repeat(2,minmax(0,1fr))}.extra-two{grid-template-columns:1fr}}
+@media(max-width:740px){.extra-storecards,.extra-goals{grid-template-columns:1fr}.extra-filters .field{max-width:none}.extra-task-row{flex-direction:column;align-items:flex-start}.extra-itemactions{width:100%}.extra-checkstores{gap:11px}.extra-storecard{padding:16px}}
+/* Com oito áreas de navegação, preservar acesso pelo celular. */
+@media(max-width:940px){.side-nav .nav-item span:last-child{display:inline!important;font-size:10px}.side-nav .nav-item{gap:5px;min-width:max-content}.side-nav{scrollbar-width:thin}.sidebar{gap:7px}}
+@media(max-width:650px){.side-nav .nav-item{padding:7px 8px}.side-nav .nav-icon{font-size:15px;width:17px}.sidebar .brand{min-width:97px!important}.sidebar .brand-logo-image{width:76px!important}.side-nav .nav-item span:last-child{font-size:10px}}
+/* Navegação compacta com rótulos sempre acessíveis em telas pequenas. */
+@media(max-width:940px){
+ .shell{display:block}
+ .sidebar{display:flex;flex-direction:column;align-items:stretch;position:static;padding:12px 15px 13px;gap:8px;overflow:visible;height:auto}
+ .sidebar .brand{display:flex;align-items:center;justify-content:center;min-width:0!important;width:100%;padding:0 0 7px;border:0}
+ .sidebar .brand-logo-image{width:116px!important;height:50px!important;object-fit:contain}
+ .side-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap:5px;overflow:visible;flex:none}
+ .side-nav .nav-item{min-width:0!important;white-space:normal;width:100%;padding:8px 4px;min-height:58px;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;line-height:1.15}
+ .side-nav .nav-item .nav-icon{width:auto;font-size:17px}
+ .side-nav .nav-item span:last-child{display:block!important;font-size:10px;overflow-wrap:anywhere;text-align:center}
+}
+@media(max-width:480px){
+ .sidebar{padding:10px 9px 12px}
+ .side-nav{gap:4px}
+ .side-nav .nav-item{font-size:10px;min-height:64px;padding:6px 2px}
+ .sidebar .brand-logo-image{width:104px!important;height:44px!important}
+}
+@media(max-width:720px){
+ .topbar .logout-btn{display:inline-flex!important;font-size:11px;padding:8px 10px;white-space:nowrap}
+ .topbar .avatar{display:none}
+ .topbar .breadcrumb{font-size:10px}
+ .topbar-right{gap:6px}
+}
 
 </style>
 </body>
