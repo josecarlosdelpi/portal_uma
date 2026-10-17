@@ -4,9 +4,9 @@ Protótipo demonstrativo de gestão comercial da **Universo das Mangueiras Autom
 
 ## Versão disponível
 
-**v4 — Televendas, avaliações Google, insumos e checklist (demonstração)**, em `index.html`.
+**v5 — Indicadores, fechamento mensal, treinamentos assinados, metas diárias e marketing (demonstração)**, em `index.html`.
 
-Inclui tela de login com campos inicialmente vazios, visão geral, vendas, carteira de televendas, registros de ligações e compras, indicadores demonstrativos, acompanhamento das avaliações no Google **por loja**, controle do estoque de insumos **por unidade** e checklist semanal com metas de ligações obtidas dos registros de televendas, além de padrões/treinamentos e ações gerenciais (GR).
+Inclui tela de login inicialmente vazia, visão geral, vendas, carteira de televendas, avaliações no Google, controle de insumos, checklist, metas diárias, assinatura demonstrativa de treinamentos, calendário de Status do WhatsApp e apresentações gerenciais em slides.
 
 **Permissões fictícias:** Milena/Admin lança contagens mensais de avaliações, entrega de brindes, entradas de estoque, cadastro de materiais, metas e validação das tarefas. Vendedores apenas consultam as avaliações de sua loja, registram retiradas dos insumos da própria loja e acompanham tarefas e ligações.
 
@@ -26,6 +26,26 @@ Inclui tela de login com campos inicialmente vazios, visão geral, vendas, carte
 - O portal **não está integrado ao ERP** e não comprova automaticamente compras, cupons ou premiações.
 - As regras de premiação exibidas são hipóteses para validação com a gestão antes de uso operacional.
 - **Repositório público:** não inclua dados de clientes, credenciais reais ou segredos.
+
+## Novidades da v5 — 16/10/2026
+
+- **Visão Geral:** percentuais de metas comerciais (vendas, ligações, avaliações) separados dos operacionais (tarefas e Instagram). Cada indicador com meta válida tem peso igual dentro de seu grupo, limitado a 100% apenas no cálculo do indicador consolidado. O Status do WhatsApp, que é único para toda a UMA, é apresentado à parte; não é atribuído artificialmente a cada loja. Há seleção de mês ou semana e consulta a períodos anteriores.
+- **Metas diárias:** meta mensal cadastrada pela Milena por unidade; contagem de segunda a sexta-feira com exclusões configuráveis de feriados/dias sem expediente por loja. A meta do dia corresponde ao valor restante dividido pelos dias de funcionamento restantes. Após o faturamento acumulado alcançar a meta mensal, os dias seguintes utilizam o valor mínimo diário configurado por loja, preservado entre meses. Vendedores consultam apenas a própria loja.
+- **GR — fechamento mensal:** oito slides gerados a partir dos registros presentes no portal, incluindo vendas, avaliações, ligações, tarefas, WhatsApp e Instagram (quando cadastrados). Exibição em tela cheia, impressão/salvamento em PDF pelo navegador, exportação como HTML de slides e arquivamento local de um retrato por mês. **Não exporta PPTX nesta demonstração.**
+- **Treinamentos:** procedimento, versão, colaborador/loja, responsável, data e horário, arquivo PDF pequeno opcional, desenho de assinatura na tela e comprovante imprimível. A assinatura e o documento ficam apenas no armazenamento local. **Não devem ser usados como comprovação jurídica ou com dados reais**.
+- **Status WhatsApp:** calendário único de segunda a sexta, categorias de posts do planejamento utilizado pela UMA, controle de código de produto único dentro do ano, imagem da arte e evidência em JPG/PNG/WebP compactadas, confirmação de publicação, histórico e download. Apenas o administrador exclui registros. Dias sem publicação podem ser indicados pela Milena.
+- **Instagram:** campos de contagem mensal de posts previstos e realizados por loja; lançamentos manuais da Milena para alimentar indicadores e slides, sem API.
+- **Permissões demonstrativas:** perfil Milena/Admin vê todas as lojas; vendedor consulta a própria unidade e pode atualizar publicações do calendário único de WhatsApp. Os controles de acesso ocorrem apenas no navegador, sem proteção de servidor.
+
+**Fontes do cálculo demonstrativo:** vendas já cadastradas na aba Vendas deste navegador; ligações já cadastradas no módulo de televendas; checklist e avaliações registrados nos módulos v4. Não há sincronização com ERP, Google ou outras máquinas. As metas de abertura e os produtos **DEMO-** são exemplos fictícios, não representam dados comerciais da UMA.
+
+### Avisos de implantação
+
+- **GitHub Pages hospeda apenas a demonstração estática.** Todo conteúdo novo é armazenado por navegador em localStorage, não é compartilhado entre computadores, pode ser apagado pelo usuário e tem espaço limitado. Anexos numerosos podem exceder esse limite.
+- Não anexar fotografias, dados de clientes, documentos internos, assinaturas reais, credenciais ou informações privadas. Para um uso real, serão indispensáveis login seguro, permissões no servidor, armazenamento de arquivos e banco centralizado com backup e adequação à LGPD.
+- **Assinaturas não são juridicamente validadas** pelo protótipo; o histórico local não comprova autoria nem integridade para fins trabalhistas.
+- A consulta automática às avaliações do Google continua pendente de estudo de integração e autorização.
+- A metodologia de metas diárias foi inspirada exclusivamente na aba **"Meta do dia"** da planilha fornecida, com correção consciente de datas e referências inconsistentes.
 
 ## Módulos v4 — implementação demonstrativa
 
