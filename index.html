@@ -62,17 +62,19 @@
     <button type="button" class="nav-item" data-view="google"><span class="nav-icon">★</span><span>Avaliações Google</span></button>
     <button type="button" class="nav-item" data-view="supplies"><span class="nav-icon">▣</span><span>Materiais e insumos</span></button>
     <button type="button" class="nav-item" data-view="checklist"><span class="nav-icon">☑</span><span>Checklist semanal</span></button>
+    <button type="button" class="nav-item" data-view="targets"><span class="nav-icon">&#36;</span><span>Metas di&aacute;rias</span></button>
+    <button type="button" class="nav-item" data-view="marketing"><span class="nav-icon">&#9635;</span><span>Status WhatsApp</span></button>
     <button type="button" class="nav-item" data-view="procedures"><span class="nav-icon">&#9776;</span><span>Padr&otilde;es &amp; treinamento</span></button>
     <button type="button" class="nav-item" data-view="management"><span class="nav-icon">&#9678;</span><span>GR gerencial</span></button>
   </nav>
   <div class="side-spacer"></div>
   <div class="sidebar-note"><span class="sidebar-pill">AMBIENTE DE DEMO</span><strong>Apresenta&ccedil;&atilde;o para a dire&ccedil;&atilde;o</strong><p>Nenhum dado aqui representa o desempenho real dos funcion&aacute;rios ou das lojas. Tudo &eacute; ilustrativo.</p></div>
-  <div class="sidebar-bottom">Prot&oacute;tipo demonstrativo v0.4<br>Sem conex&atilde;o com ERP ou site da UMA</div>
+  <div class="sidebar-bottom">Prot&oacute;tipo demonstrativo v0.5<br>Sem conex&atilde;o com ERP ou site da UMA</div>
 </aside>
 <main class="main">
   <header class="topbar"><div class="breadcrumb">Universo das Mangueiras <span style="margin:0 7px;color:#adc0c6">/</span> <strong id="breadcrumbCurrent">Vis&atilde;o geral</strong></div><div class="topbar-right"><span class="topbar-note">Um lugar para transformar informa&ccedil;&atilde;o em decis&atilde;o</span><span class="profile-chip" id="profileLabel">Admin · demonstração</span><span class="avatar">UMA</span><button type="button" id="logoutBtn" class="logout-btn">Sair</button></div></header>
   <div class="workspace">
-    <div class="demo-ribbon"><span class="demo-mark">!</span><span><strong>Dados 100% fict&iacute;cios.</strong> Este prot&oacute;tipo demonstra televendas, avalia&ccedil;&otilde;es no Google, insumos e checklist com exemplos ilustrativos. N&atilde;o h&aacute; sincroniza&ccedil;&atilde;o com o ERP ou o Google, autentica&ccedil;&atilde;o segura ou compartilhamento entre computadores.</span></div>
+    <div class="demo-ribbon"><span class="demo-mark">!</span><span><strong>Dados 100% fict&iacute;cios.</strong> Este prot&oacute;tipo demonstra televendas, avalia&ccedil;&otilde;es no Google, insumos, checklist, metas di&aacute;rias, treinamentos com assinatura e artes de WhatsApp com exemplos ilustrativos. N&atilde;o h&aacute; sincroniza&ccedil;&atilde;o com o ERP ou o Google, autentica&ccedil;&atilde;o segura ou compartilhamento entre computadores.</span></div>
 
     <section class="view active" id="view-overview" aria-label="Visao geral">
       <div class="page-header"><div><div class="eyebrow">VIS&Atilde;O DEMONSTRATIVA</div><h1>Decis&otilde;es melhores come&ccedil;am com dados.</h1><p>O que cada loja vendeu, quais atividades comerciais ocorreram e que compromissos precisam ser acompanhados.</p></div><span class="mini-pill">&#9679; PROVA DE CONCEITO</span></div>
@@ -90,6 +92,20 @@
       </div>
       <article class="panel"><div class="panel-head"><div><h3>Vis&atilde;o por vendedor</h3><p>Resultado + atividades + compromissos, sem ranking de pessoas</p></div><span class="soft-label">AN&Aacute;LISE CONTEXTUAL</span></div><div class="table-wrap"><table><thead><tr><th>Vendedor (fict&iacute;cio)</th><th>Loja</th><th style="text-align:right">Vendas</th><th style="text-align:right">Faturamento</th><th style="text-align:right">Tentativas</th><th style="text-align:right">Conversas efetivas</th><th style="text-align:right">Retornos pendentes</th></tr></thead><tbody id="sellerTable"></tbody></table></div><div class="info-band"><span class="mini-icon">&#9432;</span><span><strong>O painel n&atilde;o conclui quem &eacute; bom ou ruim.</strong> Uma avalia&ccedil;&atilde;o justa tamb&eacute;m requer metas adequadas, carga de atendimento, condi&ccedil;&otilde;es da loja, processos, treinamento e qualidade da execu&ccedil;&atilde;o.</span></div></article>
       <div class="poc-footer"><span>Portal UMA &middot; Conceito demonstrativo &middot; Dados fict&iacute;cios</span><span>Construir indicadores &rarr; medir &rarr; decidir &rarr; acompanhar</span></div>
+<!-- UMA v5: INDICADORES COMERCIAL E OPERACIONAL -->
+<!-- V5_OVERVIEW -->
+<article class="panel v5-section" id="v5PerformancePanel">
+ <div class="panel-head"><div><h3>Cumprimento de metas por loja</h3><p>Indicadores comerciais e operacionais separados. Resultados de dados fict&iacute;cios registrados neste navegador.</p></div><span class="soft-label">NOVO NA V5</span></div>
+ <div class="v5-toolbar">
+  <div class="field"><label for="v5PeriodType">Per&iacute;odo</label><select id="v5PeriodType"><option value="month">M&ecirc;s</option><option value="week">Semana</option></select></div>
+  <div class="field" id="v5MonthField"><label for="v5PeriodMonth">M&ecirc;s de refer&ecirc;ncia</label><input id="v5PeriodMonth" type="month"></div>
+  <div class="field hidden" id="v5WeekField"><label for="v5PeriodWeek">Dia da semana desejada</label><input id="v5PeriodWeek" type="date"></div>
+ </div>
+ <div id="v5PerformanceCards" class="v5-performance-grid"></div>
+ <div id="v5GlobalMarketing" class="v5-global-post"></div>
+ <div class="v5-hint">Os percentuais resumem apenas metas com base cadastrada. Cada indicador participante tem peso igual <strong>dentro de seu grupo</strong>; o resultado individual &eacute; limitado a 100% para o c&aacute;lculo. Metas excedidas aparecem separadamente. Google e Instagram s&atilde;o mensais. O calend&aacute;rio de WhatsApp &eacute; &uacute;nico para a UMA e n&atilde;o pontua as lojas separadamente.</div>
+</article>
+
     </section>
 
     <section class="view" id="view-sales" aria-label="Vendas">
@@ -194,6 +210,49 @@
       </article>
     </section>
 
+<section class="view" id="view-targets" aria-label="Metas diarias de vendas">
+ <div class="page-header"><div><div class="eyebrow">VENDAS POR UNIDADE</div><h1>Metas di&aacute;rias de vendas.</h1><p>C&aacute;lculo din&acirc;mico conforme a aba &ldquo;Meta do dia&rdquo;: meta restante dividida pelos dias de funcionamento restantes.</p></div><span class="mini-pill">DEMONSTRA&Ccedil;&Atilde;O V5</span></div>
+ <div class="module-intro"><strong>Fonte dos resultados:</strong> somente as vendas registradas no m&oacute;dulo Vendas deste navegador. N&atilde;o h&aacute; integra&ccedil;&atilde;o com ERP ou atualiza&ccedil;&atilde;o entre computadores. As metas iniciais s&atilde;o exemplos fict&iacute;cios.</div>
+ <article class="panel v5-section">
+  <div class="v5-toolbar"><div class="field"><label for="v5TargetMonth">M&ecirc;s</label><input id="v5TargetMonth" type="month"></div><div class="field"><label for="v5TargetStore">Unidade</label><select id="v5TargetStore"></select></div></div>
+  <div id="v5TargetKPIs" class="kpi-grid"></div>
+  <div id="v5TargetNote" class="v5-hint"></div>
+  <div class="table-wrap"><table class="v5-table"><thead><tr><th>Data</th><th>Dia</th><th>Dias restantes</th><th>Meta do dia</th><th>Vendido</th><th>Falta no m&ecirc;s</th><th>Condi&ccedil;&atilde;o</th></tr></thead><tbody id="v5TargetDays"></tbody></table></div>
+ </article>
+ <article class="panel v5-section v5-admin" id="v5TargetAdmin">
+  <div class="panel-head"><div><h3>Configura&ccedil;&atilde;o da Milena</h3><p>Defina a meta do m&ecirc;s, o m&iacute;nimo di&aacute;rio fixo e os feriados ou dias sem expediente de cada loja.</p></div><span class="soft-label">ADMIN</span></div>
+  <form id="v5TargetForm"><div class="field-grid"><div class="field"><label for="v5TargetGoal">Meta mensal da loja (R$)</label><input id="v5TargetGoal" type="number" min="1" step="0.01" required></div><div class="field"><label for="v5TargetFloor">Valor m&iacute;nimo di&aacute;rio ap&oacute;s atingir a meta (R$)</label><input id="v5TargetFloor" type="number" min="0" step="0.01" required></div></div>
+  <div class="form-actions"><button type="submit" class="btn btn-primary">Salvar meta e m&iacute;nimo</button></div></form>
+  <div class="hr"></div><h4>Calend&aacute;rio de funcionamento</h4><p class="v5-small">O sistema considera segunda a sexta-feira. Clique em um dia para marcar ou desmarcar como <strong>sem expediente</strong> apenas nesta loja.</p><div id="v5TargetBusinessDays" class="v5-days-grid"></div>
+ </article>
+</section>
+<section class="view" id="view-marketing" aria-label="Status WhatsApp e artes">
+ <div class="page-header"><div><div class="eyebrow">MARKETING &amp; PLANEJAMENTO</div><h1>Status do WhatsApp.</h1><p>Calend&aacute;rio &uacute;nico da UMA: um c&oacute;digo de produto por data, sem repeti&ccedil;&atilde;o do mesmo c&oacute;digo durante o ano.</p></div><span class="mini-pill">DEMONSTRA&Ccedil;&Atilde;O V5</span></div>
+ <div class="module-intro"><strong>Aviso:</strong> anexos e evid&ecirc;ncias ficam somente neste navegador. A demonstra&ccedil;&atilde;o p&uacute;blica n&atilde;o compartilha arquivos entre lojas; n&atilde;o anexe documentos, fotos ou dados confidenciais reais.</div>
+ <article class="panel v5-section">
+  <div class="v5-toolbar"><div class="field"><label for="v5MarketingMonth">M&ecirc;s</label><input id="v5MarketingMonth" type="month"></div><div class="v5-legend"><span class="v5-dot waiting"></span> Sem produto <span class="v5-dot planned"></span> Programado <span class="v5-dot art"></span> Arte pronta <span class="v5-dot published"></span> Publicado</div></div>
+  <div id="v5MarketingKPIs" class="kpi-grid"></div>
+  <div id="v5MarketingCalendar" class="v5-calendar" aria-label="Calendario de postagens"></div>
+  <div class="v5-hint">Segunda: promo&ccedil;&atilde;o | Ter&ccedil;a: lan&ccedil;amentos | Quarta: linha leve | Quinta: linha pesada | Sexta: tubos, adaptadores, conectores, aditivos e abra&ccedil;adeiras. Sem programa&ccedil;&atilde;o aos s&aacute;bados e domingos.</div>
+ </article>
+ <div class="v5-two-column">
+  <article class="panel v5-section"><div class="panel-head"><div><h3>Planejar ou atualizar um dia</h3><p>Funcion&aacute;rios podem registrar a arte e a publica&ccedil;&atilde;o; apenas a Milena pode excluir registros.</p></div></div>
+   <form id="v5MarketingForm">
+    <div class="field-grid"><div class="field"><label for="v5MarketDate">Data (segunda a sexta) *</label><input id="v5MarketDate" type="date" required></div><div class="field"><label for="v5MarketCode">C&oacute;digo do produto *</label><input id="v5MarketCode" maxlength="55" placeholder="Ex.: MM 22002" required></div><div class="field wide"><label for="v5MarketCategory">Categoria / tema</label><input id="v5MarketCategory" maxlength="120" placeholder="Categoria programada para o dia"></div><div class="field wide"><label for="v5MarketNote">Observa&ccedil;&otilde;es (ex.: pre&ccedil;o somente CNPJ, promo&ccedil;&atilde;o)</label><textarea id="v5MarketNote" rows="2" maxlength="450"></textarea></div>
+    <div class="field"><label for="v5MarketArt">Arte (JPG, PNG ou WebP)</label><input type="file" id="v5MarketArt" accept="image/jpeg,image/png,image/webp"><small>Imagem compactada para guardar localmente.</small></div><div class="field"><label for="v5MarketEvidence">Comprovante (JPG, PNG ou WebP)</label><input type="file" id="v5MarketEvidence" accept="image/jpeg,image/png,image/webp"><small>Captura de tela opcional.</small></div></div>
+    <div id="v5MarketingUploads" class="v5-upload-preview"></div>
+    <div class="form-actions"><button type="submit" class="btn btn-primary">Salvar programa&ccedil;&atilde;o</button><button type="button" class="btn btn-outline" id="v5MarketPublish">Confirmar publica&ccedil;&atilde;o</button><button type="button" class="btn btn-outline" id="v5MarketReset">Limpar formul&aacute;rio</button><button type="button" class="btn btn-outline v5-admin" id="v5MarketDelete">Excluir registro</button></div>
+   </form>
+   <div class="v5-admin v5-off-wrapper"><label><input type="checkbox" id="v5MarketDayOff"> N&atilde;o h&aacute; postagem nesta data (feriado / loja fechada)</label><p class="v5-small">Somente a Milena pode marcar dias sem postagem.</p></div>
+  </article>
+  <article class="panel v5-section"><div class="panel-head"><div><h3>Hist&oacute;rico e arquivos</h3><p>Consulte e baixe as artes e evid&ecirc;ncias guardadas localmente.</p></div></div><div id="v5MarketingHistory"></div></article>
+ </div>
+ <article class="panel v5-section" id="v5InstagramPanel"><div class="panel-head"><div><h3>Instagram &mdash; posts previstos e realizados</h3><p>Controle mensal independente dos Status do WhatsApp, usado nos indicadores e no fechamento gerencial. Sem integra&ccedil;&atilde;o autom&aacute;tica.</p></div><span class="soft-label">CONTAGEM MANUAL &middot; V5</span></div>
+ <div id="v5InstagramSummary" class="v5-instagram-summary"></div>
+ <form id="v5InstagramForm" class="v5-admin"><div class="field-grid"><div class="field"><label for="v5InstagramStore">Loja</label><select id="v5InstagramStore"></select></div><div class="field"><label for="v5InstagramPlanned">Quantidade prevista no m&ecirc;s</label><input id="v5InstagramPlanned" type="number" min="0" max="500" step="1" required></div><div class="field"><label for="v5InstagramDone">Posts realizados no m&ecirc;s</label><input id="v5InstagramDone" type="number" min="0" max="500" step="1" required></div></div><div class="form-actions"><button type="submit" class="btn btn-primary">Registrar resultados do Instagram</button></div></form>
+ </article>
+</section>
+
     <section class="view" id="view-procedures" aria-label="Padroes e treinamento">
       <div class="page-header"><div><div class="eyebrow">CLAREZA E CAPACITA&Ccedil;&Atilde;O</div><h1>Processos escritos. Equipe preparada.</h1><p>O vendedor precisa saber qual &eacute; o padr&atilde;o esperado, receber treinamento, praticar e ter feedback.</p></div><span class="mini-pill">EXEMPLOS DE POPS</span></div>
       <div class="training-banner"><span style="font-size:28px">&#10003;</span><div><h3>Uma assinatura n&atilde;o &eacute; a mesma coisa que aprendizado.</h3><p>O processo real deve registrar documento e vers&atilde;o, instrutor, participantes, data, ci&ecirc;ncia/assinatura e verifica&ccedil;&atilde;o pr&aacute;tica. A lista de presen&ccedil;a comprova participa&ccedil;&atilde;o, mas n&atilde;o garante aplica&ccedil;&atilde;o correta.</p></div></div>
@@ -206,6 +265,23 @@
         <article class="panel"><div class="panel-head"><div><h3>Simular um registro de treinamento</h3><p>Registro local de participa&ccedil;&atilde;o, sem assinatura v&aacute;lida</p></div></div><form id="trainingForm"><div class="field-grid one"><div class="field"><label for="trainingSeller">Colaborador demonstrativo</label><select id="trainingSeller" required></select></div><div class="field"><label for="trainingProcedure">Procedimento</label><select id="trainingProcedure"><option value="POP-COM-01">POP-COM-01 - Atendimento e cotacao</option><option value="POP-COM-02">POP-COM-02 - Prospeccao</option><option value="POP-COM-03">POP-COM-03 - Demanda nao atendida</option></select></div><div class="field"><label for="trainingStep">Etapa do treinamento</label><select id="trainingStep"><option value="participou">Treinamento apresentado</option><option value="pratica">Execu&ccedil;&atilde;o pr&aacute;tica verificada</option></select></div></div><div class="form-actions"><button type="submit" class="btn btn-primary">+ Simular registro</button></div></form></article>
         <article class="panel"><div class="panel-head"><div><h3>Evid&ecirc;ncias de capacita&ccedil;&atilde;o</h3><p>Exemplos que ajudam a demonstrar o fluxo</p></div></div><div class="table-wrap"><table style="min-width:400px"><thead><tr><th>Colaborador</th><th>POP</th><th>Etapa</th><th>Data</th></tr></thead><tbody id="trainingTable"></tbody></table></div><p class="note-line">Em implanta&ccedil;&atilde;o, usar lista de presen&ccedil;a, ci&ecirc;ncia assinada e verifica&ccedil;&atilde;o pr&aacute;tica em reposit&oacute;rio controlado.</p></article>
       </div>
+<!-- INSERIR DENTRO DO MODULO PROCEDIMENTOS -->
+<article class="panel v5-section v5-admin" id="v5TrainingPanel">
+ <div class="panel-head"><div><h3>Registro de treinamento com assinatura</h3><p>Comprovante demonstrativo de ci&ecirc;ncia com assinatura desenhada na tela. N&atilde;o substitui registros oficiais.</p></div><span class="soft-label">NOVO NA V5</span></div>
+ <form id="v5TrainingForm">
+  <div class="field-grid"><div class="field"><label for="v5TrainingSeller">Colaborador *</label><select id="v5TrainingSeller" required></select></div><div class="field"><label for="v5TrainingStore">Loja</label><input id="v5TrainingStore" readonly></div>
+  <div class="field"><label for="v5TrainingProcedure">Procedimento / documento *</label><select id="v5TrainingProcedure"><option value="POP-COM-01">POP-COM-01 - Atendimento e cota&ccedil;&atilde;o</option><option value="POP-COM-02">POP-COM-02 - Prospec&ccedil;&atilde;o e reativa&ccedil;&atilde;o</option><option value="POP-COM-03">POP-COM-03 - Demanda n&atilde;o atendida</option><option value="Outro">Outro procedimento</option></select></div><div class="field"><label for="v5TrainingTitle">T&iacute;tulo / refer&ecirc;ncia complementar</label><input id="v5TrainingTitle" maxlength="140" placeholder="Identifique o documento entregue"></div>
+  <div class="field"><label for="v5TrainingVersion">Vers&atilde;o do procedimento *</label><input id="v5TrainingVersion" required value="Rascunho 0.1" maxlength="45"></div><div class="field"><label for="v5TrainingInstructor">Respons&aacute;vel que ministrou *</label><input id="v5TrainingInstructor" required maxlength="90" value="Milena (exemplo)"></div>
+  <div class="field"><label for="v5TrainingDate">Data *</label><input type="date" id="v5TrainingDate" required></div><div class="field"><label for="v5TrainingTime">Hor&aacute;rio *</label><input type="time" id="v5TrainingTime" required></div>
+  <div class="field wide"><label for="v5TrainingDocument">Anexar o documento PDF (opcional; pequeno arquivo)</label><input type="file" id="v5TrainingDocument" accept="application/pdf"><small>Para demonstra&ccedil;&atilde;o, at&eacute; 350 KB; documentos reais devem ser guardados em servidor seguro.</small></div></div>
+  <div class="v5-declaration">Declaro que participei do treinamento indicado e recebi as orienta&ccedil;&otilde;es referentes ao procedimento apresentado.</div>
+  <label class="v5-sign-label" for="v5SignatureCanvas">Assinatura do colaborador com o dedo, mouse ou caneta touch *</label>
+  <div class="v5-sign-box"><canvas id="v5SignatureCanvas" aria-label="Campo para desenhar a assinatura" tabindex="0"></canvas></div>
+  <div class="form-actions"><button type="button" id="v5SignatureClear" class="btn btn-outline">Limpar assinatura</button><button type="submit" class="btn btn-primary">Registrar ci&ecirc;ncia (demo)</button></div>
+ </form>
+</article>
+<article class="panel v5-section" id="v5TrainingListPanel"><div class="panel-head"><div><h3>Hist&oacute;rico de confirma&ccedil;&otilde;es</h3><p>O registro pode ser impresso com dados do treinamento e assinatura. Para uso real ser&atilde;o necess&aacute;rias autentica&ccedil;&atilde;o e prote&ccedil;&atilde;o de dados.</p></div></div><div id="v5TrainingHistory"></div></article>
+
     </section>
 
     <section class="view" id="view-management" aria-label="GR gerencial">
@@ -216,10 +292,24 @@
         <article class="panel"><div class="panel-head"><div><h3>Registro de a&ccedil;&otilde;es</h3><p>O resultado de uma boa reuni&atilde;o deve continuar depois dela</p></div></div><form id="actionForm"><div class="field-grid"><div class="field wide"><label for="actionWhat">Decis&atilde;o / a&ccedil;&atilde;o *</label><input id="actionWhat" required maxlength="130" placeholder="Ex.: Verificar relat&oacute;rio por vendedor no ERP"></div><div class="field"><label for="actionOwner">Respons&aacute;vel *</label><select id="actionOwner"><option>Milena</option><option>Jardel</option><option>Respons&aacute;vel da loja</option></select></div><div class="field"><label for="actionDue">Prazo *</label><input type="date" id="actionDue" required></div></div><div class="form-actions"><button type="submit" class="btn btn-primary">+ Registrar a&ccedil;&atilde;o</button></div></form><div class="hr"></div><div id="actionsList" class="action-list"></div></article>
       </div>
       <div class="callout" style="margin-top:20px"><strong>Governan&ccedil;a:</strong> relat&oacute;rios de gest&atilde;o precisam de respons&aacute;vel pela extra&ccedil;&atilde;o, atualiza&ccedil;&atilde;o e an&aacute;lise. Para o piloto, solicitar a Jardel permiss&otilde;es de <strong>leitura e exporta&ccedil;&atilde;o comercial</strong> para Milena, sem abrir poderes de pagamento, altera&ccedil;&atilde;o de pre&ccedil;os ou outros acessos n&atilde;o necess&aacute;rios.</div>
+<!-- INSERIR DENTRO DE GR -->
+<article class="panel v5-section" id="v5ReportPanel">
+ <div class="panel-head"><div><h3>Fechamento mensal em slides</h3><p>Apresenta&ccedil;&atilde;o gerencial de 8 slides, com dados existentes no portal e sugest&otilde;es de acompanhamento.</p></div><span class="soft-label">NOVO NA V5</span></div>
+ <div class="v5-toolbar"><div class="field"><label for="v5ReportMonth">M&ecirc;s de refer&ecirc;ncia</label><input type="month" id="v5ReportMonth"></div><button type="button" class="btn btn-primary" id="v5ReportOpen">Abrir apresenta&ccedil;&atilde;o</button><button type="button" class="btn btn-outline" id="v5ReportDownload">Baixar slides em HTML</button><button type="button" class="btn btn-outline v5-admin" id="v5ReportArchive">Arquivar fechamento</button></div>
+ <div id="v5ReportPreview" class="v5-hint"></div><div id="v5ReportArchives" class="v5-row-actions"></div><p class="v5-small">Durante a apresenta&ccedil;&atilde;o use as setas para navegar e a op&ccedil;&atilde;o de impress&atilde;o do navegador para salvar em PDF. Os slides s&atilde;o demonstrativos e n&atilde;o equivalem aos relat&oacute;rios oficiais do ERP.</p>
+</article>
+<!-- OVERLAY GLOBAL DOS SLIDES -->
     </section>
   </div>
 </main></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="v5SlidesOverlay" class="v5-slides-overlay hidden" role="dialog" aria-modal="true" aria-label="Apresentacao de fechamento mensal">
+ <div class="v5-slides-top"><span id="v5SlideCounter">Slide 1 / 8</span><div class="v5-slides-controls"><button type="button" id="v5SlidePrint">Imprimir / PDF</button><button type="button" id="v5SlidePrev">Anterior</button><button type="button" id="v5SlideNext">Pr&oacute;ximo</button><button type="button" id="v5SlideClose">Fechar &times;</button></div></div>
+ <div id="v5SlideCanvas" class="v5-slide-canvas"></div>
+ <div class="v5-slide-foot">UMA &middot; Documento gerado com registros demonstrativos locais. Use as setas do teclado ou bot&otilde;es para navegar.</div>
+</div>
+
 <script>
 (function () {
 'use strict';
@@ -238,7 +328,7 @@ const SELLERS = [
 ];
 const OUTCOMES = {sem_resposta:'N\u00e3o atendeu',apresentacao:'Apresenta\u00e7\u00e3o',interesse:'Demonstrou interesse',sem_interesse:'Sem interesse agora'};
 const TRAINING_STAGES = {participou:'Apresentado',pratica:'Pr\u00e1tica verificada'};
-const VIEWS = {overview:'Vis\u00e3o geral',sales:'Vendas',contacts:'Telemarketing',procedures:'Padr\u00f5es e treinamento',management:'GR gerencial',google:'Avaliações Google',supplies:'Materiais e insumos',checklist:'Checklist semanal'};
+const VIEWS = {overview:'Vis\u00e3o geral',sales:'Vendas',contacts:'Telemarketing',procedures:'Padr\u00f5es e treinamento',management:'GR gerencial',google:'Avaliações Google',supplies:'Materiais e insumos',checklist:'Checklist semanal',targets:'Metas di\u00e1rias',marketing:'Status WhatsApp'};
 const today = dayISO(new Date());
 let db;
 let currentView = 'overview';
@@ -337,14 +427,15 @@ function renderActions() {
   const actions=[...db.actions].sort((a,b)=>Number(a.done)-Number(b.done)||a.due.localeCompare(b.due));
   el('actionsList').innerHTML=actions.map(a=>'<div class="action-row"><div class="action-info"><strong>'+esc(a.what)+'</strong><small>'+esc(a.owner)+' &middot; Prazo '+shortDate(a.due)+'</small><div class="meta">'+(a.done?'Conclu\u00eddo (simulado)':'Aguardando verifica\u00e7\u00e3o')+'</div></div><div class="action-status"><span class="tag '+(a.done?'done':a.due<today?'late':'pending')+'">'+(a.done?'Feita':a.due<today?'Vencida':'Aberta')+'</span>'+(a.done?'':'<button type="button" class="btn btn-soft btn-small" data-done-action="'+esc(a.id)+'">Concluir</button>')+'</div></div>').join('')||'<div class="empty-msg">Sem a\u00e7\u00f5es registradas.</div>';
 }
-function renderAll() {renderOverview();renderSales();renderContacts();renderTraining();renderActions();extraRenderAll();}
+function renderAll() {renderOverview();renderSales();renderContacts();renderTraining();renderActions();extraRenderAll();if(v5)v5RenderAll();}
 function setView(v) {
-  if(!VIEWS[v]||(!teleIsAdmin()&&!['contacts','google','supplies','checklist'].includes(v)))return;
+  if(!VIEWS[v]||(!teleIsAdmin()&&!['overview','contacts','google','supplies','checklist','targets','marketing'].includes(v)))return;
   currentView=v;
   document.querySelectorAll('.view').forEach(section=>section.classList.toggle('active',section.id==='view-'+v));
   document.querySelectorAll('[data-view]').forEach(btn=>{const active=btn.dataset.view===v;btn.classList.toggle('active',active);btn.setAttribute('aria-current',active?'page':'false');});
   el('breadcrumbCurrent').textContent=VIEWS[v];
    if(['google','supplies','checklist'].includes(v))extraRenderAll();
+ if(v5&&['targets','marketing','overview','management','procedures'].includes(v))v5RenderAll();
   window.scrollTo({top:0,behavior:'instant'});
 }
 function toast(message) {const t=el('toast');t.textContent=message;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),3200);}
@@ -601,12 +692,13 @@ function teleSetRole(role,sellerId){
  const stores=teleStoresForRole();
  teleChoice('teleStoreFilter',teleIsAdmin()?[{id:'all',label:'Todas as lojas'},...STORES.map(s=>({id:s.id,label:s.name}))]:stores.map(s=>({id:s.id,label:s.name})),teleUI.store);
  teleChoice('teleNewStore',stores.map(s=>({id:s.id,label:s.name})),teleUI.store==='all'?'joi':teleUI.store);
- document.querySelectorAll('.side-nav [data-view]').forEach(b=>b.classList.toggle('hidden',!teleIsAdmin()&&!['contacts','google','supplies','checklist'].includes(b.dataset.view)));
+ document.querySelectorAll('.side-nav [data-view]').forEach(b=>b.classList.toggle('hidden',!teleIsAdmin()&&!['overview','contacts','google','supplies','checklist','targets','marketing'].includes(b.dataset.view)));
  document.querySelector('.reset-demo')?.classList.toggle('hidden',!teleIsAdmin());
  el('profileLabel').textContent=profile.label;
  if(!teleIsAdmin())setView('contacts');
  teleRender();
  if(extra)extraRoleChanged();
+ if(v5)v5RoleChanged();
 }
 function teleValidateName(store,name,erpId,idToIgnore){
  const normName=normKey(name),normErp=normKey(erpId);
@@ -1244,7 +1336,217 @@ function extraInitUI(){
  });
 }
 
-function init() {load();initSelectors();teleInitUI();extraInitUI();bindEvents();teleBindUI();renderAll();setupAuth();}
+/* Portal UMA v5 - novos modulos; prototipo LOCAL com dados exclusivamente ficticios. */
+const V5_KEY='portal_uma_v5_demo';
+const V5_CATEGORIES={1:'Promo&ccedil;&atilde;o',2:'Lan&ccedil;amentos',3:'Linha leve',4:'Linha pesada',5:'Tubos / adaptadores / conectores / aditivos / abra&ccedil;adeiras'};
+const V5_DOW=['Domingo','Segunda-feira','Ter&ccedil;a-feira','Quarta-feira','Quinta-feira','Sexta-feira','S&aacute;bado'];
+let v5;
+const v5UI={targetMonth:today.slice(0,7),targetStore:'joi',marketingMonth:today.slice(0,7),marketDate:'',art:null,evidence:null,reportMonth:today.slice(0,7),periodType:'month',periodMonth:today.slice(0,7),periodWeek:today,slides:[],slideIndex:0,signDrawing:false,signUsed:false,docData:null};
+const v5StoreVisible=()=>teleIsAdmin()?STORES:STORES.filter(s=>s.id===extraStoreRole());
+const v5MonthStart=month=>month+'-01';
+function v5MonthEnd(month){const d=new Date(month+'-01T12:00:00');d.setMonth(d.getMonth()+1);d.setDate(0);return dayISO(d);}
+function v5ISOdate(str){return /^\d{4}-\d{2}-\d{2}$/.test(str)&&!Number.isNaN(new Date(str+'T12:00:00').getTime());}
+function v5IsWeekday(date){const day=new Date(date+'T12:00:00').getDay();return day!==0&&day!==6;}
+function v5DateRange(start,end,weekdaysOnly=false){const days=[];if(!v5ISOdate(start)||!v5ISOdate(end)||start>end)return days;for(let d=start;d<=end;d=addDays(d,1)){if(!weekdaysOnly||v5IsWeekday(d))days.push(d);if(days.length>370)break;}return days;}
+function v5MonthLabel(month){return new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric'}).format(new Date(month+'-10T12:00:00'));}
+function v5PlainPercent(n){return n===null?'Sem meta':Math.round(n)+'%';}
+function v5Cap(n){return n===null?null:Math.min(100,Math.max(0,n));}
+function v5Ratio(done,expected){return expected>0?Math.max(0,done)/expected*100:null;}
+function v5Num(n){return Number.isFinite(Number(n))?Number(n):0;}
+function v5SampleArt(){return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480"><rect width="480" height="480" fill="#161616"/><rect x="34" y="34" width="412" height="412" rx="23" fill="#272727" stroke="#efc452" stroke-width="6"/><text x="240" y="190" font-family="Arial" font-weight="bold" font-size="50" fill="#efc452" text-anchor="middle">UMA</text><text x="240" y="250" font-family="Arial" font-size="25" fill="#fff" text-anchor="middle">ARTE FICTICIA</text><text x="240" y="298" font-family="Arial" font-size="16" fill="#ddd" text-anchor="middle">Somente demonstracao</text></svg>');}
+function v5Seed(){
+ const cur=today.slice(0,7),prev=monthBefore(cur),wk=extraWeekStart(today),dates=v5DateRange(wk,addDays(wk,4),true);
+ const targets={};
+ for(const [month,k] of [[cur,1],[prev,0.92]])for(const [store,amt] of [['joi',25000],['tub',16000],['ita',8500]])targets[store+'|'+month]=Math.round(amt*k);
+ const marketing=[];
+ for(const [i,d] of dates.entries())if(i<=2&&d<=today){marketing.push({id:'demo-marketing-'+i,date:d,code:'DEMO-'+String(401+i),category:V5_CATEGORIES[new Date(d+'T12:00:00').getDay()].replace(/&[^;]+;/g,' '),note:'Apenas demonstra\u00e7\u00e3o. Produto e arte fict\u00edcios.',art:i===0?v5SampleArt():'',evidence:'',publishedAt:i===0?d:'',createdBy:'Exemplo v5',updatedAt:d});}
+ return {version:5,reportArchives:{},instagram:{},targets,minimums:{joi:1000,tub:700,ita:500},daysOff:{},marketingDaysOff:[],marketing,trainingRecords:[],audit:[]};
+}
+function v5Load(){try{const raw=localStorage.getItem(V5_KEY);if(raw){const p=JSON.parse(raw);if(p&&p.version===5&&p.targets&&p.minimums&&p.daysOff&&Array.isArray(p.marketing)&&Array.isArray(p.marketingDaysOff)&&Array.isArray(p.trainingRecords)&&Array.isArray(p.audit)){v5=p;v5.instagram=v5.instagram||{};return;}}}catch(e){console.warn('Dados demonstrativos v5 indisponiveis',e);}v5=v5Seed();v5Save();}
+function v5Save(){try{localStorage.setItem(V5_KEY,JSON.stringify(v5));return true;}catch(err){console.warn('Erro ao salvar dados demonstrativos v5',err);toast('Espa\u00e7o local insuficiente. Reduza anexos ou libere armazenamento.');return false;}}
+function v5Commit(fn,success){const before=JSON.stringify(v5);fn();if(v5Save()){v5RenderAll();if(success)toast(success);return true;}v5=JSON.parse(before);return false;}
+function v5Sales(store,start,end){return db.sales.filter(r=>r.store===store&&r.date>=start&&r.date<=end).reduce((sum,r)=>sum+v5Num(r.amount),0);}
+function v5SalesCount(store,start,end){return db.sales.filter(r=>r.store===store&&r.date>=start&&r.date<=end).length;}
+function v5TargetConfig(store,month){const value=v5.targets[store+'|'+month];return Number.isFinite(Number(value))&&Number(value)>0?Number(value):null;}
+function v5OpenDays(store,month){const off=v5.daysOff[store+'|'+month]||[];return v5DateRange(v5MonthStart(month),v5MonthEnd(month),true).filter(d=>!off.includes(d));}
+function v5DayPlans(store,month){const goal=v5TargetConfig(store,month),days=v5OpenDays(store,month),minimum=Math.max(0,v5Num(v5.minimums[store]));if(goal===null)return [];
+ return days.map((date,i)=>{const before=v5Sales(store,v5MonthStart(month),addDays(date,-1));const accomplished=before>=goal;const remainder=Math.max(0,goal-before);const remainingDays=days.length-i;const daily=accomplished?minimum:(remainingDays>0?remainder/remainingDays:0);const sold=v5Sales(store,date,date);const after=v5Sales(store,v5MonthStart(month),date);return {date,remainingDays,daily,sold,shortfall:Math.max(0,goal-after),accomplished,before};});
+}
+function v5GoalDetails(store,month){const goal=v5TargetConfig(store,month),sold=v5Sales(store,v5MonthStart(month),v5MonthEnd(month));return {goal,sold,pct:goal===null?null:v5Ratio(sold,goal)};}
+function v5TargetSync(){const store=v5UI.targetStore,month=v5UI.targetMonth;el('v5TargetGoal').value=v5TargetConfig(store,month)||'';el('v5TargetFloor').value=v5.minimums[store]??0;}
+function v5TargetsRender(){if(!v5)return;let store=v5UI.targetStore;if(!teleIsAdmin())store=v5UI.targetStore=extraStoreRole();const month=v5UI.targetMonth,goal=v5TargetConfig(store,month),days=v5OpenDays(store,month),details=v5GoalDetails(store,month),rows=v5DayPlans(store,month);v5TargetSync();
+ el('v5TargetKPIs').innerHTML=[extraKPICard('Meta mensal',goal===null?'N\u00e3o cadastrada':money(goal,0),'Definida pela Milena (demonstra\u00e7\u00e3o)'),extraKPICard('Vendas registradas',money(details.sold,0),integer(v5SalesCount(store,v5MonthStart(month),v5MonthEnd(month)))+' vendas no navegador'),extraKPICard('Cumprimento',v5PlainPercent(details.pct),goal===null?'Sem base para calcular':money(Math.max(0,goal-details.sold),0)+' para atingir'),extraKPICard('M\u00ednimo ap\u00f3s meta',money(v5.minimums[store]||0,0),days.length+' dias abertos no m\u00eas')].join('');
+ el('v5TargetNote').innerHTML=goal===null?'N&atilde;o h&aacute; meta cadastrada para esta loja e m&ecirc;s. A Milena pode defini-la abaixo.':'A meta de cada dia considera as vendas de <strong>dias anteriores</strong> e o total de dias de funcionamento restantes, incluindo a data. Ao alcan&ccedil;ar a meta mensal, os dias seguintes adotam o valor m&iacute;nimo fixo. Dias sem expediente n&atilde;o geram meta.';
+ el('v5TargetDays').innerHTML=rows.map(r=>'<tr><td>'+esc(extraDateLong(r.date))+'</td><td>'+V5_DOW[new Date(r.date+'T12:00:00').getDay()]+'</td><td>'+r.remainingDays+'</td><td class="num"><b>'+money(r.daily,2)+'</b></td><td class="num">'+money(r.sold,2)+'</td><td class="num">'+money(r.shortfall,2)+'</td><td><span class="tag '+(r.accomplished?'done':'pending')+'">'+(r.accomplished?'M\u00ednimo fixo':'Meta din\u00e2mica')+'</span></td></tr>').join('')||'<tr><td colspan="7">Nenhum dia de expediente com meta configurada.</td></tr>';
+ el('v5TargetBusinessDays').innerHTML=v5DateRange(v5MonthStart(month),v5MonthEnd(month),true).map(date=>{const off=(v5.daysOff[store+'|'+month]||[]).includes(date);return '<button type="button" class="v5-day '+(off?'v5-closed':'')+'" '+(!teleIsAdmin()?'disabled':'')+' data-v5-dayoff="'+date+'" title="'+(off?'Marcar aberto':'Marcar sem expediente')+'"><b>'+date.slice(-2)+'</b><small>'+V5_DOW[new Date(date+'T12:00:00').getDay()].slice(0,3)+'</small><span>'+(off?'Fechado':'Aberto')+'</span></button>'}).join('');
+}
+function v5CallsBetween(store,start,end){return tele.calls.filter(c=>c.date>=start&&c.date<=end&&(c.store||teleStoreForClient(c.clientId))===store).length;}
+function v5CallsGoal(store,start,end){let goal=0;for(let week=extraWeekStart(start);week<=end;week=addDays(week,7)){
+  const weekdayCount=v5DateRange(week,addDays(week,4),true).filter(d=>d>=start&&d<=end).length;
+  if(weekdayCount)goal+=extraTarget(store,week)*weekdayCount/5;
+ }return Math.ceil(goal);
+}
+function v5TasksBetween(store,start,end){let total=0,done=0;for(let week=extraWeekStart(start);week<=end;week=addDays(week,7)){
+  for(const task of extra.tasks){if(!extraTaskRelevant(task,store,week))continue;const d=addDays(week,(Number(task.day)-1+7)%7);if(d<start||d>end)continue;total++;if(extraTaskStatus(task,store,week)?.done===true)done++;}
+ }return {total,done};
+}
+function v5MarketingBetween(start,end){const days=v5DateRange(start,end,true).filter(d=>!v5.marketingDaysOff.includes(d));return {expected:days.length,published:days.filter(d=>!!v5.marketing.find(m=>m.date===d&&m.publishedAt)).length};}
+function v5StatsForStore(store,start,end,isMonth){const sales=v5Sales(store,start,end),count=v5SalesCount(store,start,end);const month=isMonth?start.slice(0,7):'';
+ let saleTarget=null;if(isMonth)saleTarget=v5TargetConfig(store,month);else{
+   let sums=0,hits=0;const months=[...new Set(v5DateRange(start,end,true).map(d=>d.slice(0,7)))];for(const mo of months){if(v5TargetConfig(store,mo)===null)continue;const plan=v5DayPlans(store,mo);for(const day of plan){if(day.date>=start&&day.date<=end){sums+=day.daily;hits++;}}}if(hits)saleTarget=sums;
+ }
+ const calls=v5CallsBetween(store,start,end),callGoal=v5CallsGoal(store,start,end);const tasks=v5TasksBetween(store,start,end);const marketing=v5MarketingBetween(start,end);const review=isMonth?extraReviewGet(month,store):null;
+ const partsCommercial=[{key:'Vendas',done:sales,goal:saleTarget,pct:v5Ratio(sales,saleTarget??0),money:true},{key:'Liga\u00e7\u00f5es',done:calls,goal:callGoal,pct:v5Ratio(calls,callGoal)}];if(isMonth)partsCommercial.push({key:'Google',done:review?.count??0,goal:20,pct:review?v5Ratio(review.count,20):null});
+ const partsOperational=[{key:'Checklist',done:tasks.done,goal:tasks.total,pct:v5Ratio(tasks.done,tasks.total)}];
+ const instagram=isMonth?(v5.instagram[store+'|'+month]||null):null;
+ if(instagram&&instagram.planned>0)partsOperational.push({key:'Instagram',done:instagram.done,goal:instagram.planned,pct:v5Ratio(instagram.done,instagram.planned)});
+ const summary=parts=>{const eligible=parts.filter(x=>x.pct!==null);return eligible.length?eligible.reduce((s,p)=>s+v5Cap(p.pct),0)/eligible.length:null;};
+ return {store,sales,count,saleTarget,calls,callGoal,review,tasks,marketing,instagram,commercial:partsCommercial,operational:partsOperational,commercialPct:summary(partsCommercial),operationalPct:summary(partsOperational)};
+}
+function v5Range(){const isMonth=v5UI.periodType==='month';const start=isMonth?v5MonthStart(v5UI.periodMonth):extraWeekStart(v5UI.periodWeek);return {start,end:isMonth?v5MonthEnd(v5UI.periodMonth):addDays(start,6),isMonth};}
+function v5Progress(title,pct){const capped=v5Cap(pct);return '<div class="v5-meter"><div class="v5-meter-head"><b>'+esc(title)+'</b><strong>'+(pct===null?'Sem base':v5PlainPercent(pct))+'</strong></div><div class="v5-meter-track"><span style="width:'+(capped??0)+'%"></span></div></div>';}
+function v5Details(parts){return '<div class="v5-metrics-list">'+parts.map(p=>'<div><span>'+esc(p.key)+'</span><b>'+ (p.pct===null?'Sem meta':v5PlainPercent(p.pct))+'</b><small>'+ (p.money?money(p.done,0):integer(p.done))+' / '+(p.goal===null?'sem meta':p.money?money(p.goal,0):String(Number(p.goal.toFixed(1))))+'</small></div>').join('')+'</div>';}
+function v5OverviewRender(){if(!v5)return;const {start,end,isMonth}=v5Range();el('v5MonthField').classList.toggle('hidden',!isMonth);el('v5WeekField').classList.toggle('hidden',isMonth);
+ const available=v5StoreVisible().filter(s=>teleIsAdmin()||s.id===extraStoreRole());const stats=available.map(s=>v5StatsForStore(s.id,start,end,isMonth));
+ el('v5GlobalMarketing').innerHTML='<strong>Status WhatsApp da UMA (único para toda a empresa)</strong><p>Calendário central de produtos, sem distribuição da meta entre lojas.</p>'+v5Progress('Publicações confirmadas',v5Ratio(v5MarketingBetween(start,end).published,v5MarketingBetween(start,end).expected));
+ el('v5PerformanceCards').innerHTML=stats.map(a=>'<article class="v5-performance-card"><div class="v5-card-heading"><h4>'+esc(storeName(a.store))+'</h4><small>'+extraDateLong(start)+' a '+extraDateLong(end)+'</small></div>'+v5Progress('Desempenho comercial',a.commercialPct)+v5Details(a.commercial)+v5Progress('Desempenho operacional',a.operationalPct)+v5Details(a.operational)+'</article>').join('');
+}
+function v5MarketRecord(date){return v5.marketing.find(r=>r.date===date)||null;}
+function v5MarketCategory(date){return V5_CATEGORIES[new Date(date+'T12:00:00').getDay()]||'';}
+function v5MarketState(r){return !r?'waiting':r.publishedAt?'published':r.art?'art':'planned';}
+function v5MarketStatus(r){return !r?'N\u00e3o programado':r.publishedAt?'Publicado':r.art?'Arte produzida':'Produto programado';}
+function v5MarketValidDate(date){return v5ISOdate(date)&&v5IsWeekday(date);}
+function v5MarketingRender(){if(!v5)return;
+ const month=v5UI.marketingMonth,all=v5DateRange(v5MonthStart(month),v5MonthEnd(month),true),scheduled=v5.marketing.filter(r=>r.date.startsWith(month)),stats=v5MarketingBetween(v5MonthStart(month),v5MonthEnd(month));
+ el('v5MarketingKPIs').innerHTML=[extraKPICard('Dias previstos',stats.expected,'Segunda a sexta, exceto folgas indicadas'),extraKPICard('Produtos planejados',scheduled.filter(r=>!v5.marketingDaysOff.includes(r.date)).length,'C\u00f3digos diferentes no ano'),extraKPICard('Publica\u00e7\u00f5es conclu\u00eddas',stats.published,'Confirmadas no prot\u00f3tipo'),extraKPICard('Cumprimento',v5PlainPercent(v5Ratio(stats.published,stats.expected)),'Dias previstos neste m\u00eas')].join('');
+ const first=new Date(v5MonthStart(month)+'T12:00:00').getDay(),padding=(first+6)%7;
+ const cells=Array.from({length:Math.min(4,padding)},()=>'<div class="v5-calendar-empty"></div>');
+ for(const date of all){const r=v5MarketRecord(date),off=v5.marketingDaysOff.includes(date),state=off?'closed':v5MarketState(r);cells.push('<button type="button" class="v5-calendar-day '+state+(date===v5UI.marketDate?' selected':'')+'" data-v5-date="'+date+'"><small>'+date.slice(-2)+'</small><b>'+ (off?'Sem postagem':r?esc(r.code):'Pendente')+'</b><span>'+ (off?'Feriado/fechado':v5MarketStatus(r))+'</span></button>');}
+ el('v5MarketingCalendar').innerHTML=['Seg','Ter','Qua','Qui','Sex'].map(a=>'<div class="v5-calendar-head">'+a+'</div>').join('')+cells.join('');
+ const history=scheduled.sort((a,b)=>b.date.localeCompare(a.date));el('v5MarketingHistory').innerHTML=history.map(r=>{
+  const buttons=(r.art?'<button type="button" class="btn btn-small btn-outline" data-v5-download="art|'+r.id+'">Baixar arte</button>':'')+(r.evidence?'<button type="button" class="btn btn-small btn-outline" data-v5-download="evidence|'+r.id+'">Baixar evid&ecirc;ncia</button>':'');
+  return '<div class="v5-history-row"><div class="v5-history-figure">'+(r.art?'<img alt="Arte fict\u00edcia vinculada a '+esc(r.code)+'" src="'+esc(r.art)+'">':'<span>Sem arte</span>')+'</div><div><strong>'+extraDateLong(r.date)+' &middot; '+esc(r.code)+'</strong><small>'+esc(r.category||'')+' &middot; '+v5MarketStatus(r)+'</small>'+(r.publishedAt?'<small>Publicado em '+extraDateLong(r.publishedAt)+' &middot; '+esc(r.updatedBy||r.createdBy||'Exemplo')+'</small>':'')+'<div class="v5-row-actions"><button type="button" class="btn btn-small btn-soft" data-v5-date="'+r.date+'">Abrir</button>'+buttons+'</div></div></div>';
+ }).join('')||'<div class="empty-msg">Nenhum produto programado neste m&ecirc;s.</div>';
+ const date=v5UI.marketDate||'';el('v5MarketDayOff').checked=!!date&&v5.marketingDaysOff.includes(date);el('v5MarketDayOff').disabled=!teleIsAdmin()||!v5MarketValidDate(date);
+ v5InstagramRender();
+ el('v5MarketDelete').disabled=!teleIsAdmin()||!v5MarketRecord(date);
+ v5MarketUploadPreview();
+}
+function v5InstagramRender(){if(!v5)return;const month=v5UI.marketingMonth,visible=v5StoreVisible();el('v5InstagramSummary').innerHTML=visible.map(s=>{const r=v5.instagram[s.id+'|'+month];return '<div class="v5-instagram-row"><b>'+esc(s.name)+'</b><span>'+(r?integer(r.done)+' / '+integer(r.planned)+' &middot; '+v5PlainPercent(v5Ratio(r.done,r.planned)):'N&atilde;o informado')+'</span></div>';}).join('');
+ const store=el('v5InstagramStore').value||'joi',r=v5.instagram[store+'|'+month];el('v5InstagramPlanned').value=r?.planned??'';el('v5InstagramDone').value=r?.done??'';
+}
+function v5InstagramSubmit(e){e.preventDefault();if(!teleIsAdmin())return;const store=el('v5InstagramStore').value,month=v5UI.marketingMonth,planned=Number(el('v5InstagramPlanned').value),done=Number(el('v5InstagramDone').value);
+ if(!Number.isInteger(planned)||planned<0||planned>500||!Number.isInteger(done)||done<0||done>500)return extraMsgBad('Informe quantidades inteiras entre 0 e 500.');
+ v5Commit(()=>{v5.instagram[store+'|'+month]={planned,done,by:profile.label,at:today};},'Resultados demonstrativos do Instagram registrados.');
+}
+function v5MarketUploadPreview(){const a=v5UI.art,e=v5UI.evidence;el('v5MarketingUploads').innerHTML=(a?'<div><img src="'+esc(a)+'" alt="Prévia da arte"><small>Arte dispon&iacute;vel</small></div>':'')+(e?'<div><img src="'+esc(e)+'" alt="Pr&eacute;via da evid&ecirc;ncia"><small>Evid&ecirc;ncia dispon&iacute;vel</small></div>':'')||'<span class="v5-small">Selecione um dia ou anexe uma arte. Os anexos salvos aparecem aqui.</span>';}
+function v5MarketPick(date){if(!v5MarketValidDate(date)){toast('Escolha uma data de segunda a sexta-feira.');return false;}
+ v5UI.marketDate=date;const rec=v5MarketRecord(date);el('v5MarketDate').value=date;el('v5MarketCode').value=rec?.code||'';el('v5MarketCategory').value=rec?.category||'';if(!rec)el('v5MarketCategory').value=new DOMParser().parseFromString(v5MarketCategory(date),'text/html').body.textContent;
+ el('v5MarketNote').value=rec?.note||'';v5UI.art=rec?.art||null;v5UI.evidence=rec?.evidence||null;el('v5MarketArt').value='';el('v5MarketEvidence').value='';v5MarketingRender();return true;
+}
+function v5MarketCodeDuplicate(code,date){const normalized=normKey(code);return v5.marketing.find(r=>r.date.slice(0,4)===date.slice(0,4)&&r.date!==date&&normKey(r.code)===normalized);}
+function v5MarketSave(publish){const date=el('v5MarketDate').value,code=el('v5MarketCode').value.trim();if(!v5MarketValidDate(date))return extraMsgBad('A postagem deve ser feita em um dia de segunda a sexta.');if(v5.marketingDaysOff.includes(date))return extraMsgBad('Dia marcado como sem postagem. A Milena precisa reabrir a data.');if(!code)return extraMsgBad('Informe o c\u00f3digo do produto.');const duplicate=v5MarketCodeDuplicate(code,date);if(duplicate)return extraMsgBad('C\u00f3digo j\u00e1 previsto no ano, na data '+extraDateLong(duplicate.date)+'.');
+ const prior=v5MarketRecord(date);const art=v5UI.art||'',evidence=v5UI.evidence||'';
+ if(publish&&date>today)return extraMsgBad('A publica\u00e7\u00e3o futura n\u00e3o pode ser confirmada.');if(publish&&!art)return extraMsgBad('Anexe a arte antes de confirmar a publica\u00e7\u00e3o.');
+ const updated={id:prior?.id||freshId(),date,code,category:el('v5MarketCategory').value.trim()||new DOMParser().parseFromString(v5MarketCategory(date),'text/html').body.textContent,note:el('v5MarketNote').value.trim(),art,evidence,publishedAt:publish?(prior?.publishedAt||today):(prior?.publishedAt||''),createdBy:prior?.createdBy||profile.label,updatedAt:today,updatedBy:profile.label};
+ const ok=v5Commit(()=>{if(prior)Object.assign(prior,updated);else v5.marketing.push(updated);v5.audit.push({date:today,type:publish?'publicacao':'planejamento',ref:date,by:profile.label,desc:code});},publish?'Publica\u00e7\u00e3o confirmada (demo).':'Programa\u00e7\u00e3o salva (demo).');if(ok){v5UI.marketDate=date;v5MarketingRender();}return ok;
+}
+function v5ImageData(file,done){if(!file)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type))return extraMsgBad('Envie uma imagem PNG, JPG ou WebP.');if(file.size>4*1024*1024)return extraMsgBad('Imagem muito grande. Use um arquivo de at\u00e9 4 MB.');
+ const reader=new FileReader();reader.onerror=()=>toast('N\u00e3o foi poss\u00edvel ler a imagem.');reader.onload=()=>{const img=new Image();img.onerror=()=>toast('Arquivo de imagem inv\u00e1lido.');img.onload=()=>{const ratio=Math.min(1,960/Math.max(img.width,img.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.floor(img.width*ratio));canvas.height=Math.max(1,Math.floor(img.height*ratio));const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);const data=canvas.toDataURL('image/jpeg',0.7);if(data.length>380000){toast('Imagem ainda muito grande ap\u00f3s compactar.');return;}done(data);v5MarketUploadPreview();};img.src=reader.result;};reader.readAsDataURL(file);
+}
+function v5DownloadData(data,filename){const a=document.createElement('a');a.href=data;a.download=filename;document.body.appendChild(a);a.click();a.remove();}
+function v5MarketingDelete(){if(!teleIsAdmin())return;const date=v5UI.marketDate,r=v5MarketRecord(date);if(!r)return;if(!confirm('Excluir o planejamento fict\u00edcio de '+date+'?'))return;v5Commit(()=>{v5.marketing=v5.marketing.filter(x=>x.id!==r.id);v5.audit.push({date:today,type:'exclusao',ref:date,by:profile.label,desc:r.code});},'Publica\u00e7\u00e3o removida da demonstra\u00e7\u00e3o.');v5MarketPick(date);}
+function v5MarketHoliday(){if(!teleIsAdmin())return;const date=v5UI.marketDate;if(!v5MarketValidDate(date))return;const flag=el('v5MarketDayOff').checked;if(flag&&v5MarketRecord(date)){el('v5MarketDayOff').checked=false;return extraMsgBad('Exclua o registro deste dia antes de marc\u00e1-lo como fechado.');}v5Commit(()=>{v5.marketingDaysOff=v5.marketingDaysOff.filter(d=>d!==date);if(flag)v5.marketingDaysOff.push(date);},'Calend\u00e1rio de postagens atualizado.');}
+function v5SignContext(){const canvas=el('v5SignatureCanvas');return canvas.getContext('2d');}
+function v5SignatureReset(){const canvas=el('v5SignatureCanvas'),ctx=v5SignContext();const w=canvas.getBoundingClientRect().width||540;canvas.width=Math.ceil(w*devicePixelRatio);canvas.height=Math.ceil(164*devicePixelRatio);ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,w,164);ctx.lineWidth=2.3;ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#202020';v5UI.signUsed=false;v5UI.signDrawing=false;}
+function v5SignDrawStart(ev){if(ev.button!==undefined&&ev.button!==0)return;ev.preventDefault();const canvas=el('v5SignatureCanvas'),ctx=v5SignContext(),r=canvas.getBoundingClientRect();try{canvas.setPointerCapture(ev.pointerId);}catch(e){}ctx.beginPath();ctx.moveTo(ev.clientX-r.left,ev.clientY-r.top);v5UI.signDrawing=true;}
+function v5SignDrawMove(ev){if(!v5UI.signDrawing)return;ev.preventDefault();const canvas=el('v5SignatureCanvas'),ctx=v5SignContext(),r=canvas.getBoundingClientRect();ctx.lineTo(ev.clientX-r.left,ev.clientY-r.top);ctx.stroke();v5UI.signUsed=true;}
+function v5SignDrawEnd(ev){if(v5UI.signDrawing)v5UI.signDrawing=false;}
+function v5TrainingSellerSync(){const seller=SELLERS.find(s=>s.id===el('v5TrainingSeller').value);el('v5TrainingStore').value=seller?storeName(seller.store):'';}
+function v5TrainingRender(){if(!v5)return;const records=[...v5.trainingRecords].reverse();el('v5TrainingHistory').innerHTML=records.map(r=>'<div class="v5-history-row"><div class="v5-sign-thumb"><img src="'+esc(r.signature)+'" alt="Assinatura de exemplo"></div><div><strong>'+esc(r.sellerLabel)+' &middot; '+esc(storeName(r.store))+'</strong><small>'+esc(r.procedure)+' '+esc(r.version)+' &middot; '+extraDateLong(r.date)+' '+esc(r.time)+'</small><small>Respons&aacute;vel: '+esc(r.instructor)+' &middot; Documento: '+(r.document?'PDF anexado':'Refer&ecirc;ncia do procedimento')+'</small><div class="v5-row-actions"><button class="btn btn-small btn-outline" type="button" data-v5-receipt="'+esc(r.id)+'">Comprovante / imprimir</button>'+(r.document?'<button type="button" class="btn btn-small btn-soft" data-v5-train-pdf="'+esc(r.id)+'">Baixar PDF anexado</button>':'')+'</div></div></div>').join('')||'<div class="empty-msg">Nenhuma assinatura cadastrada nesta demonstra&ccedil;&atilde;o.</div>';
+}
+function v5TrainingSubmit(event){event.preventDefault();if(!teleIsAdmin())return;const seller=SELLERS.find(s=>s.id===el('v5TrainingSeller').value);if(!seller)return extraMsgBad('Selecione o colaborador.');if(!v5UI.signUsed)return extraMsgBad('Desenhe uma assinatura fict\u00edcia no quadro.');if(v5UI.docReading)return extraMsgBad('Aguarde o carregamento do PDF.');const date=el('v5TrainingDate').value,time=el('v5TrainingTime').value;if(!v5ISOdate(date)||date>today)return extraMsgBad('Informe uma data de treinamento v\u00e1lida.');
+ const rec={id:freshId(),sellerId:seller.id,sellerLabel:seller.name,store:seller.store,procedure:el('v5TrainingProcedure').value,title:el('v5TrainingTitle').value.trim(),version:el('v5TrainingVersion').value.trim(),instructor:el('v5TrainingInstructor').value.trim(),date,time,signature:el('v5SignatureCanvas').toDataURL('image/png'),declaration:'Declaro que participei do treinamento indicado e recebi as orienta\u00e7\u00f5es referentes ao procedimento apresentado.',document:v5UI.docData||'',by:profile.label,registeredAt:new Date().toISOString()};
+ if(!rec.version||!rec.instructor||!time)return extraMsgBad('Preencha vers\u00e3o, respons\u00e1vel e hor\u00e1rio.');
+ if(v5Commit(()=>{v5.trainingRecords.push(rec);v5.audit.push({date:today,type:'treinamento',ref:rec.id,by:profile.label,desc:rec.procedure});},'Confirma\u00e7\u00e3o demonstrativa registrada.')){v5SignatureReset();v5UI.docData=null;el('v5TrainingDocument').value='';el('v5TrainingTitle').value='';}
+}
+function v5Receipt(record){const r=record;return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Comprovante de treinamento - UMA</title><style>body{font:16px Arial;color:#181818;max-width:820px;margin:35px auto;padding:20px;line-height:1.6}header{border-bottom:5px solid #e6b937;padding-bottom:16px}h1{font-size:25px}strong{display:inline-block;min-width:175px}article{border:1px solid #bbb;border-radius:9px;padding:20px;margin-top:20px}img{width:350px;max-width:100%;border:1px solid #ddd}small{color:#555}.btn{padding:10px 15px;background:#111;color:#fff;border:0;border-radius:7px}@media print{.btn{display:none}} </style></head><body><button class="btn" onclick="window.print()">Imprimir / salvar como PDF</button><header><h1>UMA - Comprovante demonstrativo de treinamento</h1><small>Registro local fict\u00edcio, sem valida\u00e7\u00e3o jur\u00eddica ou autentica\u00e7\u00e3o segura</small></header><article><p><strong>Colaborador:</strong> '+esc(r.sellerLabel)+'</p><p><strong>Unidade:</strong> '+esc(storeName(r.store))+'</p><p><strong>Procedimento:</strong> '+esc(r.procedure+' - '+r.title)+'</p><p><strong>Vers\u00e3o:</strong> '+esc(r.version)+'</p><p><strong>Respons\u00e1vel:</strong> '+esc(r.instructor)+'</p><p><strong>Data e hora:</strong> '+extraDateLong(r.date)+' '+esc(r.time)+'</p><p><strong>Documento:</strong> '+(r.document?'PDF vinculado ao registro local':'Procedimento de refer\u00eancia sem anexo')+'</p><p>'+esc(r.declaration)+'</p><img alt="Tra\u00e7o de assinatura demonstrativa" src="'+esc(r.signature)+'"><p><small>Registro: '+esc(r.id)+' &middot; '+esc(r.registeredAt)+'</small></p></article></body></html>';}
+function v5ReceiptOpen(id){const record=v5.trainingRecords.find(r=>r.id===id);if(!record)return;const win=window.open('','_blank');if(!win)return extraMsgBad('Habilite a abertura de uma nova aba para visualizar o comprovante.');win.document.open();win.document.write(v5Receipt(record));win.document.close();}
+function v5ReportStats(month){const start=v5MonthStart(month),end=v5MonthEnd(month);return STORES.map(s=>v5StatsForStore(s.id,start,end,true));}
+function v5MetricRow(title,n,den,currency){const ratio=den!==null?v5Ratio(n,den):null;return '<div class="v5-slide-stat"><span>'+esc(title)+'</span><strong>'+(currency?money(n,0):integer(n))+'</strong><small>'+(den===null?'Meta n\u00e3o configurada':'Meta '+(currency?money(den,0):integer(den))+' &middot; '+v5PlainPercent(ratio))+'</small></div>';}
+function v5SlideShell(tag,title,sub,body){return '<div class="v5-slide-kicker">UNIVERSO DAS MANGUEIRAS &middot; '+tag+'</div><h2>'+title+'</h2><p class="v5-slide-desc">'+sub+'</p>'+body+'<div class="v5-slide-brand">PORTAL UMA V5 &middot; DADOS FICT&Iacute;CIOS</div>';}
+function v5SlideStore(s){return '<div class="v5-slide-stats">'+v5MetricRow('Faturamento',s.sales,s.saleTarget,true)+v5MetricRow('Vendas',s.count,null,false)+v5MetricRow('Avalia\u00e7\u00f5es Google',s.review?.count??0,s.review?20:null,false)+v5MetricRow('Liga\u00e7\u00f5es comerciais',s.calls,s.callGoal,false)+v5MetricRow('Tarefas conclu\u00eddas',s.tasks.done,s.tasks.total,false)+v5MetricRow('Instagram',s.instagram?.done??0,s.instagram?s.instagram.planned:null,false)+'</div><div class="v5-slide-group">Comercial: <b>'+v5PlainPercent(s.commercialPct)+'</b> &nbsp;&nbsp; Operacional: <b>'+v5PlainPercent(s.operationalPct)+'</b></div>';}
+function v5GenerateSlides(month){const stats=v5ReportStats(month),tot=(key)=>stats.reduce((s,r)=>s+(Number(r[key])||0),0),storeBy=id=>stats.find(s=>s.store===id);
+ const revenueTarget=stats.every(s=>s.saleTarget!==null)?tot('saleTarget'):null;const totalTasks=stats.reduce((s,r)=>s+r.tasks.total,0),tasksDone=stats.reduce((s,r)=>s+r.tasks.done,0);const marketing=v5MarketingBetween(v5MonthStart(month),v5MonthEnd(month));const published=marketing.published,expected=marketing.expected;
+ const allOpen=db.actions.filter(x=>!x.done);const pending=[];for(const s of stats){if(s.saleTarget!==null&&s.sales<s.saleTarget)pending.push(storeName(s.store)+': receita abaixo da meta ('+v5PlainPercent(v5Ratio(s.sales,s.saleTarget))+')');if(s.tasks.total>s.tasks.done)pending.push(storeName(s.store)+': '+(s.tasks.total-s.tasks.done)+' tarefa(s) pendente(s)');}if(expected>published)pending.push('WhatsApp: '+(expected-published)+' publica\u00e7\u00e3o(\u00f5es) n\u00e3o confirmada(s)');
+ const slides=[];
+ slides.push(v5SlideShell('FECHAMENTO MENSAL','Resultados de '+v5MonthLabel(month),'Demonstra\u00e7\u00e3o de reuni\u00e3o comercial e operacional de 20 a 30 minutos.','<div class="v5-slide-hero"><strong>Resultados, aprendizados e pr\u00f3ximos passos</strong><p>Joinville &middot; Itaja\u00ed &middot; Tubar\u00e3o</p></div>'));
+ slides.push(v5SlideShell('02 / GERAL','Resultado consolidado UMA','Faturamento, volume de vendas e contexto do m\u00eas.','<div class="v5-slide-stats">'+v5MetricRow('Faturamento consolidado',tot('sales'),revenueTarget,true)+v5MetricRow('N\u00famero de vendas',tot('count'),null,false)+v5MetricRow('Liga\u00e7\u00f5es',tot('calls'),tot('callGoal'),false)+v5MetricRow('Tarefas',tasksDone,totalTasks,false)+v5MetricRow('Postagens WhatsApp',published,expected,false)+v5MetricRow('Instagram',stats.reduce((s,r)=>s+(r.instagram?.done||0),0),stats.some(r=>r.instagram)?stats.reduce((s,r)=>s+(r.instagram?.planned||0),0):null,false)+'</div>'));
+ for(const [id,n] of [['joi','03'],['ita','04'],['tub','05']]){const st=storeBy(id);slides.push(v5SlideShell(n+' / UNIDADE','Loja '+storeName(id),'Indicadores previstos e realizados no m\u00eas selecionado.',v5SlideStore(st)));}
+ slides.push(v5SlideShell('06 / COMPARATIVO','Panorama das tr\u00eas lojas','Comparativo sem atribuir uma nota geral \u00fanica entre rotinas de naturezas diferentes.','<div class="v5-slide-compare"><div class="head"><b>Loja</b><b>Comercial</b><b>Operacional</b><b>Faturamento</b></div>'+stats.map(s=>'<div><strong>'+storeName(s.store)+'</strong><span>'+v5PlainPercent(s.commercialPct)+'</span><span>'+v5PlainPercent(s.operationalPct)+'</span><span>'+money(s.sales,0)+'</span></div>').join('')+'</div>'));
+ slides.push(v5SlideShell('07 / DIAGN\u00d3STICO','Pend\u00eancias e pontos de aten\u00e7\u00e3o','Perguntas para investigar as causas, n\u00e3o somente cobrar resultados.','<ul class="v5-slide-list">'+(pending.slice(0,6).map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Nenhuma pend\u00eancia calculada com os registros dispon\u00edveis.</li>')+'</ul><p>Investigar: falta de tempo, condi\u00e7\u00f5es de trabalho, materiais e treinamento.</p>'));
+ slides.push(v5SlideShell('08 / GR E A\u00c7\u00c3O','O que faremos no pr\u00f3ximo m\u00eas?','Encaminhamentos em aberto no Gerenciamento de Rotina.','<ul class="v5-slide-list">'+(allOpen.slice(0,5).map(x=>'<li>'+esc(x.what)+' &mdash; '+esc(x.owner)+' &mdash; prazo '+extraDateLong(x.due)+'</li>').join('')||'<li>Registrar melhorias, respons\u00e1veis e prazos no GR.</li>')+'</ul><p>Acompanhar na pr\u00f3xima reuni\u00e3o. Resultados demonstrativos, sem ERP integrado.</p>'));
+ return slides;
+}
+function v5SlideShow(){const overlay=el('v5SlidesOverlay');overlay.classList.remove('hidden');document.body.classList.add('v5-presenting');v5SlideDisplay();}
+function v5SlideDisplay(){if(!v5UI.slides.length)return;el('v5SlideCanvas').innerHTML=v5UI.slides[v5UI.slideIndex];el('v5SlideCounter').textContent='Slide '+(v5UI.slideIndex+1)+' / '+v5UI.slides.length;el('v5SlidePrev').disabled=v5UI.slideIndex===0;el('v5SlideNext').disabled=v5UI.slideIndex===v5UI.slides.length-1;}
+function v5SlideMove(delta){v5UI.slideIndex=Math.min(Math.max(0,v5UI.slideIndex+delta),v5UI.slides.length-1);v5SlideDisplay();}
+function v5SlideClose(){el('v5SlidesOverlay').classList.add('hidden');document.body.classList.remove('v5-presenting');}
+function v5ReportOpen(archivedMonth){if(!teleIsAdmin())return;const month=archivedMonth||v5UI.reportMonth;v5UI.slides=archivedMonth&&v5.reportArchives?.[month]?v5.reportArchives[month].slides:v5GenerateSlides(month);v5UI.slideIndex=0;v5SlideShow();}
+function v5ExportSlides(month){if(!teleIsAdmin())return;const slides=v5GenerateSlides(month);const css='body{margin:0;background:#111;font:16px Arial;color:#fff;text-align:center}.nav{position:sticky;top:0;background:#111;padding:15px}button{margin:4px;padding:10px 14px;cursor:pointer}article{background:#f9f8f5;color:#181818;width:min(1100px,94vw);aspect-ratio:16/9;margin:24px auto;padding:38px;box-sizing:border-box;overflow:auto;text-align:left;border-top:11px solid #f0bc3d}h2{font-size:36px}.v5-slide-kicker{font-weight:800;color:#856111}.v5-slide-desc{font-size:18px;color:#555}.v5-slide-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-top:26px}.v5-slide-stat{border:1px solid #ddd;padding:20px;border-radius:10px}.v5-slide-stat span,.v5-slide-stat small{display:block}.v5-slide-stat strong{display:block;font-size:26px;margin:7px 0}.v5-slide-brand{font-size:12px;color:#777;margin-top:32px}.v5-slide-hero{margin-top:100px;font-size:28px}.v5-slide-group{padding:15px;background:#fff0bb;margin-top:18px}.v5-slide-compare{margin-top:30px}.v5-slide-compare div{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #bbb;padding:16px}.v5-slide-list{font-size:20px;line-height:1.7}@media print{body{background:#fff}.nav{display:none}article{page-break-after:always;break-after:page;width:100%;height:92vh;margin:0;box-shadow:none}}';
+ const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Fechamento UMA - '+esc(month)+'</title><style>'+css+'</style><div class="nav"><button onclick="window.print()">Imprimir / PDF</button> <b>UMA - Slides fict\u00edcios - '+esc(month)+'</b></div>'+slides.map(s=>'<article>'+s+'</article>').join('')+'</html>';
+ const blob=new Blob([html],{type:'text/html;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='UMA_fechamento_'+month+'_demo.html';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Apresenta\u00e7\u00e3o HTML exportada com dados fict\u00edcios.');
+}
+function v5ArchiveReport(){if(!teleIsAdmin())return;const month=v5UI.reportMonth;v5Commit(()=>{v5.reportArchives=v5.reportArchives||{};v5.reportArchives[month]={savedAt:new Date().toISOString(),by:profile.label,slides:v5GenerateSlides(month)};},'Fechamento demonstrativo arquivado neste navegador.');}
+function v5ReportRender(){if(!v5)return;const month=v5UI.reportMonth,exists=!!v5.reportArchives?.[month];el('v5ReportPreview').innerHTML='Selecione o m&ecirc;s e abra a apresenta&ccedil;&atilde;o. O relat&oacute;rio utiliza as vendas, avalia&ccedil;&otilde;es, liga&ccedil;&otilde;es, tarefas e postagens <strong>registradas neste navegador</strong>. '+(exists?'<strong>Existe um fechamento arquivado para este m&ecirc;s.</strong>':'Sem fechamento arquivado neste m&ecirc;s.');
+ el('v5ReportArchives').innerHTML=Object.entries(v5.reportArchives||{}).sort(([a],[b])=>b.localeCompare(a)).map(([mo,r])=>'<button type="button" class="btn btn-small btn-outline" data-v5-archive="'+mo+'">'+esc(v5MonthLabel(mo))+' &middot; '+esc(r.by)+'</button>').join('')||'<span class="v5-small">Nenhum fechamento arquivado nesta demonstra&ccedil;&atilde;o.</span>';
+}
+function v5RenderAll(){if(!v5)return;v5OverviewRender();v5TargetsRender();v5MarketingRender();v5TrainingRender();v5ReportRender();}
+function v5SetStoreSelector(){const options=v5StoreVisible();const sel=el('v5TargetStore');sel.replaceChildren();options.forEach(s=>sel.append(makeOption(s.id,s.name)));if(!options.some(s=>s.id===v5UI.targetStore))v5UI.targetStore=options[0]?.id||'joi';sel.value=v5UI.targetStore;}
+function v5RoleChanged(){if(!v5)return;const admin=teleIsAdmin();document.querySelectorAll('.v5-admin').forEach(node=>node.classList.toggle('hidden',!admin));
+ if(admin){el('filterStore').disabled=false;setStoreSelect('filterStore',true);filter.store='all';filter.seller='all';setSellerSelect('filterSeller','all',true);}
+ else {const store=extraStoreRole();filter.store=store;filter.seller='all';el('filterStore').replaceChildren(makeOption(store,storeName(store)));el('filterStore').value=store;el('filterStore').disabled=true;setSellerSelect('filterSeller',store,true);v5UI.targetStore=store;}
+ v5SetStoreSelector();renderOverview();v5RenderAll();}
+function v5InitUI(){v5Load();
+ el('v5PeriodType').value=v5UI.periodType;el('v5PeriodMonth').value=v5UI.periodMonth;el('v5PeriodWeek').value=v5UI.periodWeek;
+ el('v5TargetMonth').value=v5UI.targetMonth;el('v5MarketingMonth').value=v5UI.marketingMonth;el('v5ReportMonth').value=v5UI.reportMonth;
+ v5SetStoreSelector();v5UI.marketDate=v5DateRange(v5MonthStart(v5UI.marketingMonth),v5MonthEnd(v5UI.marketingMonth),true).find(d=>d>=today)||v5DateRange(v5MonthStart(v5UI.marketingMonth),v5MonthEnd(v5UI.marketingMonth),true)[0]||today;
+ v5MarketPick(v5UI.marketDate);
+ const trainee=el('v5TrainingSeller');SELLERS.forEach(s=>trainee.append(makeOption(s.id,s.name+' - '+storeName(s.store))));v5TrainingSellerSync();el('v5TrainingDate').value=today;el('v5TrainingTime').value=new Date().toTimeString().slice(0,5);
+ v5SignatureReset();const canvas=el('v5SignatureCanvas');canvas.addEventListener('pointerdown',v5SignDrawStart);canvas.addEventListener('pointermove',v5SignDrawMove);canvas.addEventListener('pointerup',v5SignDrawEnd);canvas.addEventListener('pointercancel',v5SignDrawEnd);canvas.addEventListener('lostpointercapture',v5SignDrawEnd);
+ el('v5SignatureClear').addEventListener('click',v5SignatureReset);
+ trainee.addEventListener('change',v5TrainingSellerSync);el('v5TrainingForm').addEventListener('submit',v5TrainingSubmit);
+ el('v5TrainingDocument').addEventListener('change',e=>{const file=e.target.files?.[0];v5UI.docData=null;v5UI.docFilename='';if(!file)return;
+  if(file.type!=='application/pdf'||file.size>350*1024){e.target.value='';toast('Somente arquivos PDF de at\u00e9 350 KB na demonstra\u00e7\u00e3o.');return;}v5UI.docReading=true;const reader=new FileReader();reader.onload=()=>{v5UI.docData=String(reader.result);v5UI.docFilename=file.name;v5UI.docReading=false;};reader.onerror=()=>{v5UI.docReading=false;toast('N\u00e3o foi poss\u00edvel ler o PDF.');};reader.readAsDataURL(file);
+ });
+ el('v5TrainingHistory').addEventListener('click',e=>{const receipt=e.target.closest('[data-v5-receipt]'),pdf=e.target.closest('[data-v5-train-pdf]');if(receipt)v5ReceiptOpen(receipt.dataset.v5Receipt);if(pdf){const r=v5.trainingRecords.find(x=>x.id===pdf.dataset.v5TrainPdf);if(r?.document)v5DownloadData(r.document,'UMA_documento_'+r.procedure+'.pdf');}});
+ el('v5PeriodType').addEventListener('change',e=>{v5UI.periodType=e.target.value;v5OverviewRender();});
+ el('v5PeriodMonth').addEventListener('change',e=>{if(e.target.value)v5UI.periodMonth=e.target.value;v5OverviewRender();});
+ el('v5PeriodWeek').addEventListener('change',e=>{if(e.target.value)v5UI.periodWeek=e.target.value;v5OverviewRender();});
+ el('v5TargetMonth').addEventListener('change',e=>{if(e.target.value)v5UI.targetMonth=e.target.value;v5TargetsRender();});
+ el('v5TargetStore').addEventListener('change',e=>{v5UI.targetStore=teleIsAdmin()?e.target.value:extraStoreRole();v5TargetsRender();});
+ el('v5TargetForm').addEventListener('submit',e=>{e.preventDefault();if(!teleIsAdmin())return;const month=v5UI.targetMonth,store=v5UI.targetStore,goal=Number(el('v5TargetGoal').value),floor=Number(el('v5TargetFloor').value);if(!Number.isFinite(goal)||goal<=0||!Number.isFinite(floor)||floor<0)return extraMsgBad('Informe meta maior que zero e m\u00ednimo igual ou maior que zero.');v5Commit(()=>{v5.targets[store+'|'+month]=goal;v5.minimums[store]=floor;v5.audit.push({date:today,type:'meta',ref:store+'|'+month,by:profile.label,desc:goal});},'Meta do m\u00eas e m\u00ednimo fixo salvos.');});
+ el('v5TargetBusinessDays').addEventListener('click',e=>{const btn=e.target.closest('[data-v5-dayoff]');if(!btn||!teleIsAdmin())return;const date=btn.dataset.v5Dayoff,store=v5UI.targetStore,month=v5UI.targetMonth,key=store+'|'+month;v5Commit(()=>{const list=v5.daysOff[key]||[];v5.daysOff[key]=list.includes(date)?list.filter(d=>d!==date):[...list,date];},'Calend\u00e1rio de funcionamento alterado.');});
+ el('v5MarketingMonth').addEventListener('change',e=>{if(!e.target.value)return;v5UI.marketingMonth=e.target.value;const dates=v5DateRange(v5MonthStart(e.target.value),v5MonthEnd(e.target.value),true);v5MarketPick(dates.find(d=>d>=today)||dates[0]);});
+ el('v5MarketingCalendar').addEventListener('click',e=>{const btn=e.target.closest('[data-v5-date]');if(btn)v5MarketPick(btn.dataset.v5Date);});
+ el('v5MarketDate').addEventListener('change',e=>{if(!v5MarketValidDate(e.target.value)){toast('O calend\u00e1rio de Status usa somente segunda a sexta-feira.');e.target.value=v5UI.marketDate;return;}v5UI.marketingMonth=e.target.value.slice(0,7);el('v5MarketingMonth').value=v5UI.marketingMonth;v5MarketPick(e.target.value);});
+ el('v5MarketArt').addEventListener('change',e=>v5ImageData(e.target.files?.[0],data=>{v5UI.art=data;}));
+ el('v5MarketEvidence').addEventListener('change',e=>v5ImageData(e.target.files?.[0],data=>{v5UI.evidence=data;}));
+ el('v5MarketingForm').addEventListener('submit',e=>{e.preventDefault();v5MarketSave(false);});
+ el('v5MarketPublish').addEventListener('click',()=>{if(el('v5MarketDate').value>today)return extraMsgBad('N\u00e3o confirme uma publica\u00e7\u00e3o futura.');v5MarketSave(true);});
+ el('v5MarketReset').addEventListener('click',()=>v5MarketPick(v5UI.marketDate));el('v5MarketDelete').addEventListener('click',v5MarketingDelete);el('v5MarketDayOff').addEventListener('change',v5MarketHoliday);
+ STORES.forEach(s=>el('v5InstagramStore').append(makeOption(s.id,s.name)));el('v5InstagramStore').addEventListener('change',v5InstagramRender);el('v5InstagramForm').addEventListener('submit',v5InstagramSubmit);
+ el('v5MarketingHistory').addEventListener('click',e=>{const d=e.target.closest('[data-v5-date]'),x=e.target.closest('[data-v5-download]');if(d)v5MarketPick(d.dataset.v5Date);if(x){const [kind,id]=x.dataset.v5Download.split('|'),r=v5.marketing.find(m=>m.id===id);if(r&&r[kind])v5DownloadData(r[kind],'UMA_'+kind+'_'+r.date+'.'+(r[kind].startsWith('data:image/svg')?'svg':'jpg'));}});
+ el('v5ReportMonth').addEventListener('change',e=>{if(e.target.value)v5UI.reportMonth=e.target.value;v5ReportRender();});
+ el('v5ReportOpen').addEventListener('click',()=>v5ReportOpen());el('v5ReportDownload').addEventListener('click',()=>v5ExportSlides(v5UI.reportMonth));el('v5ReportArchive').addEventListener('click',v5ArchiveReport);
+ el('v5ReportArchives').addEventListener('click',e=>{const r=e.target.closest('[data-v5-archive]');if(r)v5ReportOpen(r.dataset.v5Archive);});
+ el('v5SlidePrev').addEventListener('click',()=>v5SlideMove(-1));el('v5SlideNext').addEventListener('click',()=>v5SlideMove(1));el('v5SlideClose').addEventListener('click',v5SlideClose);el('v5SlidePrint').addEventListener('click',()=>window.print());
+ document.addEventListener('keydown',e=>{if(el('v5SlidesOverlay').classList.contains('hidden'))return;if(e.key==='Escape'){v5SlideClose();return;}if(e.key==='ArrowRight')v5SlideMove(1);if(e.key==='ArrowLeft')v5SlideMove(-1);});
+ v5RenderAll();
+}
+
+
+function init() {load();initSelectors();teleInitUI();extraInitUI();v5InitUI();bindEvents();teleBindUI();renderAll();setupAuth();}
 init();
 })();
 </script>
@@ -1391,6 +1693,19 @@ body:not(.is-auth) .shell{display:none} body.is-auth .auth-overlay{display:none}
  .topbar .breadcrumb{font-size:10px}
  .topbar-right{gap:6px}
 }
+
+</style>
+<style id="v5Style">
+/* Portal UMA v5 - interface demonstrativa integrada ao tema institucional */
+.v5-section{margin-top:20px}.v5-section .panel-head{gap:12px;flex-wrap:wrap}.v5-small{font-size:12px;line-height:1.6;color:#626262;margin:8px 0}.v5-toolbar{display:flex;align-items:end;gap:13px;flex-wrap:wrap;margin:16px 0 22px}.v5-toolbar .field{min-width:185px}.v5-toolbar .field input,.v5-toolbar .field select{min-height:41px}.v5-toolbar>button{min-height:41px}
+.v5-hint{font-size:12px;color:#555;background:#fbf8eb;border:1px solid #ecdcaa;border-radius:11px;padding:13px 15px;line-height:1.6;margin:14px 0}.v5-performance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.v5-performance-card{background:#fff;border:1px solid #e6dfc9;border-radius:14px;padding:18px;box-shadow:0 5px 18px #1818180c;min-width:0}.v5-card-heading{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:14px}.v5-card-heading h4{margin:0;font-size:18px}.v5-card-heading small{font-size:11px;color:#666;text-align:right}.v5-meter{margin-top:15px}.v5-meter-head{display:flex;justify-content:space-between;font-size:13px;gap:9px}.v5-meter-head strong{color:#161616;font-size:16px}.v5-meter-track{margin-top:8px;height:9px;border-radius:100px;background:#eee9da;overflow:hidden}.v5-meter-track span{background:#d6ab34;height:100%;display:block;border-radius:100px;min-width:0;max-width:100%}.v5-metrics-list{margin:9px 0 15px}.v5-metrics-list>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 6px;padding:7px 0;border-bottom:1px solid #f2f0e8;font-size:12px}.v5-metrics-list>div>span{color:#505050}.v5-metrics-list b{font-size:12px;white-space:nowrap}.v5-metrics-list small{color:#757575;grid-column:1/-1;font-size:10px}
+.v5-table{min-width:730px;width:100%}.v5-table tbody tr:hover{background:#f9f7f0}.v5-days-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:13px}.v5-day{background:#fff;border:1px solid #dad8d0;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:10px 2px;color:#292929;min-width:0;min-height:70px}.v5-day b{font-size:14px}.v5-day small{font-size:10px;color:#888}.v5-day span{font-size:10px;color:#517448}.v5-day.v5-closed{background:#fff2ed;border-color:#dbb7a9}.v5-day.v5-closed span{color:#9c4e34}.v5-day:disabled{opacity:.85;cursor:default}
+.v5-two-column{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:18px}.v5-legend{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:11px;color:#666;margin-bottom:8px}.v5-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-left:7px;background:#d5d5d5}.v5-dot.planned{background:#ba8d2c}.v5-dot.art{background:#48768f}.v5-dot.published{background:#43804d}.v5-calendar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.v5-calendar-head{padding:8px 5px;border-radius:8px;background:#171717;color:#f0c454;text-align:center;font-size:12px;font-weight:800}.v5-calendar-day{min-width:0;background:#f8f8f7;border:1px solid #ddd;border-radius:10px;min-height:91px;padding:9px 7px;text-align:left;display:flex;flex-direction:column;gap:4px;color:#353535}.v5-calendar-day small{font-size:11px;color:#555}.v5-calendar-day b{font-size:12px;overflow-wrap:anywhere;line-height:1.2}.v5-calendar-day span{font-size:10px;color:#666;line-height:1.15}.v5-calendar-day.planned{background:#fff8df;border-color:#efd68b}.v5-calendar-day.art{background:#eaf2f7;border-color:#aed0da}.v5-calendar-day.published{background:#e9f5e8;border-color:#a9d4aa}.v5-calendar-day.closed{background:#f1f1f1;color:#777}.v5-calendar-day.selected{outline:3px solid #a27a15;outline-offset:1px}.v5-calendar-empty{background:#fff;min-height:50px}.v5-off-wrapper{padding:15px;margin-top:18px;border:1px dashed #d9c88f;border-radius:10px}.v5-off-wrapper label{font-weight:700}.v5-upload-preview{display:flex;gap:12px;align-items:center;min-height:80px;padding:10px;background:#faf9f5;border-radius:9px;margin:10px 0;flex-wrap:wrap}.v5-upload-preview>div{display:flex;flex-direction:column;align-items:center;gap:5px}.v5-upload-preview img{height:90px;max-width:140px;object-fit:cover;border-radius:7px}.v5-upload-preview small{font-size:11px}.v5-history-row{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid #ededed;min-width:0}.v5-history-row>div:last-child{min-width:0;flex:1}.v5-history-row strong{font-size:13px;display:block;overflow-wrap:anywhere}.v5-history-row small{display:block;color:#6b6b6b;font-size:11px;overflow-wrap:anywhere}.v5-history-figure{flex:0 0 70px;height:75px;background:#f4f3f0;display:grid;place-items:center;border-radius:8px;overflow:hidden;color:#777;font-size:10px}.v5-history-figure img{width:100%;height:100%;object-fit:cover}.v5-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}.v5-row-actions .btn{font-size:11px}.v5-sign-box{border:2px dashed #ccb971;background:#fff;border-radius:12px;overflow:hidden;margin:9px 0 14px}.v5-sign-box canvas{display:block;width:100%;height:164px;touch-action:none;cursor:crosshair}.v5-declaration{padding:14px 16px;background:#fffaea;border:1px solid #e2c878;border-radius:10px;margin-top:20px;font-size:13px}.v5-sign-label{display:block;margin-top:15px;font-size:12px;font-weight:800}.v5-sign-thumb{flex:0 0 110px;background:#fff;border:1px solid #ddd;border-radius:7px;overflow:hidden}.v5-sign-thumb img{display:block;width:100%;height:64px;object-fit:contain}
+.v5-slides-overlay{position:fixed;inset:0;z-index:2000;background:#151515;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px;gap:12px;overflow:auto}.v5-slides-top{width:min(1230px,100%);display:flex;align-items:center;justify-content:space-between;gap:10px;color:#f2c95b;font-size:13px;font-weight:800}.v5-slides-controls{display:flex;gap:7px;flex-wrap:wrap}.v5-slides-controls button{border:1px solid #5b5b5b;background:#292929;color:#fff;border-radius:8px;padding:10px 13px;font-size:12px}.v5-slides-controls button:disabled{opacity:.35;cursor:default}.v5-slide-canvas{background:#f8f7f3;color:#222;width:min(1180px,98%);aspect-ratio:16/9;min-height:440px;max-height:calc(100vh - 145px);overflow:auto;border-radius:4px;border-top:11px solid #e8bb3f;padding:32px 45px;position:relative;box-shadow:0 22px 80px #0009}.v5-slide-kicker{color:#8a650c;font-size:13px;letter-spacing:2px;font-weight:900}.v5-slide-canvas h2{font-size:clamp(25px,3.5vw,44px);margin:12px 0 4px;color:#181818;line-height:1.2}.v5-slide-desc{font-size:clamp(13px,1.6vw,17px);color:#666;margin:5px 0 15px}.v5-slide-hero{padding:55px 25px;margin-top:20px;background:#222;color:#f9dd7e;border-radius:12px}.v5-slide-hero strong{font-size:clamp(21px,2.8vw,36px)}.v5-slide-hero p{color:#fff}.v5-slide-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:26px}.v5-slide-stat{padding:13px;border:1px solid #e4dfd0;background:#fff;border-radius:10px}.v5-slide-stat>span,.v5-slide-stat>small{display:block;font-size:13px;color:#595959}.v5-slide-stat strong{display:block;font-size:clamp(17px,2vw,28px);margin:6px 0;color:#181818;overflow-wrap:anywhere}.v5-slide-stat small{font-size:11px}.v5-slide-group{margin-top:15px;padding:11px 15px;background:#fff2bd;border-radius:9px;font-size:16px}.v5-slide-compare>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:14px 6px;border-bottom:1px solid #e6e1d5}.v5-slide-compare .head{background:#222;color:#f4c64c;font-size:12px}.v5-slide-list{font-size:clamp(15px,1.5vw,21px);line-height:1.7;padding-left:26px;margin-top:25px}.v5-slide-brand{font-size:10px;font-weight:800;letter-spacing:1px;color:#777;margin-top:18px}.v5-slide-foot{color:#bfbfbf;font-size:11px;text-align:center}
+@media(max-width:1250px){.v5-performance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:950px){.v5-two-column{grid-template-columns:1fr}.v5-performance-grid{grid-template-columns:1fr}.v5-days-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.v5-slide-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.v5-slide-canvas{max-height:none;flex:1;width:100%;min-height:360px;padding:22px}.v5-slides-top{align-items:flex-start;flex-wrap:wrap}.v5-slide-foot{display:none}}
+@media(max-width:620px){.v5-calendar{gap:4px}.v5-calendar-day{padding:7px 4px;min-height:87px}.v5-calendar-day b{font-size:10px}.v5-calendar-day span{font-size:9px}.v5-performance-card{padding:15px}.v5-days-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.v5-slide-stats{grid-template-columns:1fr 1fr;gap:8px}.v5-slide-stat{padding:10px}.v5-slide-stat strong{font-size:15px}.v5-slides-overlay{padding:8px}.v5-slides-controls button{padding:7px;font-size:11px}.v5-slide-compare>div{font-size:11px}.v5-slide-list{font-size:14px}}
+@media print{body.v5-presenting>.shell,body.v5-presenting>.auth-overlay,body.v5-presenting>#toast{display:none!important}body.v5-presenting .v5-slides-overlay{position:static!important;display:block!important;background:#fff!important;padding:0;margin:0;height:auto!important;overflow:visible!important}body.v5-presenting .v5-slides-top,body.v5-presenting .v5-slide-foot{display:none!important}body.v5-presenting .v5-slide-canvas{width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;border:0!important;box-shadow:none!important;min-height:0!important;aspect-ratio:16/9!important}}
+.v5-global-post{border:1px dashed #dec87a;background:#fffbeb;border-radius:12px;padding:16px;margin-top:14px}.v5-global-post>strong{font-size:14px}.v5-global-post p{font-size:12px;color:#666;margin:5px 0 10px}.v5-global-post .v5-meter{max-width:580px}.v5-instagram-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}.v5-instagram-row{border:1px solid #ded8c5;background:#faf9f3;border-radius:11px;padding:13px}.v5-instagram-row b,.v5-instagram-row span{display:block}.v5-instagram-row span{margin-top:4px;color:#666;font-size:12px}@media(max-width:650px){.v5-instagram-summary{grid-template-columns:1fr}}
 
 </style>
 </body>
