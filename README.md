@@ -4,7 +4,7 @@ Protótipo demonstrativo de gestão comercial da **Universo das Mangueiras Autom
 
 ## Versão disponível
 
-**v5 — Indicadores, fechamento mensal, treinamentos assinados, metas diárias e marketing (demonstração)**, em `index.html`.
+**v5.1 — Fechamento Mensal interativo de 7 slides e até 20 minutos (demonstração)**, em `index.html`.
 
 Inclui tela de login inicialmente vazia, visão geral, vendas, carteira de televendas, avaliações no Google, controle de insumos, checklist, metas diárias, assinatura demonstrativa de treinamentos, calendário de Status do WhatsApp e apresentações gerenciais em slides.
 
@@ -27,11 +27,33 @@ Inclui tela de login inicialmente vazia, visão geral, vendas, carteira de telev
 - As regras de premiação exibidas são hipóteses para validação com a gestão antes de uso operacional.
 - **Repositório público:** não inclua dados de clientes, credenciais reais ou segredos.
 
-## Novidades da v5 — 16/10/2026
+## Atualização v5.1 — Fechamento Mensal (19/10/2026)
+
+O Portal UMA mantém os módulos da v5. A tela **Fechamento Mensal**, no menu principal, foi atualizada sem reconstruir o sistema.
+
+- **Apresentação de 7 slides em 20 minutos:** (1) abertura, 1 min; (2) resultado consolidado, 3 min; (3) as três lojas lado a lado, 5 min; (4) atividades comerciais, 3 min; (5) qualidade das rotinas, 2 min; (6) reconhecimentos, melhorias e avisos, 2 min; (7) prioridades do mês seguinte, 4 min.
+- **Preparação administrativa:** mês/ano, mensagem de abertura, comentários para cada loja, oportunidades, reconhecimentos, melhorias, avisos gerais e recados por unidade. Salvar rascunho recupera os comentários do mês selecionado.
+- **Prioridades de 3 a 5 ações:** responsável, loja, prazo e situação. Podem ser criadas ou vinculadas a ações existentes do módulo de acompanhamento gerencial, evitando duplicação de registros. A apresentação mostra pendências documentadas no fechamento do mês anterior.
+- **Dados calculados na abertura:** faturamento, meta, atingimento, comparação com mês anterior e ano anterior quando existirem registros; atividades de televendas, avaliações Google, checklists, treinamentos, WhatsApp e Instagram. Itens não monitorados ficam marcados **Sem dados/Ainda não monitorado**; não se inventam zeros nem métricas de campanhas.
+- **Modo apresentação:** proporção 16:9 para TV/projetor, tela cheia ao clicar **Iniciar apresentação**, setas ←/→, Esc para encerrar, botões de navegação, numeração e tempos sugeridos. Visual preta, branca e amarela, com a logo original.
+- **Saída e histórico:** botões **Salvar rascunho**, **Pré-visualizar**, **Iniciar apresentação**, **Arquivar fechamento**, **Imprimir / PDF** (todos os 7 slides em páginas de paisagem) e **Exportar slides HTML**. Cada arquivo guarda os dados e comentários daquele momento; nova versão de um fechamento preserva a anterior no histórico. Arquivos históricos antigos com 8 slides permanecem consultáveis.
+- **Sem ranking individual de vendedores e sem nota única que misture resultados comerciais e operacionais.** O Status WhatsApp é único para a UMA, não atribuído artificialmente às três lojas.
+
+### Como testar
+
+1. Entre com **Milena/Milena** ou **Admin/Admin** (credenciais de apresentação).
+2. Abra **Fechamento Mensal** no menu e escolha um mês.
+3. Escreva comentários e clique em **Salvar rascunho**.
+4. Cadastre ou vincule 3–5 prioridades; use **Pré-visualizar** ou **Iniciar apresentação**.
+5. Arquive o fechamento e teste a consulta, a impressão/PDF e a exportação HTML.
+
+**Limitação fundamental:** todos os dados, comentários, ações e arquivos continuam sendo armazenados apenas no navegador, sem autenticação real nem ERP. A versão pública deve ser testada exclusivamente com dados fictícios; não inserir valores comerciais confidenciais, nomes de funcionários reais, informações pessoais ou documentos internos.
+
+## Histórico: novidades da v5 — 16/10/2026
 
 - **Visão Geral:** percentuais de metas comerciais (vendas, ligações, avaliações) separados dos operacionais (tarefas e Instagram). Cada indicador com meta válida tem peso igual dentro de seu grupo, limitado a 100% apenas no cálculo do indicador consolidado. O Status do WhatsApp, que é único para toda a UMA, é apresentado à parte; não é atribuído artificialmente a cada loja. Há seleção de mês ou semana e consulta a períodos anteriores.
 - **Metas diárias:** meta mensal cadastrada pela Milena por unidade; contagem de segunda a sexta-feira com exclusões configuráveis de feriados/dias sem expediente por loja. A meta do dia corresponde ao valor restante dividido pelos dias de funcionamento restantes. Após o faturamento acumulado alcançar a meta mensal, os dias seguintes utilizam o valor mínimo diário configurado por loja, preservado entre meses. Vendedores consultam apenas a própria loja.
-- **GR — fechamento mensal:** oito slides gerados a partir dos registros presentes no portal, incluindo vendas, avaliações, ligações, tarefas, WhatsApp e Instagram (quando cadastrados). Exibição em tela cheia, impressão/salvamento em PDF pelo navegador, exportação como HTML de slides e arquivamento local de um retrato por mês. **Não exporta PPTX nesta demonstração.**
+- **Fechamento na v5 (substituído na v5.1):** oito slides gerados a partir dos registros presentes no portal, incluindo vendas, avaliações, ligações, tarefas, WhatsApp e Instagram (quando cadastrados). Exibição em tela cheia, impressão/salvamento em PDF pelo navegador, exportação como HTML de slides e arquivamento local de um retrato por mês. **Não exporta PPTX nesta demonstração.**
 - **Treinamentos:** procedimento, versão, colaborador/loja, responsável, data e horário, arquivo PDF pequeno opcional, desenho de assinatura na tela e comprovante imprimível. A assinatura e o documento ficam apenas no armazenamento local. **Não devem ser usados como comprovação jurídica ou com dados reais**.
 - **Status WhatsApp:** calendário único de segunda a sexta, categorias de posts do planejamento utilizado pela UMA, controle de código de produto único dentro do ano, imagem da arte e evidência em JPG/PNG/WebP compactadas, confirmação de publicação, histórico e download. Apenas o administrador exclui registros. Dias sem publicação podem ser indicados pela Milena.
 - **Instagram:** campos de contagem mensal de posts previstos e realizados por loja; lançamentos manuais da Milena para alimentar indicadores e slides, sem API.
