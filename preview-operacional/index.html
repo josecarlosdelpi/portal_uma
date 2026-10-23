@@ -148,6 +148,18 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:940px){.sidebar .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
  .sidebar .nav button,.sidebar .nav-disabled{display:flex;flex-direction:column;align-items:center;justify-content:center;
  min-height:58px;white-space:normal;text-align:center;font-size:10px;padding:8px 4px}}
+
+/* Prévia da nova gestão de acessos */
+.uma-invite-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:13px 0}
+.uma-invite-grid label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#6e5c2a;font-weight:760}
+.uma-invite-grid input,.uma-invite-grid select{padding:10px;border:1px solid #e0d19a;border-radius:9px;min-height:41px;background:white;color:#1b1b1b}
+.uma-invite-row{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid #eadfae;padding:13px 0}
+.uma-invite-row>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.uma-invite-row strong{font-size:13px}.uma-invite-row small{font-size:11px;color:#796e50;overflow-wrap:anywhere}
+.uma-invite-form{border:1px solid #dfcf99;border-radius:10px;background:#fffdf2;padding:15px;margin:15px 0}
+.uma-invite-notice{background:#fff8d6;border:1px solid #e5d499;color:#66521d;border-radius:10px;padding:12px;font-size:12px;margin:15px 0}
+.uma-invite-history{margin:14px 0}.uma-invite-history summary{font-size:12px;color:#756013;cursor:pointer}
+@media(max-width:630px){.uma-invite-grid{grid-template-columns:1fr}.uma-invite-row{flex-direction:column;align-items:start}}
 </style>
 </head>
 <body>
@@ -198,6 +210,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     TUBARAO:["overview.view","sales.view","sales.target.view","targets.view","reviews.view"],
     ITAJAI:["overview.view","sales.view","targets.view"]
   };
+  var invitationDrafts=[];
+  var inviteFormOpen=false;
   var users=[
     {id:"u0",name:"SuperAdmin (exemplo)",profile:"SuperAdmin",store:null,active:true,overrides:{}},
     {id:"u1",name:"Administrador (exemplo)",profile:"Administrador",store:null,active:true,overrides:{}},
@@ -245,11 +259,38 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function profileText(user){return user.profile+(user.store?" · "+stores[user.store]:" · Todas as lojas");}
   function userRow(user){return '<button class="user-row '+(st.user===user.id?"active":"")+'" data-action="user" data-id="'+user.id+'"><span class="user-mark">'+user.name.slice(0,2).toUpperCase()+'</span><span class="user-text"><strong>'+user.name+'</strong><small>'+profileText(user)+'</small></span>'+status(user)+'</button>';}
   function permissionOptions(override){return '<option value="inherit" '+(override===undefined?"selected":"")+'>Herdar</option><option value="allow" '+(override===true?"selected":"")+'>Permitir</option><option value="deny" '+(override===false?"selected":"")+'>Bloquear</option>';}
+
+  function invitationPreview(){
+    var pending=invitationDrafts.filter(function(v){return v.status==="prepared";});
+    var history=invitationDrafts.filter(function(v){return v.status!=="prepared";});
+    var rows=pending.map(function(v){return '<div class="uma-invite-row"><div><strong>'+esc(v.name)+'</strong><small>'+esc(v.email)+
+      ' · '+(v.profile==="seller"?"Vendedor — "+esc(stores[v.store]):"Administrador — todas as lojas")+'</small>'+
+      '<span class="chip">Preparado · não enviado</span></div><button class="btn secondary" data-action="cancelInvite" data-id="'+v.id+'">Cancelar pré-cadastro</button></div>';}).join("");
+    var form=inviteFormOpen?'<div class="uma-invite-form"><h3>Preparar acesso</h3><div class="uma-invite-grid">'+
+      '<label>Nome do colaborador<input id="newInviteName" maxlength="150" placeholder="Nome e sobrenome"></label>'+
+      '<label>E-mail individual<input type="email" id="newInviteEmail" maxlength="254" placeholder="colaborador@exemplo.com.br"></label>'+
+      '<label>Perfil<select id="newInviteProfile"><option value="seller">Vendedor — somente leitura</option><option value="administrator">Administrador operacional</option></select></label>'+
+      '<label id="inviteStoreWrapper">Loja<select id="newInviteStore">'+Object.keys(stores).map(function(k){return '<option value="'+k+'">'+stores[k]+'</option>';}).join("")+'</select></label>'+
+      '</div><div class="btn-row"><button class="btn primary" data-action="saveInvite">Salvar pré-cadastro</button>'+
+      '<button class="btn secondary" data-action="toggleInvite">Fechar</button></div></div>':"";
+    var old=history.length?'<details class="uma-invite-history"><summary>Pré-cadastros cancelados ('+history.length+')</summary>'+
+      history.map(function(v){return '<div class="uma-invite-row"><div><strong>'+esc(v.name)+'</strong><small>'+esc(v.email)+'</small></div>'+
+      '<button class="btn secondary" data-action="reopenInvite" data-id="'+v.id+'">Preparar novamente</button></div>';}).join("")+'</details>':"";
+    return '<section class="panel" style="margin-bottom:18px"><div class="panel-head"><div><h2>Novos colaboradores e convites</h2>'+
+      '<p>Cadastre nome, e-mail, perfil e loja, sem permitir acesso antecipado.</p></div>'+
+      '<button class="btn primary" data-action="toggleInvite">'+(inviteFormOpen?"Fechar cadastro":"+ Novo colaborador")+'</button></div>'+
+      '<div class="uma-invite-notice"><b>Convites e senhas ainda não habilitados:</b> este formulário é uma simulação visual. Na versão operacional, os pré-cadastros ficam no banco; e-mails e senhas só funcionarão após configurar o provedor de login.</div>'+
+      form+'<h3>Aguardando ativação <span class="chip">'+pending.length+'</span></h3>'+
+      (pending.length?rows:'<p class="tiny-note">Nenhum pré-cadastro em preparação.</p>')+old+
+      '<div class="uma-invite-notice">Para retirar acesso de uma conta já ativada, use “Suspender”, preservando a auditoria. A redefinição de senha será feita com segurança pelo provedor de autenticação, nunca por uma senha visível ao gestor.</div></section>';
+  }
+
   function usersScreen(){
+    var invitationHeader=invitationPreview();
     var u=users.find(function(v){return v.id===st.user;});
     var left='<section class="panel"><div class="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione uma conta para configurar.</p></div><span class="chip">'+users.length+' contas fictícias</span></div><div class="users">'+users.map(userRow).join("")+'</div><p class="tiny-note">Na versão real, o login de cada usuário será gerenciado por autenticação segura. Esta prévia não cria usuários reais.</p></section>';
     var right='<section class="panel">';
-    if(!u){right+='<div class="empty">Selecione um usuário.</div></section>';return '<div class="grid-two">'+left+right+'</div>';}
+    if(!u){right+='<div class="empty">Selecione um usuário.</div></section>';return invitationHeader+'<div class="grid-two">'+left+right+'</div>';}
     right+='<div class="panel-head"><div><h2>'+u.name+'</h2><p>'+profileText(u)+'</p></div></div>';
     if(u.profile==="Vendedor"){
       right+='<div class="form-row"><label for="userStore">Loja vinculada</label><select id="userStore">'+Object.keys(stores).map(function(k){return '<option value="'+k+'" '+(u.store===k?"selected":"")+'>'+stores[k]+'</option>';}).join("")+'</select></div>';
@@ -262,7 +303,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       right+='</div><button class="btn primary" data-action="saveOverrides">Salvar exceções (simulação)</button>';
     }
     right+='</section>';
-    return '<div class="grid-two">'+left+right+'</div>';
+    return invitationHeader+'<div class="grid-two">'+left+right+'</div>';
   }
   function groupsScreen(){
     var left='<section class="panel"><div class="panel-head"><div><h2>Grupos de lojas</h2><p>Cada vendedor herda as permissões da sua unidade.</p></div></div><div class="users">'+Object.keys(stores).map(function(k){return '<button class="user-row '+(st.group===k?'active':'')+'" data-action="group" data-id="'+k+'"><span class="user-mark">⌂</span><span class="user-text"><strong>'+stores[k]+'</strong><small>'+groups[k].length+' permissões liberadas</small></span></button>';}).join("")+'</div></section>';
@@ -455,6 +496,53 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
     if(action==="tab"){st.tab=id;render();return;}
     if(action==="user"){st.user=id;render();return;}
     if(action==="group"){st.group=id;render();return;}
+
+    if(action==="toggleInvite"){
+      if(st.profile!=="superadmin")return;
+      inviteFormOpen=!inviteFormOpen;render();return;
+    }
+    if(action==="saveInvite"){
+      if(st.profile!=="superadmin")return;
+      var name=$("newInviteName").value.trim();
+      var email=$("newInviteEmail").value.trim().toLowerCase();
+      var role=$("newInviteProfile").value;
+      var store=role==="seller"?$("newInviteStore").value:null;
+      if(name.length<2||email.length>254||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+        notify("Preencha nome e e-mail individual válidos.");return;
+      }
+      if(!["seller","administrator"].includes(role)||role==="seller"&&!stores[store]){
+        notify("Perfil ou loja inválidos.");return;
+      }
+      if(invitationDrafts.some(function(v){return v.email===email&&v.status==="prepared";})){
+        notify("Este e-mail já possui pré-cadastro.");return;
+      }
+      var existing=invitationDrafts.find(function(v){return v.email===email&&v.status==="cancelled";});
+      if(existing){
+        existing.name=name;existing.profile=role;existing.store=store;existing.status="prepared";
+      }else{
+        invitationDrafts.push({id:"sim-"+Date.now(),name:name,email:email,profile:role,store:store,status:"prepared"});
+      }
+      inviteFormOpen=false;
+      audit.unshift({time:"Agora",action:"Pré-cadastro simulado",detail:name,by:"SuperAdmin fictício"});
+      render();notify("Pré-cadastro simulado: nenhuma senha ou e-mail enviado.");return;
+    }
+    if(action==="cancelInvite"){
+      if(st.profile!=="superadmin")return;
+      var invitation=invitationDrafts.find(function(v){return v.id===id&&v.status==="prepared";});
+      if(!invitation)return;
+      if(!window.confirm("Cancelar pré-cadastro de "+invitation.name+"?"))return;
+      invitation.status="cancelled";
+      audit.unshift({time:"Agora",action:"Pré-cadastro cancelado (simulação)",detail:invitation.name,by:"SuperAdmin fictício"});
+      render();notify("Cancelado apenas nesta simulação.");return;
+    }
+    if(action==="reopenInvite"){
+      if(st.profile!=="superadmin")return;
+      var cancelled=invitationDrafts.find(function(v){return v.id===id&&v.status==="cancelled";});
+      if(!cancelled)return;
+      cancelled.status="prepared";
+      audit.unshift({time:"Agora",action:"Pré-cadastro reaberto (simulação)",detail:cancelled.name,by:"SuperAdmin fictício"});
+      render();notify("Pré-cadastro reaberto apenas nesta simulação.");return;
+    }
     if(action==="toggleUser"){
       var user=users.find(function(v){return v.id===st.user;});
       if(user.profile==="SuperAdmin"){notify("A conta SuperAdmin não pode ser suspensa.");return;}
@@ -496,6 +584,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   });
   document.addEventListener("change",function(event){
     var e=event.target;
+    if(e.id==="newInviteProfile"){
+      var wrapper=$("inviteStoreWrapper");
+      if(wrapper)wrapper.style.display=e.value==="seller"?"flex":"none";
+      return;
+    }
     if(e.id==="profile"){
       st.profile=e.value;st.view=st.profile==="superadmin"?"admin":"overview";st.store=st.profile==="seller"?"JOINVILLE":st.store;
       render();notify("Perfil de demonstração alterado. Nenhum login foi realizado.");return;
