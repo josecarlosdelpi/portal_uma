@@ -29,6 +29,7 @@ class User(Base):
     profile: Mapped[str] = mapped_column(String(30), nullable=False)
     is_superadmin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -402,4 +403,44 @@ class AccessInvitation(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class LocalCredential(Base):
+    """Contas sem e-mail. Apenas hash Argon2id; nunca armazenar a senha provisoria."""
+    __tablename__ = "local_credentials"
+    __table_args__ = (
+        UniqueConstraint("username_key", name="uq_local_credentials_username"),
+        CheckConstraint("failed_attempts >= 0", name="ck_local_failed_attempts"),
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
+    )
+    username_key: Mapped[str] = mapped_column(String(70), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(350), nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    temporary_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class LocalSession(Base):
+    """Sessao revogavel, com digest SHA256 do token, nunca com token em claro."""
+    __tablename__ = "local_sessions"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_local_session_hash"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    limited: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

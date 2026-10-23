@@ -58,8 +58,17 @@ def current_user(
             status_code=401, detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    subject = verify_identity(credentials.credentials, settings)
+    token = credentials.credentials
+    if token.startswith("uma_"):
+        from app.local_identity import LocalAuthError, valid_session
+        try:
+            return valid_session(db, token, allow_limited=False)[0]
+        except LocalAuthError as err:
+            raise HTTPException(status_code=err.status_code, detail=err.message) from err
+    subject = verify_identity(token, settings)
+    if subject.startswith("local:"):
+        raise HTTPException(status_code=403, detail="Access not provisioned")
     user = db.scalar(select(User).where(User.auth_subject == subject))
-    if user is None or not user.active:
+    if user is None or not user.active or user.deleted_at is not None:
         raise HTTPException(status_code=403, detail="Access not provisioned")
     return user

@@ -15,7 +15,7 @@ class AdminRepository:
         self.db = db
 
     def users(self) -> list[User]:
-        return list(self.db.scalars(select(User).order_by(User.display_name, User.id)))
+        return list(self.db.scalars(select(User).where(User.deleted_at.is_(None)).order_by(User.display_name, User.id)))
 
     def user(self, user_id: UUID) -> User | None:
         return self.db.get(User, user_id)

@@ -186,7 +186,7 @@ class AdminService:
 
     def replace_user_overrides(self, user_id: UUID, permissions: dict[str, bool | None]) -> dict:
         user = self.repo.user(user_id)
-        if user is None:
+        if user is None or getattr(user, "deleted_at", None) is not None:
             raise AdminError(404, "User not found")
         if user.is_superadmin or user.profile != "seller":
             raise AdminError(422, "Overrides are only supported for sellers")
@@ -202,7 +202,7 @@ class AdminService:
 
     def assign_user_store(self, user_id: UUID, store_code: str) -> dict:
         user = self.repo.user(user_id)
-        if user is None:
+        if user is None or getattr(user, "deleted_at", None) is not None:
             raise AdminError(404, "User not found")
         if user.is_superadmin or user.profile != "seller":
             raise AdminError(422, "Only sellers may be assigned to store groups")
@@ -220,8 +220,10 @@ class AdminService:
 
     def set_user_active(self, user_id: UUID, active: bool) -> dict:
         user = self.repo.user(user_id)
-        if user is None:
+        if user is None or getattr(user, "deleted_at", None) is not None:
             raise AdminError(404, "User not found")
+        if getattr(user, "deleted_at", None) is not None:
+            raise AdminError(404, "Usuario excluido")
         if user.is_superadmin or user.id == self.actor.id:
             raise AdminError(403, "The superadministrator cannot be deactivated here")
         previous = user.active

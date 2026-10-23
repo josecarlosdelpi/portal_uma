@@ -10,6 +10,7 @@ from app.admin_service import AdminError, AdminService
 from app.auth import current_user
 from app.db import get_db
 from app.models import User
+from app.local_identity import LocalIdentityService, LocalAuthError
 
 router = APIRouter(prefix="/api/v1/admin", tags=["administration"])
 
@@ -72,6 +73,43 @@ class PrepareInvitation(BaseModel):
 class CancelInvitation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision: int = Field(ge=1)
+
+
+class NewLocalUser(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str = Field(min_length=3, max_length=40)
+    display_name: str = Field(min_length=2, max_length=150)
+    profile: str = Field(pattern=r"^(administrator|seller)$")
+    store_code: str | None = None
+
+
+def secure_result(call):
+    try:
+        return call()
+    except LocalAuthError as error:
+        raise HTTPException(status_code=error.status_code, detail=error.message) from error
+
+
+@router.post("/local-users", status_code=201)
+def create_local_user(payload: NewLocalUser,
+                      actor: User = Depends(current_user),
+                      db: Session = Depends(get_db)) -> dict:
+    return secure_result(lambda: LocalIdentityService(db).create_account(
+        actor, username=payload.username, name=payload.display_name,
+        profile=payload.profile, store_code=payload.store_code,
+    ))
+
+
+@router.post("/users/{user_id}/reset-password")
+def reset_local_password(user_id: UUID, actor: User = Depends(current_user),
+                         db: Session = Depends(get_db)) -> dict:
+    return secure_result(lambda: LocalIdentityService(db).reset_password(actor, user_id))
+
+
+@router.delete("/users/{user_id}")
+def remove_user(user_id: UUID, actor: User = Depends(current_user),
+                db: Session = Depends(get_db)) -> dict:
+    return secure_result(lambda: LocalIdentityService(db).delete_user(actor, user_id))
 
 
 @router.get("/invitations")
