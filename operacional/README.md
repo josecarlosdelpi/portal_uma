@@ -1,5 +1,7 @@
 # Portal UMA — versão operacional (início)
 
+> **Atualização vigente (23/10/2026):** a API e o frontend já possuem login local por nome de usuário, senha provisória individual, troca obrigatória, exclusão lógica, redefinição e provisionamento local do SuperAdmin. Esta versão **não está publicada com dados reais**. O texto dos incrementos anteriores abaixo permanece como histórico; consulte [Implantação e Acessos](./IMPLANTACAO-E-ACESSOS.md) para o estado atual.
+
 Este diretório contém a evolução operacional do Portal UMA. O protótipo **v5.1**, em `/index.html`, permanece intacto e é exclusivamente demonstrativo.
 
 ## Diretrizes aprovadas

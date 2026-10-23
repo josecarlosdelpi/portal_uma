@@ -2,6 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -89,12 +90,19 @@ def secure_result(call):
     except LocalAuthError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from error
 
+def secret_response(call) -> JSONResponse:
+    # Senhas provisórias não podem ser armazenadas por caches intermediários.
+    return JSONResponse(
+        content=secure_result(call),
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+    )
+
 
 @router.post("/local-users", status_code=201)
 def create_local_user(payload: NewLocalUser,
                       actor: User = Depends(current_user),
-                      db: Session = Depends(get_db)) -> dict:
-    return secure_result(lambda: LocalIdentityService(db).create_account(
+                      db: Session = Depends(get_db)) -> JSONResponse:
+    return secret_response(lambda: LocalIdentityService(db).create_account(
         actor, username=payload.username, name=payload.display_name,
         profile=payload.profile, store_code=payload.store_code,
     ))
@@ -102,8 +110,8 @@ def create_local_user(payload: NewLocalUser,
 
 @router.post("/users/{user_id}/reset-password")
 def reset_local_password(user_id: UUID, actor: User = Depends(current_user),
-                         db: Session = Depends(get_db)) -> dict:
-    return secure_result(lambda: LocalIdentityService(db).reset_password(actor, user_id))
+                         db: Session = Depends(get_db)) -> JSONResponse:
+    return secret_response(lambda: LocalIdentityService(db).reset_password(actor, user_id))
 
 
 @router.delete("/users/{user_id}")

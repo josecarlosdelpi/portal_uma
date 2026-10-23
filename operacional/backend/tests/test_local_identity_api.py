@@ -12,6 +12,7 @@ from app.auth import current_user
 from app.db import get_db
 from app.local_identity import LocalAuthError, password_matches
 from app.bootstrap_local import provision_initial_local_superadmin
+from app.recover_superadmin import recover_local_superadmin
 from app.main import app
 from app.models import Base, LocalCredential, LocalSession, AuditEvent, Store, StoreGroup, User
 
@@ -254,5 +255,27 @@ def test_initial_superadmin_bootstrap_creates_only_one_without_email():
             with pytest.raises(LocalAuthError) as error:
                 provision_initial_local_superadmin(db,"segundo","Outro SuperAdmin")
             assert error.value.status_code==409
+    finally:
+        engine.dispose()
+
+
+def test_superadmin_recovery_requires_correct_identity_and_revokes_old_password():
+    engine=create_engine("sqlite+pysqlite://",
+        connect_args={"check_same_thread":False},poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    try:
+        with Session(engine) as db:
+            admin, old=provision_initial_local_superadmin(db,"uma-admin","SuperAdmin UMA")
+            with pytest.raises(LocalAuthError) as error:
+                recover_local_superadmin(db,"outro-login")
+            assert error.value.status_code==403
+            new=recover_local_superadmin(db,"uma-admin")
+            cred=db.get(LocalCredential,admin.id)
+            assert new!=old and password_matches(cred.password_hash,new)
+            assert not password_matches(cred.password_hash,old)
+            assert cred.must_change_password is True
+            assert "security.superadmin.local_recovery" in [
+                a.action for a in db.scalars(select(AuditEvent))
+            ]
     finally:
         engine.dispose()

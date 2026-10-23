@@ -26,9 +26,13 @@ function verify(fileName, expected) {
 verify("index.html", [
   "Visão Geral", "Fechamento mensal", "Permissões por loja",
   "slideDurations=[1,3,5,3,2,2,4]",
-  "Novos colaboradores e convites", "Salvar pré-cadastro", "Cancelar pré-cadastro", 'href="./rotinas.html"',
+  "Cadastro de colaboradores", "Cadastrar e gerar senha", "Excluir usuário", 'href="./rotinas.html"',
 ]);
 verify("rotinas.html", [
   "Avaliações no Google", "Materiais e insumos", "Televendas e ligações",
   "Checklist semanal", "Status WhatsApp / Instagram", "Padrões e treinamento",
+]);
+
+verify("acessos.html", [
+  "Cadastro de colaboradores", "Cadastrar e gerar senha", "Excluir usuário", "DEMO-SEM-ACESSO"
 ]);

@@ -1,5 +1,7 @@
 # Portal UMA — interface operacional
 
+> **Situação vigente (23/10/2026):** o login principal usa **usuário + senha**, sem e-mail obrigatório, com troca da senha provisória no primeiro acesso. OIDC passou a ser alternativa opcional. O SuperAdmin cadastra, redefine e exclui acessos; exclusões preservam auditoria. Nenhuma conta real está ativada na prévia pública. As descrições de convites por e-mail abaixo são históricas e não representam mais o fluxo principal.
+
 Aplicação **React + TypeScript + Vite** isolada do protótipo v5.1 na raiz.
 
 ## Escopo inicial

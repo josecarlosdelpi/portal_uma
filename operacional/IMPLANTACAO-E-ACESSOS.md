@@ -1,46 +1,68 @@
-# Portal UMA — decisão de infraestrutura e gestão de acessos
+# Portal UMA — implantação e gestão de acessos (situação atual)
 
-## 1. Estado atual
+**Situação:** implementação e testes em andamento; **nenhum acesso de funcionário foi ativado em produção**. O protótipo v5.1 e o repositório DELPI Central não são alterados.
 
-- O contrato mostrado pelo responsável é **Hospedagem I – Linux** na Locaweb, vinculada ao domínio `universodasmangueiras.com.br`.
-- O screenshot de faturamento **não demonstra** suporte a processo Python/FastAPI permanente nem confirma disponibilidade de PostgreSQL nesse contrato.
-- A documentação comercial pública de Hospedagem I destaca bancos MySQL; PostgreSQL aparece em níveis superiores. Conferir a contratação específica antes de assumir disponibilidade.
-- O Portal UMA usa React/TypeScript/Vite, API Python/FastAPI e PostgreSQL. A prévia do GitHub Pages é estática e **não é um ambiente de produção**.
+## 1. Diagnóstico da Locaweb
 
-## 2. Implantação segura proposta
+Captura do painel em 23/10/2026:
+- Plano **Hospedagem I Linux**, sistema **Rocky Linux 8**, **PHP 8.3**.
+- Módulos **Domínios**, **Banco de dados**, **Arquivos e acesso FTP**, **Configurações** (SSH/Git), e-mail.
+- **WAF ativo**. Campo de SSL mostra **DNS Pendente** — checar configuração antes de mudar registros.
+- **Backup: Ativar** — não tratar essa opção como proteção já configurada.
+- Domínio `universodasmangueiras.com.br` atende o site atual; propor `portal.universodasmangueiras.com.br` sem modificar a raiz.
 
-1. Manter o site institucional e o `index.html` da v5.1 sem alterações.
-2. Verificar no painel o subdomínio `portal.universodasmangueiras.com.br` e a possibilidade de apontá-lo a uma pasta independente, sem mudar o DNS principal.
-3. Verificar HTTPS para esse subdomínio (o SSL DV atual pode não incluí-lo; consultar Let's Encrypt do painel).
-4. Publicar somente a **compilação estática** do frontend na hospedagem compartilhada **se a compatibilidade e o HTTPS forem confirmados**.
-5. Hospedar backend FastAPI e PostgreSQL em serviço adequado, **preferencialmente gerenciado**, caso o plano compartilhado não suporte essa arquitetura. Não usar o PostgreSQL compartilhado a partir de backend externo sem confirmação das regras da Locaweb.
-6. Definir o provedor de identidade OIDC, configurar MFA do SuperAdmin, teste de recuperação, backups, permissões, logs e HTTPS antes de dados reais.
-7. Só mudar DNS, contratar serviços e integrar dados reais depois de homologação explícita. Nunca colocar credenciais, `.env`, informações reais de funcionários ou planilhas no GitHub Pages.
+Contrato `contrato-hospedagem.pdf` fornecido pelo cliente:
+- Cláusula 1.1.2.2 (página 4): prevê PHP, MySQL, PostgreSQL e SQL Server **genericamente** para hospedagens Linux I/II/III, mas a ficha (página 2) deixa os recursos específicos subordinados à contratação efetiva. **Não garante PostgreSQL no contrato específico**.
+- Cláusula 5.3.1 (página 8): proíbe instalar programas no servidor compartilhado. Logo **não presumir hospedagem de serviço Python/FastAPI sempre ativo**.
+- Cláusulas 6.7 e 6.7.1 (página 14): cópias mantidas **apenas sete dias**, em intervalos de até sete dias, sem substituir backup independente e testado.
+- Cláusula 15 (página 21): cancelamento pode eliminar os arquivos irreversivelmente.
+- O contrato de hospedagem fala sobre a senha de **administração da Locaweb**, diferente das senhas dos usuários do Portal UMA.
 
-## 3. Acessos do Portal UMA
+### Arquitetura recomendada
 
-### Implementado na ramificação operacional
+1. Preservar o site institucional, a demonstração v5.1 e a configuração de domínio enquanto há dúvidas técnicas.
+2. Conferir no painel **Banco de dados** os tipos disponíveis e limites do plano, sem copiar credenciais.
+3. Conferir **Domínios** para criação de subdomínio com pasta própria e **SSL/DNS** para HTTPS.
+4. Avaliar publicar o **frontend estático** React compilado em pasta/subdomínio da Locaweb.
+5. Hospedar **FastAPI e PostgreSQL** em infraestrutura compatível, preferencialmente gerenciada, se o compartilhado não comportar.
+6. Homologar antes de produção: HTTPS, política de acesso, backup independente e restauração testada, logs, recuperação de conta, rate limiting, MFA do SuperAdmin e proteção de dados pessoais.
+7. Sem mudanças de DNS, contratos, servidores ou publicação de credenciais sem autorização.
 
-- Um SuperAdmin exclusivo, provisionado tecnicamente por identidade OIDC **verificada** e com auditoria; não existe senha padrão.
-- Perfis operacionais `administrator` (todas as três lojas, sem governança) e `seller` (uma única loja e consulta somente).
-- Criação de **pré-cadastro** por nome, e-mail, perfil e loja em `access_invitations`.
-- Cancelamento e reabertura de pré-cadastro, sem apagar histórico; verificação de revisão para evitar alterações concorrentes.
-- Administração de contas já provisionadas: suspender/reativar, mover vendedor de loja, permissões individuais, por grupo e auditoria.
-- Os rascunhos de convite têm status **prepared**, `delivery=not_configured`; não enviam email, não emitem tokens nem geram senha.
+## 2. Acessos SEM E-MAIL — fluxo vigente
 
-### Integração necessária para contas funcionarem
+**Novo fluxo, solicitado em 23/10/2026:** o SuperAdmin cadastra nome, **nome de usuário** (sem e-mail), perfil e loja. O Portal UMA gera **senha provisória ALEATÓRIA, INDIVIDUAL, exibida uma única vez**; validade inicial de 72 horas. A primeira sessão fica limitada à troca obrigatória de senha. Não existe senha global igual para todos.
 
-O serviço OIDC escolhido deverá assumir envio de convites, senha e recuperação; confirmar endereço individual, identidade, emissor e público do token; vincular `sub` verificado ao perfil pré-cadastrado **sem conceder privilégios pelo e-mail não verificado**; aplicar MFA ao SuperAdmin e preservar auditoria de ativações e suspensões. Contas canceladas não podem ser ativadas; convites devem expirar e ter uso único.
+- Username de 3 a 40 caracteres: letras sem acento, números, ponto, sublinhado e hífen. Não exigir e-mail.
+- Senha pessoal de no mínimo 12 caracteres, nunca igual à provisória; não permite acesso aos módulos antes da troca.
+- Senhas são protegidas por hash **Argon2id** com salt automático; nunca armazenadas, registradas na auditoria ou consultáveis em texto aberto.
+- Sessões geram tokens criptograficamente aleatórios; o PostgreSQL armazena **somente hashes** dos tokens.
+- Bloqueio temporário após cinco tentativas erradas; sessões de troca de senha duram 15 minutos e sessões normais 12 horas.
+- O SuperAdmin pode redefinir a senha provisória e invalidar sessões anteriores.
+- **Excluir usuário** revoga o acesso, encerra sessões, remove o colaborador da lista de contas administráveis, mas preserva a identidade e os dados históricos para auditoria (**exclusão lógica**, não exclusão física de informações comerciais). Não é possível excluir o SuperAdmin.
+- Um administrador operacional pode trabalhar nas três lojas, mas não administrar contas; vendedor fica limitado à sua única loja e leitura aprovada.
+- Criação do primeiro SuperAdmin não está disponível por rota HTTP. O procedimento privado abaixo verifica ausência de outro SuperAdmin.
+- O fluxo OIDC anterior fica compatível como alternativa, mas não é obrigatório para cadastrar colaboradores por login local; o antigo pré-cadastro por e-mail não é usado na interface.
+- A prévia estática do GitHub Pages **não envia nem valida senhas reais**. Nunca inserir informações verdadeiras nela.
 
-Não automatizar inclusão de contas por simples indicação de nome ou e-mail. O SuperAdmin continua único e nunca é criado pelo fluxo de convite. Contas já ativadas devem ser suspensas/desativadas, não apagadas fisicamente, para preservar trilhas de auditoria.
+### Como preparar o primeiro SuperAdmin (somente manutenção privada)
 
-## 4. Informações que faltam da Locaweb
+Requer PostgreSQL já implantado, migração `0008`, ambiente protegido e HTTPS para login real. Não executar em GitHub Actions nem compartilhar a saída do terminal.
 
-No painel **Hospedagem de Sites → Administrar site**, coletar apenas capturas de telas **sem senhas**:
+```bash
+cd operacional/backend
+alembic upgrade head
+export UMA_INITIAL_SUPERADMIN_USERNAME='substituir-por-login-escolhido'
+export UMA_INITIAL_SUPERADMIN_NAME='Nome do SuperAdmin'
+export UMA_CONFIRM_INITIAL_SUPERADMIN='I_UNDERSTAND_ONE_TIME'
+python -m app.bootstrap_local
+```
 
-- Aba de **Configurações / Informações técnicas**, se houver, indicando tipo de hospedagem e tecnologias suportadas.
-- Aba de **Banco de dados**, especialmente tipos de bancos permitidos (não compartilhar usuários, senhas, endereços completos ou detalhes sensíveis de conexão).
-- Aba **Domínios / Subdomínios**, para ver se existe opção de pasta independente.
-- Aba **SSL / Certificados**, para verificar se o subdomínio pode ter HTTPS.
+O comando cria exatamente um SuperAdmin e exibe sua senha inicial somente uma vez. Em caso de perda/expiração, **recuperação exclusivamente por operador autorizado com acesso administrativo ao banco**, usando `python -m app.recover_superadmin` e variáveis `UMA_SUPERADMIN_USERNAME` / `UMA_CONFIRM_SUPERADMIN_RESET=I_UNDERSTAND_ONE_TIME`. A recuperação revoga sessões antigas. Recomenda-se guardar logs de operações sem senhas.
 
-Se o painel não esclarecer: perguntar ao suporte se **Hospedagem I Linux** permite servir arquivos HTML/JS de uma aplicação React, criar subdomínio com pasta própria, usar HTTPS e executar continuamente um servidor Python ASGI/FastAPI. Confirmar também se inclui PostgreSQL. Nenhuma senha, chave, token ou acesso administrativo deve ser compartilhado no chat.
+### Antes da publicação real
+
+Obrigatório configurar infraestrutura, HTTPS, backup, autenticação forte (especialmente **MFA do SuperAdmin**), fluxo de recuperação privado, testes contra força bruta por IP/proxy e autorização por loja. Armazenar tokens e credenciais de modo protegido; avaliar cookies HttpOnly seguros com proteção CSRF para a implantação final. O modo atual de sessão do frontend usa armazenamento por aba e requer revisão em homologação.
+
+## 3. Perguntas pendentes à Locaweb
+
+No painel (sem publicar segredos): verificar **Banco de dados** (MySQL/PostgreSQL disponíveis), **Domínios** (subdomínio/pasta), **Certificado SSL** (causa de DNS Pendente), **Configurações** (possibilidades de arquivos estáticos e restrições de execução). Pedir ao suporte por escrito: “Hospedagem I Linux permite hospedar uma interface React estática em subdomínio com HTTPS? Há suporte a processo contínuo Python ASGI/FastAPI ou somente PHP? Quais bancos e limitações estão incluídos?”.
