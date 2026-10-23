@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
 import { TargetsPage } from "./TargetsPage";
+import { OverviewPage } from "./OverviewPage";
+import { ClosingPage } from "./ClosingPage";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
-type Area = "access" | "targets";
+type Area = "access" | "targets" | "overview" | "closing";
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir.";
 const profileLabel = (profile: string) =>
   profile === "superadmin" ? "SuperAdmin" : profile === "administrator" ? "Administrador" : "Vendedor";
@@ -16,7 +18,7 @@ export function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("usuarios");
-  const [area, setArea] = useState<Area>("access");
+  const [area, setArea] = useState<Area>("overview");
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [groups, setGroups] = useState<StoreGroup[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -96,6 +98,20 @@ export function App() {
   };
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    if (!profile) return;
+    setArea(previous => {
+      if (previous === "overview" && profile.features.overview) return previous;
+      if (previous === "targets" && profile.features.targets) return previous;
+      if (previous === "closing" && profile.features.monthly_closing) return previous;
+      if (previous === "access" && profile.profile === "superadmin") return previous;
+      if (profile.features.overview) return "overview";
+      if (profile.features.targets) return "targets";
+      if (profile.features.monthly_closing) return "closing";
+      return "access";
+    });
+  }, [profile]);
+
   if (auth.isLoading) return <div className="login-stage"><div className="login-panel">Validando sessão segura…</div></div>;
   if (auth.error) return <div className="login-stage"><div className="login-panel"><h1>Falha na autenticação</h1><p>{auth.error.message}</p><button onClick={() => void auth.signinRedirect()}>Tentar novamente</button></div></div>;
   if (!auth.isAuthenticated) {
@@ -114,16 +130,21 @@ export function App() {
   const isSuperAdmin = profile?.profile === "superadmin";
   const isSeller = user?.profile === "seller";
   const canViewTargets = profile?.features?.targets ?? false;
+  const canViewOverview = profile?.features?.overview ?? false;
+  const canViewClosing = profile?.features?.monthly_closing ?? false;
 
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-logo">U</div><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
       <div className="side-heading">NAVEGAÇÃO</div>
       <nav aria-label="Menu principal">
-        <div className="nav-item disabled">▦ &nbsp;Visão geral <span className="soon">Em preparação</span></div>
+        {canViewOverview && <button className={"nav-item" + (area === "overview" ? " active" : "")}
+          onClick={() => setArea("overview")}>▦ &nbsp;Visão Geral</button>}
+        {!canViewOverview && <div className="nav-item disabled">▦ &nbsp;Visão Geral <span className="soon">Restrito</span></div>}
         {canViewTargets && <button className={"nav-item" + (area === "targets" ? " active" : "")}
           onClick={() => setArea("targets")}>▤ &nbsp;Metas diárias</button>}
-        <div className="nav-item disabled">▥ &nbsp;Fechamento mensal</div>
+        {canViewClosing && <button className={"nav-item" + (area === "closing" ? " active" : "")}
+          onClick={() => setArea("closing")}>▥ &nbsp;Fechamento mensal</button>}
         {isSuperAdmin && <button className={"nav-item" + (area === "access" ? " active" : "")}
           onClick={() => { setArea("access"); setTab("usuarios"); }}>⚙ &nbsp;Configurações</button>}
       </nav>
@@ -132,11 +153,13 @@ export function App() {
       <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="breadcrumb">Portal UMA <span> / </span> <strong>{area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
+      <header className="topbar"><div className="breadcrumb">Portal UMA <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
         <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={() => void auth.signoutRedirect()}>Sair</button></div>
       </header>
       <div className="workspace">
-        {area === "targets" && profile ? <TargetsPage token={token} profile={profile} /> : <>
+        {area === "overview" && profile ? <OverviewPage token={token} profile={profile} /> :
+         area === "closing" && profile ? <ClosingPage token={token} profile={profile} /> :
+         area === "targets" && profile ? <TargetsPage token={token} profile={profile} /> : <>
         <div className="page-header"><div><div className="eyebrow">PORTAL OPERACIONAL</div><h1>{isSuperAdmin ? "Configurações do sistema" : "Meu acesso ao Portal UMA"}</h1><p>Controle de usuários, unidades e permissões com registros de auditoria.</p></div></div>
         <div className="notice notice-amber">A versão operacional está em desenvolvimento. Não utilizar dados comerciais reais até a homologação.</div>
         {error && <div className="notice notice-error" role="alert">{error}</div>}

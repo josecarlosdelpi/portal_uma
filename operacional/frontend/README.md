@@ -37,3 +37,11 @@ A API já suporta cadastro seguro mediante um identificador `sub` existente no p
 - Meta mensal e mínimo diário separados, além de dias úteis excluídos manualmente por loja; alterações versionadas e auditadas no backend.
 - A tabela diária mostra apenas a **distribuição-base orientativa**, não o faturamento real nem a meta dinâmica. Nenhum valor de vendas é fabricado.
 - O cálculo dinâmico está preparado no backend, mas aguarda o histórico oficial do ERP para ativação.
+
+## Incremento 5 — Visão Geral e Fechamento Mensal
+
+- Dashboard com filtros de competência, escopo por loja e metas autorizadas. Faturamento, evolução e percentual não aparecem como zero nem como valor fictício.
+- Fechamento mensal com rascunho versionado, comentários por loja, conquistas, melhorias, avisos e prioridades de 3 a 5 ações.
+- Apresentação navegável de **7 slides, total 20 minutos** (1/3/5/3/2/2/4), com impressão e versão arquivada congelada.
+- Apresentação **consolidada** só pode ser acessada pela gestão. Usuários vendedores não recebem dados de outras lojas, ainda que recebam permissões para consulta local.
+- O provedor de autenticação OIDC e a base de vendas ainda estão pendentes. Arquivos atuais são identificados como **parciais — dados de vendas pendentes**.

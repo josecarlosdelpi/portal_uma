@@ -6,7 +6,7 @@ export type MyProfile = {
   display_name: string;
   profile: "superadmin" | "administrator" | "seller";
   stores: string[];
-  features: { targets: boolean };
+  features: { targets: boolean; overview: boolean; monthly_closing: boolean };
 };
 
 export type PortalUser = {
@@ -56,6 +56,89 @@ export type TargetSnapshot = {
     dynamic_day_plan: null;
   };
 };
+
+
+export type OverviewStore = {
+  code: string;
+  name: string;
+  target: string | null;
+  target_visibility: "allowed" | "restricted";
+  revenue: null;
+  attainment_percent: null;
+  previous_month_change_percent: null;
+  previous_year_change_percent: null;
+};
+
+export type OverviewSnapshot = {
+  year: number;
+  month: number;
+  scope: "consolidated" | "store";
+  stores: OverviewStore[];
+  summary: {
+    monthly_target: string | null;
+    revenue: null;
+    attainment_percent: null;
+    previous_month_change_percent: null;
+    previous_year_change_percent: null;
+  };
+  source: { sales_status: "awaiting_erp_integration"; sales_updated_at: null; message: string };
+};
+
+export type ClosingPriority = {
+  id: string; what: string; owner: string;
+  scope: "all" | "JOINVILLE" | "TUBARAO" | "ITAJAI";
+  due: string; status: "pendente" | "andamento" | "concluida";
+};
+
+export type ClosingNotes = { JOINVILLE: string; TUBARAO: string; ITAJAI: string };
+
+export type ClosingDraft = {
+  opening: string;
+  stores: ClosingNotes;
+  opportunities: string;
+  wins: string;
+  improvements: string;
+  notices: string;
+  notes: ClosingNotes;
+  priorities: ClosingPriority[];
+};
+
+export type ClosingData = {
+  stores: Array<{
+    code: string; name: string; target: string | null; revenue: null;
+    attainment_percent: null; change_percent: null;
+  }>;
+  total_target: string | null;
+  revenue: null;
+  attainment_percent: null;
+  previous_month_change_percent: null;
+  previous_year_change_percent: null;
+  source: {status: "awaiting_erp_integration"; sales_updated_at: null};
+};
+
+export type ClosingSnapshot = {
+  period: string;
+  draft: ClosingDraft;
+  data: ClosingData;
+  previous_pending: ClosingPriority[];
+  durations: number[];
+  state: "partial_sales_pending";
+  source: string;
+};
+
+export type ClosingView = {
+  year: number; month: number; draft: ClosingDraft; revision: number;
+  updated_at: string | null; data: ClosingData;
+  previous_pending: ClosingPriority[];
+  last_archive: {id: string; version: number; created_at: string} | null;
+  durations: number[];
+  sales_data_complete: false;
+};
+
+export type ClosingArchiveRef = {
+  id: string; version: number; state: string; created_at: string;
+};
+export type ClosingArchive = ClosingArchiveRef & {snapshot: ClosingSnapshot};
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -147,4 +230,26 @@ export const api = {
                        daysOff: string[], expectedRevision: number) =>
     request<TargetSnapshot>(token, "/api/v1/targets/" + encodeURIComponent(store) + "/" + year + "/" + month + "/calendar",
       "PUT", { days_off: daysOff, expected_revision: expectedRevision }),
+  overview: (token: string, year: number, month: number) =>
+    request<OverviewSnapshot>(token, "/api/v1/overview/" + year + "/" + month),
+
+  closing: (token: string, year: number, month: number) =>
+    request<ClosingView>(token, "/api/v1/monthly-closing/" + year + "/" + month),
+
+  saveClosing: (token: string, year: number, month: number,
+                draft: ClosingDraft, expected_revision: number) =>
+    request<ClosingView>(token, "/api/v1/monthly-closing/" + year + "/" + month,
+      "PUT", {draft, expected_revision}),
+
+  archiveClosing: (token: string, year: number, month: number, expected_revision: number) =>
+    request<ClosingArchive>(token, "/api/v1/monthly-closing/" + year + "/" + month + "/archives",
+      "POST", {expected_revision}),
+
+  closingArchives: (token: string, year: number, month: number) =>
+    request<ClosingArchiveRef[]>(token, "/api/v1/monthly-closing/" + year + "/" + month + "/archives"),
+
+  closingArchive: (token: string, year: number, month: number, id: string) =>
+    request<ClosingArchive>(token, "/api/v1/monthly-closing/" + year + "/" + month +
+      "/archives/" + encodeURIComponent(id)),
+
 };

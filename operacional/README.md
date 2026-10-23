@@ -59,3 +59,9 @@ A estrutura PostgreSQL inclui metas mensais por unidade, configurações de mín
 A interface React passa a oferecer **Metas diárias**, com cadastro por loja e mês, calendário de segunda a sexta, exceções de dias sem expediente e prévia financeira distribuída exatamente em centavos. **Faturamento realizado, atingimento e meta dinâmica continuam sem dados até uma importação validada do ERP**. Não são calculados a partir de registros fictícios.
 
 A implantação exige aplicar as migrações Alembic (agora também 0003), configurar um provedor OIDC e homologar acesso/backup antes de utilizar valores comerciais reais. O `delpi-central` não participa do desenvolvimento ou da execução.
+
+## Incremento 5 — Dashboard e fechamento mensal
+
+Foram adicionados `/api/v1/overview/{year}/{month}` e `/api/v1/monthly-closing/...`, com escopo por loja, ausência explícita de fonte de faturamento e versão auditada dos rascunhos. A migração `0004` adiciona tabelas de rascunho e snapshots imutáveis de fechamento. A edição e o arquivamento exigem perfil de gestão autenticado e a apresentação consolidada não pode ser acessada diretamente por vendedores.
+
+A interface React inclui Visão Geral, editor mensal, prioridades, apresentação de sete slides (até vinte minutos) e histórico de arquivos. Ainda é necessário integrar as informações comerciais oficiais e configurar as contas do provedor de identidade antes de uso com dados reais.
