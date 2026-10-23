@@ -261,34 +261,15 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   function permissionOptions(override){return '<option value="inherit" '+(override===undefined?"selected":"")+'>Herdar</option><option value="allow" '+(override===true?"selected":"")+'>Permitir</option><option value="deny" '+(override===false?"selected":"")+'>Bloquear</option>';}
 
   function invitationPreview(){
-    var pending=invitationDrafts.filter(function(v){return v.status==="prepared";});
-    var history=invitationDrafts.filter(function(v){return v.status!=="prepared";});
-    var rows=pending.map(function(v){return '<div class="uma-invite-row"><div><strong>'+esc(v.name)+'</strong><small>'+esc(v.email)+
-      ' · '+(v.profile==="seller"?"Vendedor — "+esc(stores[v.store]):"Administrador — todas as lojas")+'</small>'+
-      '<span class="chip">Preparado · não enviado</span></div><button class="btn secondary" data-action="cancelInvite" data-id="'+v.id+'">Cancelar pré-cadastro</button></div>';}).join("");
-    var form=inviteFormOpen?'<div class="uma-invite-form"><h3>Preparar acesso</h3><div class="uma-invite-grid">'+
-      '<label>Nome do colaborador<input id="newInviteName" maxlength="150" placeholder="Nome e sobrenome"></label>'+
-      '<label>E-mail individual<input type="email" id="newInviteEmail" maxlength="254" placeholder="colaborador@exemplo.com.br"></label>'+
-      '<label>Perfil<select id="newInviteProfile"><option value="seller">Vendedor — somente leitura</option><option value="administrator">Administrador operacional</option></select></label>'+
-      '<label id="inviteStoreWrapper">Loja<select id="newInviteStore">'+Object.keys(stores).map(function(k){return '<option value="'+k+'">'+stores[k]+'</option>';}).join("")+'</select></label>'+
-      '</div><div class="btn-row"><button class="btn primary" data-action="saveInvite">Salvar pré-cadastro</button>'+
-      '<button class="btn secondary" data-action="toggleInvite">Fechar</button></div></div>':"";
-    var old=history.length?'<details class="uma-invite-history"><summary>Pré-cadastros cancelados ('+history.length+')</summary>'+
-      history.map(function(v){return '<div class="uma-invite-row"><div><strong>'+esc(v.name)+'</strong><small>'+esc(v.email)+'</small></div>'+
-      '<button class="btn secondary" data-action="reopenInvite" data-id="'+v.id+'">Preparar novamente</button></div>';}).join("")+'</details>':"";
-    return '<section class="panel" style="margin-bottom:18px"><div class="panel-head"><div><h2>Novos colaboradores e convites</h2>'+
-      '<p>Cadastre nome, e-mail, perfil e loja, sem permitir acesso antecipado.</p></div>'+
-      '<button class="btn primary" data-action="toggleInvite">'+(inviteFormOpen?"Fechar cadastro":"+ Novo colaborador")+'</button></div>'+
-      '<div class="uma-invite-notice"><b>Convites e senhas ainda não habilitados:</b> este formulário é uma simulação visual. Na versão operacional, os pré-cadastros ficam no banco; e-mails e senhas só funcionarão após configurar o provedor de login.</div>'+
-      form+'<h3>Aguardando ativação <span class="chip">'+pending.length+'</span></h3>'+
-      (pending.length?rows:'<p class="tiny-note">Nenhum pré-cadastro em preparação.</p>')+old+
-      '<div class="uma-invite-notice">Para retirar acesso de uma conta já ativada, use “Suspender”, preservando a auditoria. A redefinição de senha será feita com segurança pelo provedor de autenticação, nunca por uma senha visível ao gestor.</div></section>';
+    return '<section class="panel" style="margin-bottom:18px"><div class="panel-head">'+
+      '<div><h2>Cadastro de colaboradores</h2><p>Agora sem necessidade de e-mail.</p></div>'+
+      '<a class="btn primary" href="./acessos.html">Cadastrar e gerar senha ↗</a></div>'+
+      '<div class="uma-invite-notice">Acesse a prévia do novo fluxo: nome de usuário, senha provisória única, troca obrigatória no primeiro acesso, redefinição e Excluir usuário. Esta prévia não registra dados reais.</div></section>';
   }
-
   function usersScreen(){
     var invitationHeader=invitationPreview();
     var u=users.find(function(v){return v.id===st.user;});
-    var left='<section class="panel"><div class="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione uma conta para configurar.</p></div><span class="chip">'+users.length+' contas fictícias</span></div><div class="users">'+users.map(userRow).join("")+'</div><p class="tiny-note">Na versão real, o login de cada usuário será gerenciado por autenticação segura. Esta prévia não cria usuários reais.</p></section>';
+    var left='<section class="panel"><div class="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione uma conta para configurar.</p></div><span class="chip">'+users.length+' contas fictícias</span></div><div class="users">'+users.map(userRow).join("")+'</div><p class="tiny-note">Nesta prévia você pode testar o novo fluxo de usuários sem e-mail pelo botão acima. Nenhum acesso é criado aqui.</p></section>';
     var right='<section class="panel">';
     if(!u){right+='<div class="empty">Selecione um usuário.</div></section>';return invitationHeader+'<div class="grid-two">'+left+right+'</div>';}
     right+='<div class="panel-head"><div><h2>'+u.name+'</h2><p>'+profileText(u)+'</p></div></div>';
