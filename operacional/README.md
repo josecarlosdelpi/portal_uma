@@ -84,3 +84,7 @@ Não existe usuário ou senha padrão. O procedimento futuro será feito por um 
 A migração 0005 adiciona acompanhamento manual das avaliações Google, estoque de insumos próprio por loja (catálogo, saldos e livro de movimentações) e carteira/registro de ligações com nome do vendedor e próximas tentativas. As informações são separadas dos dados comerciais oficiais do ERP, possuem isolamento por loja, validação no servidor e auditoria.
 
 A equipe comercial **não recebe** permissão de escrita por esse incremento: preservamos a política inicialmente aprovada de vendedor somente leitura. Liberação de lançamentos pelos funcionários exigirá um fluxo próprio de autorização por ação, sem lhes dar permissão irrestrita para alterar cadastros ou outros usuários.
+
+## Incremento 7: outras rotinas operacionais
+
+A migração 0006 prepara as tabelas de checklist semanal, metas de ligações, Status WhatsApp global da empresa, controle manual do Instagram e registros de treinamento. Mantemos segregação de lojas, auditoria e o limite de vendedores à consulta somente. Sem integração automática com o Google, WhatsApp ou Instagram; anexos e assinatura digital aguardam armazenamento privado homologado.

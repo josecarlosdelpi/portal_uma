@@ -6,7 +6,7 @@ export type MyProfile = {
   display_name: string;
   profile: "superadmin" | "administrator" | "seller";
   stores: string[];
-  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean };
+  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean; checklist: boolean; whatsapp_status: boolean; instagram: boolean; training: boolean };
 };
 
 export type PortalUser = {

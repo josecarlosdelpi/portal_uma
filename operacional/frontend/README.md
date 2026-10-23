@@ -53,3 +53,10 @@ A API já suporta cadastro seguro mediante um identificador `sub` existente no p
 - Televendas: carteira de clientes por loja, contato atribuído a vendedor ativo da unidade, anotações e retornos. **Não calcula compra, ativação ou comissão sem ERP.**
 - Vendedores continuam como **consulta somente** de acordo com as permissões aprovadas; gravações exclusivamente pelos administradores até que haja aprovação específica de novo fluxo de participação.
 - O visual usa agora o logotipo original embutido na v5.1 e o tema preto/dourado. A identidade foi reaproveitada sem modificar a demonstração pública.
+
+## Incremento 7: outras rotinas
+
+- Checklist semanal com metas de ligações contadas a partir do histórico de contatos, tarefas recorrentes/extraordinárias e validação administrativa; alterações criam versões para preservar o histórico.
+- Calendário único de Status WhatsApp, seg–sex, códigos de produtos únicos por ano, estados de planejamento/arte pronta/publicação e dias sem postagem.
+- Instagram manual, por loja e mês.
+- Treinamentos: metadados de participação e prática por colaborador, com procedimentos sinalizados como rascunho. **Não persistir assinaturas, PDFs nem imagens até implantar armazenamento privado e autorizações adequadas.**

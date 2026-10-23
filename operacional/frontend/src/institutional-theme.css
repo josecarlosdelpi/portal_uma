@@ -97,3 +97,41 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:650px){.routine-kpis,.routine-storecards,.routine-form-grid{grid-template-columns:1fr}
 .routine-filters label{flex:1;min-width:130px}.routine-filters .chip{width:100%;margin-left:0}
 }
+
+/* Checklist, calendário de marketing e capacitação: acabamento institucional UMA. */
+.routine-call-progress{display:flex;flex-direction:column;gap:9px;margin:17px 0}
+.routine-call-progress>strong{font-size:23px;color:#151515}
+.routine-call-progress small{color:#786d42;font-size:11px}
+.routine-progress-track{width:100%;height:12px;background:#f5eed1;border-radius:12px;overflow:hidden}
+.routine-progress-track>div{height:100%;background:linear-gradient(90deg,#d0a900,#ffd900);border-radius:12px}
+.routine-task-list{display:flex;flex-direction:column;gap:9px}
+.routine-task{border:1px solid #e9e1bb;border-radius:11px;padding:12px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.routine-task>div:first-child{flex:1;min-width:180px}
+.routine-task small{font-size:10px;color:#847e6d}.routine-task strong{display:block;margin:4px 0;font-size:12px}
+.routine-task p{font-size:11px;margin:2px 0;color:#807a65}
+.routine-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:18px}
+.routine-cal-day{border:1px solid #e8dfb5;border-radius:10px;background:#fffdf5;min-height:87px;
+ display:flex;flex-direction:column;gap:5px;justify-content:center;align-items:center;color:#151515}
+.routine-cal-day strong{font-size:19px}.routine-cal-day small{color:#847e6d;font-size:10px}
+.routine-cal-day span{font-size:10px;color:#796e40;text-align:center}
+.routine-cal-day:hover,.routine-cal-day.selected{border-color:#d9b100;background:#fff4b8}
+.routine-cal-day.off{background:#f6eee9;border-color:#dacbbf}
+.routine-cal-day.published{background:#fff3cf;border-color:#dfb836}
+.routine-dayoff{margin-top:15px;padding:14px;background:#fff9e8;border:1px solid #eadcae;
+ border-radius:11px;display:flex;gap:10px;flex-direction:column}
+.routine-dayoff label{display:flex;align-items:center;gap:9px;font-size:12px}
+.routine-dayoff input[type=checkbox]{accent-color:#d9b100}
+.routine-dayoff input:not([type=checkbox]){min-height:39px;padding:8px 10px;border:1px solid #ded4a2;border-radius:8px}
+.routine-dayoff small{color:#8f7057;font-size:11px}
+.routine-instagram-card{background:#fffdf5;border:1px solid #e9dfb9;border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.routine-instagram-card span{font-size:19px;font-weight:850}.routine-instagram-card small{font-size:11px;color:#857b59}
+.routine-procedures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin:21px 0}
+.routine-procedures .panel{display:flex;flex-direction:column;align-items:start}
+.routine-procedures h2{font-size:17px;margin:9px 0 4px}
+.routine-procedures p{font-size:12px;line-height:1.6;color:#6a6659;flex:1}
+.routine-procedure-code{font-size:10px;font-weight:850;letter-spacing:1px;color:#816900}
+@media(max-width:1100px){.routine-calendar{grid-template-columns:repeat(5,minmax(0,1fr))}
+.routine-procedures{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.routine-calendar{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.routine-cal-day{min-height:72px}.routine-cal-day strong{font-size:16px}
+.routine-procedures{grid-template-columns:1fr}}
