@@ -29,3 +29,11 @@ Os controles do frontend são somente interface. O backend sempre decide acesso.
 ### Limitação do cadastro de usuários
 
 A API já suporta cadastro seguro mediante um identificador `sub` existente no provedor de identidade. A tela administrativa não solicita identificadores técnicos ao usuário; o fluxo de convites por e-mail será integrado quando o fornecedor de autenticação for definido. Essa etapa não impede editar permissões dos usuários já provisionados.
+
+## Metas diárias (incremento 4)
+
+- Painel de metas por loja e competência, com alterações apenas por administrador operacional ou SuperAdmin.
+- Vendedor só visualiza as metas se a permissão `targets.view` for concedida para a sua unidade.
+- Meta mensal e mínimo diário separados, além de dias úteis excluídos manualmente por loja; alterações versionadas e auditadas no backend.
+- A tabela diária mostra apenas a **distribuição-base orientativa**, não o faturamento real nem a meta dinâmica. Nenhum valor de vendas é fabricado.
+- O cálculo dinâmico está preparado no backend, mas aguarda o histórico oficial do ERP para ativação.

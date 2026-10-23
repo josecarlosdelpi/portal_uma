@@ -17,7 +17,7 @@ Este diretório contém a evolução operacional do Portal UMA. O protótipo **v
 
 **Implementado nesta ramificação:** modelos iniciais de usuários, lojas, grupos, permissões e auditoria; migrações versionadas para PostgreSQL (com grupos das três lojas); regras de autorização testáveis; API mínima que exige token válido e identidade previamente cadastrada; API administrativa exclusivamente de SuperAdmin para usuários, grupos, overrides, vínculo de loja, status de conta e consulta à auditoria; configuração de desenvolvimento local.
 
-**Ainda NÃO implementado:** fluxo completo de login, criação segura do primeiro superadministrador, interface de administração, importador Excel, telas comerciais e migração visual dos módulos v5.1. A ausência desses itens **bloqueia a operação real**.
+**Ainda NÃO implementado:** fluxo completo de login, criação segura do primeiro superadministrador, importador Excel, demais telas comerciais, integração da autenticação e migração visual completa dos módulos v5.1. A ausência desses itens **bloqueia a operação real**.
 
 ### Como testar o backend localmente (apenas ambiente de desenvolvimento)
 
@@ -36,7 +36,7 @@ Não exponha a porta do PostgreSQL em redes externas. Não inclua `.env`, creden
 ## Próximos incrementos
 
 1. Escolher/implementar o provedor de autenticação e o provisionamento inicial seguro.
-2. Criar a interface de configuração de usuários, grupos, permissões e auditoria consumindo a API administrativa.
+2. Validar a interface de configurações e de metas em um ambiente privado autenticado.
 3. Reproduzir visualmente a experiência aprovada do protótipo na aplicação React.
 4. Adaptar a importação Excel ao relatório real enviado pelo Jardel.
 5. Migrar metas, indicadores e sete slides preservando as regras aprovadas.
@@ -51,3 +51,11 @@ As rotas `/api/v1/admin/*` exigem autenticação OIDC válida e perfil SuperAdmi
 A API **não cria credenciais**, **não atribui a ninguém a condição de SuperAdmin** e **não cadastra usuários automaticamente a partir de um token**. O cadastro inicial seguro da conta SuperAdmin e o provedor de identidade ainda precisam ser definidos antes de qualquer ambiente real. Os dados de auditoria são persistidos no servidor, com operações administrativas registradas na mesma transação; retenção, backups e política de acesso ao banco serão homologados antes da produção.
 
 Nenhum nome, e-mail ou dado pessoal real foi incluído no seed; somente os três nomes de lojas e grupos. O módulo de auditoria ainda não cobre importações, metas ou outros módulos não implementados. Não expor o banco ou a API publicamente enquanto a autenticação e a infraestrutura final não forem testadas.
+
+## Metas operacionais (incremento 4)
+
+A estrutura PostgreSQL inclui metas mensais por unidade, configurações de mínimo diário por loja e dias de fechamento por competência. Vendedores só consultam a própria unidade quando o SuperAdmin concede `targets.view`, enquanto administradores e SuperAdmin podem gravar alterações auditadas. O controle de revisões rejeita gravações sobre dados desatualizados.
+
+A interface React passa a oferecer **Metas diárias**, com cadastro por loja e mês, calendário de segunda a sexta, exceções de dias sem expediente e prévia financeira distribuída exatamente em centavos. **Faturamento realizado, atingimento e meta dinâmica continuam sem dados até uma importação validada do ERP**. Não são calculados a partir de registros fictícios.
+
+A implantação exige aplicar as migrações Alembic (agora também 0003), configurar um provedor OIDC e homologar acesso/backup antes de utilizar valores comerciais reais. O `delpi-central` não participa do desenvolvimento ou da execução.

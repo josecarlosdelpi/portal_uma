@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.admin_routes import router as admin_router
+from app.targets_routes import router as targets_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
@@ -13,6 +14,7 @@ from app.repositories import load_principal
 
 app = FastAPI(title="Portal UMA - API operacional", version="0.1.0")
 app.include_router(admin_router)
+app.include_router(targets_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
@@ -36,6 +38,9 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
         "display_name": user.display_name,
         "profile": "superadmin" if principal.is_superadmin else principal.profile,
         "stores": sorted(visible_stores(principal)),
+        "features": {
+            "targets": any(can_access(principal, "targets.view", store) for store in visible_stores(principal)),
+        },
     }
 
 

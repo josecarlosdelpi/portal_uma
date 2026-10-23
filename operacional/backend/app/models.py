@@ -1,8 +1,9 @@
 """Modelo inicial de persistencia. Schema mantido por migrations Alembic."""
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, JSON, String, Text, Uuid, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, Numeric, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -74,3 +75,47 @@ class AuditEvent(Base):
     entity_id: Mapped[str | None] = mapped_column(String(150), nullable=True)
     details: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class MonthlySalesTarget(Base):
+    """Meta e calendario mensal da loja; versionados para evitar perda de alteracoes."""
+    __tablename__ = "monthly_sales_targets"
+    __table_args__ = (
+        UniqueConstraint("store_code", "year", "month", name="uq_monthly_target_store_period"),
+        CheckConstraint("year BETWEEN 2020 AND 2100", name="ck_monthly_target_year"),
+        CheckConstraint("month BETWEEN 1 AND 12", name="ck_monthly_target_month"),
+        CheckConstraint("amount IS NULL OR amount > 0", name="ck_monthly_target_amount"),
+        CheckConstraint("revision >= 1", name="ck_monthly_target_revision"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    days_off: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class StoreTargetSettings(Base):
+    """Minimo diario adotado *apos* o atingimento da meta; por loja."""
+    __tablename__ = "store_target_settings"
+    __table_args__ = (
+        CheckConstraint("minimum_daily >= 0", name="ck_store_target_minimum_nonnegative"),
+        CheckConstraint("revision >= 1", name="ck_store_settings_revision"),
+    )
+
+    store_code: Mapped[str] = mapped_column(
+        ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True
+    )
+    minimum_daily: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

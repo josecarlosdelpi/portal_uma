@@ -6,6 +6,7 @@ export type MyProfile = {
   display_name: string;
   profile: "superadmin" | "administrator" | "seller";
   stores: string[];
+  features: { targets: boolean };
 };
 
 export type PortalUser = {
@@ -36,6 +37,25 @@ export type AuditEvent = {
 };
 
 export type AuditPage = { items: AuditEvent[]; limit: number; offset: number };
+
+export type DailyBase = { date: string; weekday: number; base_daily_target: string | null };
+
+export type TargetSnapshot = {
+  store_code: string;
+  year: number;
+  month: number;
+  target: { amount: string | null; revision: number; updated_at: string | null };
+  minimum: { amount: string | null; revision: number };
+  days_off: string[];
+  working_day_count: number;
+  base_plan: DailyBase[];
+  sales: {
+    status: "awaiting_official_import";
+    monthly_revenue: null;
+    attainment_percent: null;
+    dynamic_day_plan: null;
+  };
+};
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -109,4 +129,22 @@ export const api = {
       token, adminPath + "/users/" + encodeURIComponent(userId) + "/active",
       "PATCH", { active },
     ),
+
+  target: (token: string, store: string, year: number, month: number) =>
+    request<TargetSnapshot>(token, "/api/v1/targets/" + encodeURIComponent(store) + "/" + year + "/" + month),
+
+  saveTargetGoal: (token: string, store: string, year: number, month: number,
+                   amount: string, expectedRevision: number) =>
+    request<TargetSnapshot>(token, "/api/v1/targets/" + encodeURIComponent(store) + "/" + year + "/" + month + "/goal",
+      "PUT", { amount, expected_revision: expectedRevision }),
+
+  saveTargetMinimum: (token: string, store: string, amount: string, expectedRevision: number) =>
+    request<{ store_code: string; amount: string; revision: number }>(
+      token, "/api/v1/targets/" + encodeURIComponent(store) + "/minimum",
+      "PUT", { amount, expected_revision: expectedRevision }),
+
+  saveTargetCalendar: (token: string, store: string, year: number, month: number,
+                       daysOff: string[], expectedRevision: number) =>
+    request<TargetSnapshot>(token, "/api/v1/targets/" + encodeURIComponent(store) + "/" + year + "/" + month + "/calendar",
+      "PUT", { days_off: daysOff, expected_revision: expectedRevision }),
 };

@@ -2,8 +2,10 @@ import { useAuth } from "react-oidc-context";
 import { useCallback, useEffect, useState } from "react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
+import { TargetsPage } from "./TargetsPage";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
+type Area = "access" | "targets";
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir.";
 const profileLabel = (profile: string) =>
   profile === "superadmin" ? "SuperAdmin" : profile === "administrator" ? "Administrador" : "Vendedor";
@@ -14,6 +16,7 @@ export function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>("usuarios");
+  const [area, setArea] = useState<Area>("access");
   const [users, setUsers] = useState<PortalUser[]>([]);
   const [groups, setGroups] = useState<StoreGroup[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -110,6 +113,7 @@ export function App() {
   const group = groups.find((candidate) => candidate.id === selectedGroup);
   const isSuperAdmin = profile?.profile === "superadmin";
   const isSeller = user?.profile === "seller";
+  const canViewTargets = profile?.features?.targets ?? false;
 
   return <div className="shell">
     <aside className="sidebar">
@@ -117,19 +121,22 @@ export function App() {
       <div className="side-heading">NAVEGAÇÃO</div>
       <nav aria-label="Menu principal">
         <div className="nav-item disabled">▦ &nbsp;Visão geral <span className="soon">Em preparação</span></div>
-        <div className="nav-item disabled">▤ &nbsp;Vendas e metas</div>
+        {canViewTargets && <button className={"nav-item" + (area === "targets" ? " active" : "")}
+          onClick={() => setArea("targets")}>▤ &nbsp;Metas diárias</button>}
         <div className="nav-item disabled">▥ &nbsp;Fechamento mensal</div>
-        {isSuperAdmin && <button className="nav-item active" onClick={() => setTab("usuarios")}>⚙ &nbsp;Configurações</button>}
+        {isSuperAdmin && <button className={"nav-item" + (area === "access" ? " active" : "")}
+          onClick={() => { setArea("access"); setTab("usuarios"); }}>⚙ &nbsp;Configurações</button>}
       </nav>
       <div className="side-spacer"/>
       <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>
       <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="breadcrumb">Portal UMA <span> / </span> <strong>{isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
+      <header className="topbar"><div className="breadcrumb">Portal UMA <span> / </span> <strong>{area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
         <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={() => void auth.signoutRedirect()}>Sair</button></div>
       </header>
       <div className="workspace">
+        {area === "targets" && profile ? <TargetsPage token={token} profile={profile} /> : <>
         <div className="page-header"><div><div className="eyebrow">PORTAL OPERACIONAL</div><h1>{isSuperAdmin ? "Configurações do sistema" : "Meu acesso ao Portal UMA"}</h1><p>Controle de usuários, unidades e permissões com registros de auditoria.</p></div></div>
         <div className="notice notice-amber">A versão operacional está em desenvolvimento. Não utilizar dados comerciais reais até a homologação.</div>
         {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -186,6 +193,7 @@ export function App() {
           <div className="table-wrap"><table><thead><tr><th>Data e horário</th><th>Ação</th><th>Objeto</th><th>Identificador</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td>{new Date(event.created_at).toLocaleString("pt-BR")}</td><td>{event.action}</td><td>{event.entity_type}</td><td className="mono">{event.entity_id ?? "—"}</td></tr>)}</tbody></table></div>
           {events.length === 0 && <p className="empty">Nenhum registro nesta página.</p>}<div className="paging"><button disabled={auditOffset===0} className="btn-secondary" onClick={() => setAuditOffset((current) => Math.max(0,current-30))}>Anterior</button><span>Página {Math.floor(auditOffset/30)+1}</span><button disabled={!hasMoreAudit} className="btn-secondary" onClick={() => setAuditOffset((current) => current+30)}>Próxima</button></div>
         </section>}
+        </>}
       </div>
     </main>
   </div>;
