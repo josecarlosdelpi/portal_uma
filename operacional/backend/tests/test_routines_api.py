@@ -136,7 +136,8 @@ def test_whatsapp_plan_can_be_removed_before_day_off_with_audit(env):
         "product_code":"Produto teste","status":"planejado","expected_revision":0
     })
     assert created.status_code==200,created.text
-    assert c.request("DELETE",route,json={"expected_revision":0}).status_code==409
+    assert c.request("DELETE",route,json={"expected_revision":0}).status_code==422
+    assert c.request("DELETE",route,json={"expected_revision":2}).status_code==409
     actor["user"]=seller
     assert c.request("DELETE",route,json={"expected_revision":1}).status_code==403
     actor["user"]=env[3]
