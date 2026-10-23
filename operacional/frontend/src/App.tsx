@@ -12,6 +12,7 @@ import { ContactsPage } from "./ContactsPage";
 import { ChecklistPage } from "./ChecklistPage";
 import { WhatsAppPage } from "./WhatsAppPage";
 import { TrainingPage } from "./TrainingPage";
+import { AccessInvitations } from "./AccessInvitations";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
 type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "whatsapp" | "training";
@@ -215,6 +216,7 @@ export function App() {
           <button role="tab" aria-selected={tab === "grupos"} className={tab === "grupos" ? "tab active" : "tab"} onClick={() => setTab("grupos")}>Permissões por loja</button>
           <button role="tab" aria-selected={tab === "auditoria"} className={tab === "auditoria" ? "tab active" : "tab"} onClick={() => {setAuditOffset(0); setTab("auditoria");}}>Auditoria</button>
         </div>}
+        {isSuperAdmin && tab === "usuarios" && <AccessInvitations token={token}/>}
         {isSuperAdmin && tab === "usuarios" && <div className="columns">
           <section className="panel"><div className="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione um colaborador para administrar seu acesso.</p></div><span className="count">{users.length} contas</span></div>
             {users.length === 0 ? <p className="empty">Nenhum usuário cadastrado.</p> :
@@ -222,7 +224,7 @@ export function App() {
               <span className="user-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span><span className="user-text"><strong>{person.display_name}</strong><small>{profileLabel(person.profile)} · {person.stores.map(labelStore).join(", ") || "Todas as lojas"}</small></span>
               <span className={"pill " + (person.active ? "pill-green" : "pill-grey")}>{person.active ? "Ativo" : "Suspenso"}</span>
             </button>)}</div>}
-            <p className="small-note">O convite de novos usuários será integrado ao provedor de identidade antes da operação.</p>
+            <p className="small-note">Os pré-cadastros aparecem acima. A ativação real depende do serviço de login.</p>
           </section>
           <section className="panel">
             {!user ? <div className="empty">Selecione um usuário para visualizar as configurações.</div> : <><div className="panel-head"><div><h2>{user.display_name}</h2><p>{profileLabel(user.profile)}</p></div></div>
@@ -235,7 +237,10 @@ export function App() {
                 <button disabled={working} className="btn-secondary" onClick={() => {
                   if (!window.confirm(user.active ? "Suspender este usuário?" : "Reativar este usuário?")) return;
                   void update(() => api.setActive(token,user.id,!user.active),"Situação da conta atualizada.");
-                }}>{user.active ? "Suspender conta" : "Reativar conta"}</button></div>}
+                }}>{user.active ? "Suspender acesso" : "Reativar acesso"}</button></div>}
+              <p className="small-note">Para retirar o acesso de um colaborador já ativado,
+                use “Suspender acesso”. Não apagamos a conta nem o histórico. Senhas
+                são definidas ou redefinidas no provedor de autenticação, não nesta tela.</p>
               {isSeller && <><h3>Exceções individuais</h3><p className="small-note">Herdar usa a configuração da loja. Permitir e bloquear alteram apenas a leitura deste usuário.</p><div className="permissions">{permissionGroups.map((section) => <div key={section.title}><h4>{section.title}</h4>{section.permissions.map((permission) => <div className="permission-line" key={permission.code}><div>{permission.name}</div>
                 <select aria-label={"Exceção: " + permission.name} disabled={working} value={overrideDraft[permission.code] === null || overrideDraft[permission.code] === undefined ? "inherit" : overrideDraft[permission.code] ? "allow" : "deny"}
                   onChange={(event) => setOverrideDraft((previous) => ({...previous,[permission.code]:event.target.value === "inherit" ? null : event.target.value === "allow"}))}>

@@ -88,3 +88,7 @@ A equipe comercial **não recebe** permissão de escrita por esse incremento: pr
 ## Incremento 7: outras rotinas operacionais
 
 A migração 0006 prepara as tabelas de checklist semanal, metas de ligações, Status WhatsApp global da empresa, controle manual do Instagram e registros de treinamento. Mantemos segregação de lojas, auditoria e o limite de vendedores à consulta somente. Sem integração automática com o Google, WhatsApp ou Instagram; anexos e assinatura digital aguardam armazenamento privado homologado.
+
+## Incremento 8 — acessos e convites preparados
+
+A migração `0007` cria `access_invitations` para pré-cadastrar colaboradores pelo SuperAdmin, com e-mail normalizado, perfil, loja, revisão e auditoria. O cadastro pendente **não é uma conta**: nenhum token, senha ou e-mail é emitido. O acesso somente será ativado após integração da identidade OIDC com correspondência verificada. Cancelamento preserva auditoria; a conta ativada só pode ser desativada por segurança. O SuperAdmin permanece único e não é criado por convites.

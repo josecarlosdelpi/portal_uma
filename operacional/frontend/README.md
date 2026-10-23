@@ -60,3 +60,11 @@ A API já suporta cadastro seguro mediante um identificador `sub` existente no p
 - Calendário único de Status WhatsApp, seg–sex, códigos de produtos únicos por ano, estados de planejamento/arte pronta/publicação e dias sem postagem.
 - Instagram manual, por loja e mês.
 - Treinamentos: metadados de participação e prática por colaborador, com procedimentos sinalizados como rascunho. **Não persistir assinaturas, PDFs nem imagens até implantar armazenamento privado e autorizações adequadas.**
+
+## Incremento 8 — pré-cadastro de colaboradores e gestão de acessos
+
+- O SuperAdmin pode preparar acessos por **nome, e-mail individual, perfil e loja** (vendedor vinculado a uma loja; administrador operacional acessa as três).
+- Os registros ficam em `access_invitations`, são versionados e auditados. Pré-cadastros podem ser cancelados sem excluir o histórico ou reabertos informando o mesmo e-mail.
+- O status **Preparado — não enviado** é explícito. Não enviamos e-mails, não criamos conta no provedor, não geramos senha, link de ativação ou sessão enquanto o provedor OIDC não estiver configurado.
+- Contas já ativadas continuam com suspensão/reativação; não há remoção física de usuários, para preservar auditoria.
+- Próxima integração obrigatória: convites reais pelo provedor escolhido, vínculo seguro do e-mail verificado à identidade OIDC, redefinição de senha e controle de expiração/recuperação. Nunca ativar usuário com e-mail não verificado ou confiar em dados informados pelo navegador.

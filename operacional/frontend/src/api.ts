@@ -18,6 +18,25 @@ export type PortalUser = {
   overrides: Record<string, boolean>;
 };
 
+export type AccessInvitation = {
+  id: string;
+  email: string;
+  display_name: string;
+  profile: "administrator" | "seller";
+  store_code: string | null;
+  status: "prepared" | "sent" | "activated" | "cancelled" | "expired";
+  revision: number;
+  created_at: string;
+  delivery: "not_configured";
+};
+
+export type PrepareAccessInput = {
+  display_name: string;
+  email: string;
+  profile: "administrator" | "seller";
+  store_code: string | null;
+};
+
 export type StoreGroup = {
   id: string;
   store: string;
@@ -182,6 +201,18 @@ export const api = {
 
   users: (token: string) =>
     request<PortalUser[]>(token, adminPath + "/users"),
+
+  invitations: (token: string) =>
+    request<AccessInvitation[]>(token, adminPath + "/invitations"),
+
+  prepareInvitation: (token: string, payload: PrepareAccessInput) =>
+    request<AccessInvitation>(token, adminPath + "/invitations", "POST", payload),
+
+  cancelInvitation: (token: string, invitationId: string, expectedRevision: number) =>
+    request<AccessInvitation>(
+      token, adminPath + "/invitations/" + encodeURIComponent(invitationId),
+      "DELETE", { expected_revision: expectedRevision },
+    ),
 
   groups: (token: string) =>
     request<StoreGroup[]>(token, adminPath + "/groups"),

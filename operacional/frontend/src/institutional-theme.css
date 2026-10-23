@@ -135,3 +135,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:650px){.routine-calendar{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
 .routine-cal-day{min-height:72px}.routine-cal-day strong{font-size:16px}
 .routine-procedures{grid-template-columns:1fr}}
+
+/* Cadastro de acesso via convite preparado: institucional UMA */
+.access-invitations{margin:0 0 20px}
+.access-invitations .panel-head{align-items:start}
+.access-invitations h3{font-size:14px;margin:23px 0 12px}
+.access-invitations h3 .chip{margin-left:8px}
+.access-invite-form{border:1px solid #e6d9a4;background:#fffdf4;border-radius:12px;padding:18px;margin-top:18px}
+.access-invite-form h3{margin:0 0 12px}
+.access-invite-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.access-invite-grid label{display:flex;flex-direction:column;gap:7px;color:#6b5d2d;font-size:11px;font-weight:770}
+.access-invite-grid input,.access-invite-grid select{min-height:42px;padding:9px 12px;
+ border:1px solid #e1d5a1;border-radius:9px;background:#fff;color:#222}
+.access-invite-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+ padding:15px 0;border-top:1px solid #e9e1c0}
+.access-invite-identity{display:flex;flex-direction:column;align-items:start;gap:5px;min-width:0}
+.access-invite-identity strong{font-size:13px;color:#151515}
+.access-invite-identity small{font-size:11px;color:#7a7362;overflow-wrap:anywhere}
+.access-invite-state{background:#fff2bc;color:#75600d;border-radius:11px;padding:5px 9px;
+ font-size:10px;font-weight:800}
+.access-invite-history{margin:16px 0}
+.access-invite-history summary{font-size:12px;font-weight:700;cursor:pointer;color:#75600d}
+.access-password-info{padding:16px;margin-top:21px;border:1px solid #e9dfb1;
+ border-radius:11px;background:#fffbec;font-size:12px}
+.access-password-info strong{color:#53451b}
+.access-password-info p{color:#786b46;line-height:1.6}
+@media(max-width:690px){.access-invite-grid{grid-template-columns:1fr}
+.access-invite-row{align-items:start;flex-direction:column}
+.access-invitations .panel-head{flex-direction:column;align-items:start}}
