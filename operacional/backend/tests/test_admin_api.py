@@ -21,5 +21,5 @@ def test_admin_endpoints_require_authenticated_identity():
         ("/api/v1/admin/groups/00000000-0000-0000-0000-000000000001/permissions", "put", {"permissions": ["sales.view"]}),
     ]
     for url, method, data in routes:
-        response = getattr(client, method)(url, json=data) if data is not None else getattr(client, method)(url)
+        response = client.request(method.upper(), url, json=data) if data is not None else client.request(method.upper(), url)
         assert response.status_code == 401, (method, url, response.text)

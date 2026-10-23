@@ -14,6 +14,8 @@ export type PortalUser = {
   display_name: string;
   profile: "superadmin" | "administrator" | "seller";
   active: boolean;
+  username: string | null;
+  must_change_password: boolean;
   stores: string[];
   overrides: Record<string, boolean>;
 };
@@ -193,11 +195,66 @@ export async function request<T>(
   return response.json() as Promise<T>;
 }
 
+
+export type LocalLoginResult = {
+  access_token: string; token_type: "bearer"; expires_at: string;
+  must_change_password: boolean; display_name: string;
+  profile: "superadmin" | "administrator" | "seller";
+};
+export type LocalCreateAccount = {
+  id: string; display_name: string; username: string;
+  profile: "administrator" | "seller"; stores: string[]; active: boolean;
+  temporary_password: string; temporary_valid_hours: number;
+  must_change_password: true;
+};
+export type LocalResetPassword = {
+  user_id: string; username: string;
+  temporary_password: string; temporary_valid_hours: number;
+  must_change_password: true;
+};
+
+export async function localLogin(username: string, password: string): Promise<LocalLoginResult> {
+  const response = await fetch(baseUrl + "/api/v1/local-auth/login", {
+    method: "POST", cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) throw new ApiError(
+    response.status,
+    response.status === 401 ? "Usuário ou senha inválidos, expirados ou temporariamente bloqueados." :
+      "Não foi possível entrar. Verifique a conexão.",
+  );
+  return response.json() as Promise<LocalLoginResult>;
+}
+export function localChangePassword(token: string, newPassword: string) {
+  return request<LocalLoginResult>(
+    token, "/api/v1/local-auth/change-password", "POST", { new_password: newPassword },
+  );
+}
+export function localLogout(token: string) {
+  return request<{ signed_out: boolean }>(token, "/api/v1/local-auth/logout", "POST");
+}
+
 const adminPath = "/api/v1/admin";
 
 export const api = {
   me: (token: string, signal?: AbortSignal) =>
     request<MyProfile>(token, "/api/v1/me", "GET", undefined, signal),
+
+  createLocalUser: (token: string, payload: {
+    username: string; display_name: string; profile: "administrator" | "seller";
+    store_code: string | null;
+  }) => request<LocalCreateAccount>(token, adminPath + "/local-users", "POST", payload),
+
+  resetLocalPassword: (token: string, userId: string) =>
+    request<LocalResetPassword>(
+      token, adminPath + "/users/" + encodeURIComponent(userId) + "/reset-password", "POST",
+    ),
+
+  deleteUser: (token: string, userId: string) =>
+    request<{ user_id: string; deleted: boolean }>(
+      token, adminPath + "/users/" + encodeURIComponent(userId), "DELETE",
+    ),
 
   users: (token: string) =>
     request<PortalUser[]>(token, adminPath + "/users"),

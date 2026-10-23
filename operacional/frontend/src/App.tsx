@@ -1,6 +1,5 @@
-import { useAuth } from "react-oidc-context";
-import { useCallback, useEffect, useState } from "react";
-import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent, type LocalResetPassword, ApiError } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
 import { TargetsPage } from "./TargetsPage";
 import { OverviewPage } from "./OverviewPage";
@@ -12,7 +11,7 @@ import { ContactsPage } from "./ContactsPage";
 import { ChecklistPage } from "./ChecklistPage";
 import { WhatsAppPage } from "./WhatsAppPage";
 import { TrainingPage } from "./TrainingPage";
-import { AccessInvitations } from "./AccessInvitations";
+import { AccountsManager, TemporaryPasswordNotice } from "./AccountsManager";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
 type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "whatsapp" | "training";
@@ -20,8 +19,9 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : "
 const profileLabel = (profile: string) =>
   profile === "superadmin" ? "SuperAdmin" : profile === "administrator" ? "Administrador" : "Vendedor";
 
-export function App() {
-  const auth = useAuth();
+export function App({ token, onLogout }: { token: string; onLogout: () => void }) {
+  const logoutRef = useRef(onLogout);
+  logoutRef.current = onLogout;
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ export function App() {
   const [overrideDraft, setOverrideDraft] = useState<Record<string, boolean | null>>({});
   const [storeDraft, setStoreDraft] = useState("");
   const [working, setWorking] = useState(false);
-  const token = auth.user?.access_token ?? "";
+  const [resetResult, setResetResult] = useState<LocalResetPassword | null>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -58,15 +58,13 @@ export function App() {
     } catch (problem) {
       setProfile(null);
       setError(errorText(problem));
+      if (problem instanceof ApiError && (problem.status === 401 || problem.status === 403)) logoutRef.current();
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  useEffect(() => {
-    if (auth.isAuthenticated) void refresh();
-    else setProfile(null);
-  }, [auth.isAuthenticated, refresh]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   useEffect(() => {
     const group = groups.find((candidate) => candidate.id === selectedGroup);
@@ -132,19 +130,6 @@ export function App() {
     });
   }, [profile]);
 
-  if (auth.isLoading) return <div className="login-stage"><div className="login-panel">Validando sessão segura…</div></div>;
-  if (auth.error) return <div className="login-stage"><div className="login-panel"><h1>Falha na autenticação</h1><p>{auth.error.message}</p><button onClick={() => void auth.signinRedirect()}>Tentar novamente</button></div></div>;
-  if (!auth.isAuthenticated) {
-    return <div className="login-stage"><main className="login-panel">
-      <img className="login-logo-original" src={UMA_LOGO_DATA_URI} alt="Universo das Mangueiras"/>
-      <div className="eyebrow">Versão operacional</div>
-      <h1>Gestão da UMA, em um só lugar.</h1>
-      <p>Entre com sua conta individual para acessar somente os dados autorizados.</p>
-      <button className="btn-primary" onClick={() => void auth.signinRedirect()}>Entrar com segurança →</button>
-      <small>Esta versão não oferece acessos fictícios.</small>
-    </main></div>;
-  }
-
   const user = users.find((candidate) => candidate.id === selectedUser);
   const group = groups.find((candidate) => candidate.id === selectedGroup);
   const isSuperAdmin = profile?.profile === "superadmin";
@@ -192,7 +177,7 @@ export function App() {
     </aside>
     <main className="main">
       <header className="topbar"><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "reviews" ? "Avaliações Google" : area === "supplies" ? "Materiais e insumos" : area === "contacts" ? "Telemarketing" : area === "checklist" ? "Checklist semanal" : area === "whatsapp" ? "Status WhatsApp" : area === "training" ? "Padrões e treinamento" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
-        <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={() => void auth.signoutRedirect()}>Sair</button></div>
+        <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={onLogout}>Sair</button></div>
       </header>
       <div className="workspace">
         {area === "overview" && profile ? <OverviewPage token={token} profile={profile} /> :
@@ -216,13 +201,13 @@ export function App() {
           <button role="tab" aria-selected={tab === "grupos"} className={tab === "grupos" ? "tab active" : "tab"} onClick={() => setTab("grupos")}>Permissões por loja</button>
           <button role="tab" aria-selected={tab === "auditoria"} className={tab === "auditoria" ? "tab active" : "tab"} onClick={() => {setAuditOffset(0); setTab("auditoria");}}>Auditoria</button>
         </div>}
-        {isSuperAdmin && tab === "usuarios" && <AccessInvitations token={token}/>}
+        {isSuperAdmin && tab === "usuarios" && <AccountsManager token={token} onCreated={refresh}/>}
         {isSuperAdmin && tab === "usuarios" && <div className="columns">
           <section className="panel"><div className="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione um colaborador para administrar seu acesso.</p></div><span className="count">{users.length} contas</span></div>
             {users.length === 0 ? <p className="empty">Nenhum usuário cadastrado.</p> :
             <div className="user-list">{users.map((person) => <button key={person.id} className={"user-row" + (selectedUser === person.id ? " selected" : "")} onClick={() => setSelectedUser(person.id)}>
-              <span className="user-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span><span className="user-text"><strong>{person.display_name}</strong><small>{profileLabel(person.profile)} · {person.stores.map(labelStore).join(", ") || "Todas as lojas"}</small></span>
-              <span className={"pill " + (person.active ? "pill-green" : "pill-grey")}>{person.active ? "Ativo" : "Suspenso"}</span>
+              <span className="user-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span><span className="user-text"><strong>{person.display_name}</strong><small>{profileLabel(person.profile)} · {person.username ? "@" + person.username + " · " : ""}{person.stores.map(labelStore).join(", ") || "Todas as lojas"}</small></span>
+              <span className={"pill " + (person.active ? "pill-green" : "pill-grey")}>{person.active ? (person.must_change_password ? "Senha pendente" : "Ativo") : "Suspenso"}</span>
             </button>)}</div>}
             <p className="small-note">Os pré-cadastros aparecem acima. A ativação real depende do serviço de login.</p>
           </section>
@@ -238,9 +223,31 @@ export function App() {
                   if (!window.confirm(user.active ? "Suspender este usuário?" : "Reativar este usuário?")) return;
                   void update(() => api.setActive(token,user.id,!user.active),"Situação da conta atualizada.");
                 }}>{user.active ? "Suspender acesso" : "Reativar acesso"}</button></div>}
-              <p className="small-note">Para retirar o acesso de um colaborador já ativado,
-                use “Suspender acesso”. Não apagamos a conta nem o histórico. Senhas
-                são definidas ou redefinidas no provedor de autenticação, não nesta tela.</p>
+              {!user.profile.includes("superadmin") && <div className="local-account-actions">
+                {user.username && <button className="btn-secondary" disabled={working}
+                  onClick={() => void update(async () => {
+                    const result = await api.resetLocalPassword(token, user.id);
+                    setResetResult(result);
+                  }, "Nova senha provisória gerada. Entregue somente ao colaborador.")}>
+                  Gerar nova senha provisória</button>}
+                <button className="btn-secondary local-delete-action" disabled={working}
+                  onClick={() => {
+                    if (!window.confirm(
+                      "Excluir o acesso de " + user.display_name +
+                      "? A conta sairá da lista, todas as sessões serão invalidadas e o histórico será preservado."
+                    )) return;
+                    void update(async () => {
+                      await api.deleteUser(token, user.id);
+                      setSelectedUser("");
+                      setResetResult(null);
+                    }, "Usuário excluído da lista; acesso revogado, histórico preservado.");
+                  }}>Excluir usuário</button>
+              </div>}
+              {resetResult?.user_id === user.id && <TemporaryPasswordNotice
+                username={resetResult.username} password={resetResult.temporary_password}
+                onClose={() => setResetResult(null)}/>}
+              <p className="small-note">A exclusão revoga o acesso sem apagar registros históricos.
+                A senha provisória é individual e exige troca no primeiro login.</p>
               {isSeller && <><h3>Exceções individuais</h3><p className="small-note">Herdar usa a configuração da loja. Permitir e bloquear alteram apenas a leitura deste usuário.</p><div className="permissions">{permissionGroups.map((section) => <div key={section.title}><h4>{section.title}</h4>{section.permissions.map((permission) => <div className="permission-line" key={permission.code}><div>{permission.name}</div>
                 <select aria-label={"Exceção: " + permission.name} disabled={working} value={overrideDraft[permission.code] === null || overrideDraft[permission.code] === undefined ? "inherit" : overrideDraft[permission.code] ? "allow" : "deny"}
                   onChange={(event) => setOverrideDraft((previous) => ({...previous,[permission.code]:event.target.value === "inherit" ? null : event.target.value === "allow"}))}>

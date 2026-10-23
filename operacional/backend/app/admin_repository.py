@@ -5,7 +5,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AccessInvitation, AuditEvent, GroupMembership, GroupPermission, StoreGroup, User,
+    AccessInvitation, AuditEvent, GroupMembership, GroupPermission, StoreGroup, User, LocalCredential,
     UserPermissionOverride,
 )
 
@@ -63,6 +63,9 @@ class AdminRepository:
         self.db.add(invitation)
         self.db.flush()
         return invitation
+
+    def local_credential(self, user_id: UUID) -> LocalCredential | None:
+        return self.db.get(LocalCredential, user_id)
 
     def groups(self) -> list[StoreGroup]:
         return list(self.db.scalars(select(StoreGroup).order_by(StoreGroup.store_code)))

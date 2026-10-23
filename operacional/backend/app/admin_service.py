@@ -45,6 +45,14 @@ class AdminService:
                 "display_name": user.display_name,
                 "profile": "superadmin" if user.is_superadmin else user.profile,
                 "active": user.active,
+                "username": (
+                    self.repo.local_credential(user.id).username_key
+                    if self.repo.local_credential(user.id) is not None else None
+                ),
+                "must_change_password": (
+                    self.repo.local_credential(user.id).must_change_password
+                    if self.repo.local_credential(user.id) is not None else False
+                ),
                 "stores": self.repo.user_stores(user.id),
                 "overrides": self.repo.overrides(user.id),
             }
