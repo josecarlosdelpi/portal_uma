@@ -1,7 +1,7 @@
 import { useAuth } from "react-oidc-context";
 import { useCallback, useEffect, useState } from "react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent } from "./api";
-import { labelStore, permissionGroups, readPermissionCodes, permissionName } from "./catalog";
+import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir.";
