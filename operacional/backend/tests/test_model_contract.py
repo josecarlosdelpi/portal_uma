@@ -8,6 +8,7 @@ def test_schema_has_expected_core_tables():
         "users", "stores", "store_groups", "group_memberships",
         "group_permissions", "user_permission_overrides", "audit_events",
         "monthly_sales_targets", "store_target_settings",
+        "monthly_closing_drafts", "monthly_closing_archives",
     }
 
 

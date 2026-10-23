@@ -119,3 +119,46 @@ class StoreTargetSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+
+class MonthlyClosingDraft(Base):
+    """Rascunho mensal unico, salvo com versao e trilha de auditoria."""
+    __tablename__ = "monthly_closing_drafts"
+    __table_args__ = (
+        UniqueConstraint("year", "month", name="uq_closing_draft_period"),
+        CheckConstraint("year BETWEEN 2020 AND 2100", name="ck_closing_draft_year"),
+        CheckConstraint("month BETWEEN 1 AND 12", name="ck_closing_draft_month"),
+        CheckConstraint("revision >= 1", name="ck_closing_draft_revision"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[dict] = mapped_column(JSON, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class MonthlyClosingArchive(Base):
+    """Versoes congeladas: editar o rascunho nao altera versoes anteriores."""
+    __tablename__ = "monthly_closing_archives"
+    __table_args__ = (
+        UniqueConstraint("year", "month", "version", name="uq_closing_archive_period_version"),
+        CheckConstraint("year BETWEEN 2020 AND 2100", name="ck_closing_archive_year"),
+        CheckConstraint("month BETWEEN 1 AND 12", name="ck_closing_archive_month"),
+        CheckConstraint("version >= 1", name="ck_closing_archive_version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    archived_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
