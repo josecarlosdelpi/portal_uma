@@ -3,6 +3,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
+from app.admin_routes import router as admin_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
@@ -11,11 +12,12 @@ from app.policy import can_access, visible_stores
 from app.repositories import load_principal
 
 app = FastAPI(title="Portal UMA - API operacional", version="0.1.0")
+app.include_router(admin_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "PUT", "PATCH"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
