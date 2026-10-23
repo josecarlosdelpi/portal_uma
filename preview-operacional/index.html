@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Pré-visualização estática e fictícia do desenvolvimento operacional do Portal UMA.">
+<title>Portal UMA | Pré-visualização operacional</title>
+<style>
+:root{--ink:#19313c;--muted:#708891;--line:#e5ebee;--teal:#027c81;--teal2:#00a7a6;--bg:#f6f8f9;--white:#fff;--nav:#102832;--nav2:#0d3540;--red:#aa4949;--shadow:0 8px 30px rgba(20,44,52,.055)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.5;color:var(--ink);background:var(--bg);margin:0}button,input,select{font:inherit}button{cursor:pointer}a{color:inherit}button:disabled{opacity:.48;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--teal2);outline-offset:2px}
+.preview-banner{background:#fff6df;border-bottom:1px solid #edd6a6;color:#815723;padding:10px 22px;display:flex;gap:12px;align-items:center;justify-content:space-between;font-size:12px}.preview-banner strong{font-size:12px}.preview-banner small{font-size:11px}.preview-banner a{text-decoration:underline;font-weight:700}
+.layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:calc(100vh - 47px)}
+.sidebar{background:linear-gradient(160deg,var(--nav),var(--nav2));color:#d4e3e7;display:flex;flex-direction:column;padding:28px 17px;min-height:calc(100vh - 47px)}
+.brand{display:flex;gap:12px;align-items:center;padding:0 10px 27px;border-bottom:1px solid #31505b}.brand-mark{height:43px;width:43px;display:grid;place-items:center;background:linear-gradient(140deg,#20bfc1,#14767e);color:#fff;font-size:19px;font-weight:900;border-radius:13px}.brand strong{font-size:15px;color:#fff;display:block}.brand small{display:block;font-size:11px;color:#88a9b0}
+.side-heading{font-size:10px;font-weight:800;letter-spacing:2px;color:#799da7;margin:28px 13px 12px}.nav{display:flex;flex-direction:column;gap:5px}.nav button,.nav .nav-disabled{display:flex;gap:12px;width:100%;align-items:center;text-align:left;font-weight:700;font-size:13px;color:#bdd4da;border:0;background:transparent;border-radius:12px;padding:13px 14px}.nav button:hover{background:#224551;color:#fff}.nav button.active{background:#e2fbf5;color:#07454b;box-shadow:inset 3px 0 #42d1c5}.nav .nav-disabled{opacity:.48}.nav .nav-disabled small{margin-left:auto;font-size:9px}.nav .symbol{width:22px;font-size:18px}
+.side-spacer{flex:1;min-height:20px}.side-note{border:1px solid #365662;border-radius:14px;padding:15px;background:#153943}.side-note strong{font-size:12px;color:#fff}.side-note p{font-size:11px;color:#a6c0c5;margin:5px 0 0}.side-bottom{margin-top:17px;padding:0 12px;color:#799da7;font-size:10px}
+.main{min-width:0}.topbar{min-height:81px;background:#fffffff0;border-bottom:1px solid #e6edef;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:15px 36px}.crumb{font-size:12px;color:#82939d}.crumb strong{color:#1a3841}.top-right{display:flex;align-items:center;gap:10px}.profile-picker{display:flex;flex-direction:column;gap:3px;font-size:10px;color:#738a93}.profile-picker select{height:36px;border-radius:9px;border:1px solid #dbe5e9;background:white;color:#27454d;padding:0 10px;font-size:12px}.avatar{width:35px;height:35px;flex-shrink:0;border-radius:50%;background:#e7f6f4;border:1px solid #d0e6e2;color:var(--teal);display:grid;place-items:center;font-size:11px;font-weight:850}
+.workspace{max-width:1460px;margin:0 auto;padding:31px 35px 80px}.eyebrow{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:1.3px;color:var(--teal)}.eyebrow:before{content:"";display:block;height:6px;width:6px;border-radius:50%;background:var(--teal2)}.page-header{margin:2px 0 24px}.page-header h1{font-size:clamp(26px,3.1vw,36px);letter-spacing:-1.1px;line-height:1.18;margin:6px 0 9px}.page-header p{font-size:13px;color:#68808b;margin:0}
+.notice{border-radius:12px;font-size:12px;padding:13px 15px;margin-bottom:22px}.notice-amber{background:#fff8e9;border:1px solid #f3e5cb;color:#795b30}.notice-green{background:#effaf5;border:1px solid #c7e8d8;color:#187a58}
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}.tabs button{border:1px solid #dbe5e9;border-radius:10px;padding:10px 16px;background:#fff;color:#58737c;font-weight:750;font-size:12px}.tabs button.active{background:#e2fbf5;color:#07454b;border-color:#97d7ce}
+.grid-two{display:grid;grid-template-columns:minmax(310px,.9fr) minmax(340px,1.25fr);gap:18px}.panel{background:#fff;border:1px solid #e5ecef;border-radius:16px;padding:21px 22px;min-width:0;box-shadow:var(--shadow)}.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:18px}.panel-head h2,.panel h2{font-size:16px;margin:0 0 5px;font-weight:800}.panel-head p,.help{font-size:11px;color:#8799a2;margin:0}.chip{background:#eff9f6;color:#077c70;border-radius:999px;padding:6px 10px;font-size:10px;font-weight:800;white-space:nowrap}.users{display:flex;flex-direction:column;gap:8px}.user-row{border:1px solid #e5ecef;border-radius:11px;padding:11px 10px;background:#fff;display:flex;gap:10px;align-items:center;width:100%;text-align:left}.user-row:hover,.user-row.active{border-color:#50bdba;background:#f3fbfa}.user-mark{width:34px;height:34px;border-radius:9px;background:#e9f3f5;color:#367580;font-weight:800;display:grid;place-items:center;font-size:10px;flex-shrink:0}.user-text{display:flex;flex:1;flex-direction:column;min-width:0}.user-text strong{font-size:12px}.user-text small{font-size:10px;color:#8498a0}.tag{border-radius:50px;padding:4px 9px;font-size:10px;font-weight:750}.tag.green{background:#e6f6ef;color:#187a58}.tag.gray{background:#edf3f5;color:#6d8088}.tiny-note{margin:17px 0 0;color:#8398a1;font-size:11px}
+.form-row{display:flex;flex-direction:column;gap:6px;margin:16px 0}.form-row label{font-size:11px;font-weight:800;color:#556d76}.form-row select,.form-row input{min-height:42px;border:1px solid #dbe5e9;border-radius:10px;background:#fff;color:#203a44;padding:0 12px;max-width:100%}.form-row small{color:#8398a1;font-size:10px}.btn{border-radius:9px;font-size:12px;font-weight:750;padding:10px 14px;border:1px solid #dbe5e9;background:#fff;color:#43646e}.btn:hover{filter:brightness(.98)}.btn.primary{background:var(--teal);color:#fff;border-color:var(--teal)}.btn.secondary{background:#eff9f6;color:#077c70;border-color:#c6e4e2}.btn-row{display:flex;gap:9px;flex-wrap:wrap}.rule{border-top:1px solid #e5ecef;margin:18px 0}.permission-group{margin:15px 0}.permission-group h3{font-size:12px;color:#254650;background:#f3f8f8;padding:9px 10px;border-radius:8px;margin:0 0 5px}.permission-row{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:9px 3px;border-bottom:1px solid #edf2f4;font-size:12px}.permission-row select{border-radius:8px;border:1px solid #dbe5e9;background:#fff;padding:8px 9px;min-width:102px;font-size:11px}.permission-row label{display:flex;align-items:center;gap:10px;cursor:pointer;width:100%}.permission-row input[type=checkbox],.calendar-day input{accent-color:var(--teal);width:16px;height:16px}
+.status-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.status-row strong{display:block;font-size:12px}.status-row small{display:block;font-size:10px;color:#85969f}.scroll-perms{max-height:440px;overflow:auto;padding:0 6px 0 0}.empty{border:1px dashed #d6e3e7;border-radius:12px;text-align:center;padding:24px;color:#82969d;font-size:12px}
+.table-wrap{overflow:auto;border:1px solid #edf1f3;border-radius:11px}.table-wrap table{border-collapse:collapse;width:100%;min-width:620px;font-size:12px}.table-wrap th{text-align:left;padding:12px 13px;background:#f8fafb;color:#6d838c;font-size:10px}.table-wrap td{border-top:1px solid #eef2f4;padding:12px 13px;color:#354f59}.small{font-size:11px;color:#82949d}.table-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:15px}
+.filters{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}.filters .form-row{margin:0;min-width:180px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:20px}.kpi{padding:19px 20px;min-height:132px}.kpi span{font-size:12px;color:#738a93}.kpi strong{display:block;font-size:clamp(20px,2.15vw,29px);letter-spacing:-1px;margin-top:17px;font-weight:850}.kpi small{display:block;font-size:10px;color:#8a9aa2;margin-top:7px}.day-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:16px 0}.calendar-day{display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid #dce9eb;border-radius:10px;background:#f3f8f8;color:#1a3841;padding:8px 3px;min-width:0}.calendar-day strong{font-size:16px}.calendar-day small{font-size:10px;color:#7a909a}.calendar-day em{font-size:10px;color:#187a58;font-style:normal}.calendar-day.closed{background:#fff3e2;border-color:#eed7ae}.calendar-day.closed em{color:#986c2a}.caption{font-size:11px;color:#82989e}
+.toast{position:fixed;z-index:100;bottom:20px;right:20px;background:#19313c;color:#fff;max-width:390px;border-radius:11px;padding:13px 17px;box-shadow:0 14px 40px #0003;font-size:12px;display:none}
+@media(max-width:1050px){.grid-two{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:800px){.layout{grid-template-columns:1fr}.sidebar{min-height:0;padding:12px 18px}.brand{padding:4px;border:0}.nav{display:flex;flex-direction:row;flex-wrap:wrap}.nav button,.nav .nav-disabled{width:auto;padding:9px 10px}.side-heading,.side-note,.side-spacer,.side-bottom{display:none}.topbar{padding:12px 18px}.workspace{padding:25px 18px}}@media(max-width:550px){.preview-banner{align-items:flex-start;flex-direction:column}.kpis{gap:8px}.kpi{padding:13px;min-height:125px}.kpi strong{font-size:19px}.panel{padding:16px}.filters .form-row{flex:1;min-width:135px}.top-right{gap:6px}.avatar{display:none}.day-grid{gap:4px}.calendar-day{padding:7px 0}.user-row{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<div class="preview-banner" role="note">
+  <div><strong>PRÉ-VISUALIZAÇÃO DO DESENVOLVIMENTO</strong> · Interface demonstrativa, sem conexão com banco ou ERP. Todos os nomes e valores são fictícios.</div>
+  <a href="../index.html" title="Ver a demonstração anterior">Ver demonstração v5.1 ↗</a>
+</div>
+<div class="layout">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark">U</div><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
+  <div class="side-heading">NAVEGAÇÃO</div>
+  <nav id="nav" class="nav" aria-label="Menu do portal"></nav>
+  <div class="side-spacer"></div>
+  <div class="side-note"><strong>Ambiente de visualização</strong><p>Você pode experimentar as telas. Nada é gravado no ERP ou no banco de dados.</p></div>
+  <div class="side-bottom">Universo das Mangueiras Automotivas</div>
+</aside>
+<main class="main">
+  <header class="topbar">
+    <div class="crumb">Portal UMA <span> / </span><strong id="bread">Configurações</strong></div>
+    <div class="top-right">
+      <label class="profile-picker" for="profile">Simular perfil de acesso
+      <select id="profile" aria-label="Escolha um perfil apenas para visualizar">
+        <option value="superadmin">SuperAdmin</option>
+        <option value="admin">Administrador</option>
+        <option value="seller">Vendedor — Joinville</option>
+      </select></label>
+      <div class="avatar">UMA</div>
+    </div>
+  </header>
+  <div class="workspace" id="content"></div>
+</main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+"use strict";
+/* PREVIEW ONLY. No fetch, no persistence, no credentials, no connection to ERP. */
+(function(){
+  var stores={JOINVILLE:"Joinville",TUBARAO:"Tubarão",ITAJAI:"Itajaí"};
+  var pGroups=[
+    {name:"Visão geral",items:[["overview.view","Acessar visão geral"]]},
+    {name:"Vendas",items:[["sales.view","Abrir módulo de vendas"],["sales.revenue.view","Ver faturamento"],["sales.target.view","Ver meta de vendas"],["sales.attainment.view","Ver atingimento da meta"],["sales.previous_month.view","Comparação com mês anterior"],["sales.previous_year.view","Comparação com ano anterior"]]},
+    {name:"Gestão comercial",items:[["targets.view","Metas diárias"],["monthly_closing.view","Fechamento mensal"],["telemarketing.view","Televendas"]]},
+    {name:"Rotinas e comunicação",items:[["reviews.view","Avaliações Google"],["supplies.view","Insumos"],["checklist.view","Checklist"],["training.view","Treinamentos"],["whatsapp_status.view","Status WhatsApp"],["instagram.view","Instagram"]]}
+  ];
+  var groups={
+    JOINVILLE:["overview.view","sales.view","sales.target.view","targets.view","monthly_closing.view","reviews.view","checklist.view"],
+    TUBARAO:["overview.view","sales.view","sales.target.view","targets.view","reviews.view"],
+    ITAJAI:["overview.view","sales.view","targets.view","monthly_closing.view"]
+  };
+  var users=[
+    {id:"u0",name:"SuperAdmin (exemplo)",profile:"SuperAdmin",store:null,active:true,overrides:{}},
+    {id:"u1",name:"Administrador (exemplo)",profile:"Administrador",store:null,active:true,overrides:{}},
+    {id:"u2",name:"Vendedor A (exemplo)",profile:"Vendedor",store:"JOINVILLE",active:true,overrides:{}},
+    {id:"u3",name:"Vendedor B (exemplo)",profile:"Vendedor",store:"TUBARAO",active:true,overrides:{"sales.target.view":false}},
+    {id:"u4",name:"Vendedor C (exemplo)",profile:"Vendedor",store:"ITAJAI",active:false,overrides:{}}
+  ];
+  var audit=[
+    {time:"23/10/2026 09:40",action:"Alteração de permissões",detail:"Joinville",by:"SuperAdmin de exemplo"},
+    {time:"22/10/2026 15:12",action:"Meta mensal alterada",detail:"Tubarão / out-2026",by:"Administrador de exemplo"},
+    {time:"21/10/2026 11:08",action:"Usuário suspenso",detail:"Vendedor C (exemplo)",by:"SuperAdmin de exemplo"}
+  ];
+  var targets={"JOINVILLE|2026-10":120000,"TUBARAO|2026-10":90000,"ITAJAI|2026-10":65000};
+  var mins={"JOINVILLE":900,"TUBARAO":650,"ITAJAI":500};
+  var closed={"JOINVILLE|2026-10":["2026-10-12"],"TUBARAO|2026-10":[],"ITAJAI|2026-10":[]};
+  var st={view:"users",tab:"users",profile:"superadmin",user:"u2",group:"JOINVILLE",store:"JOINVILLE",month:"2026-10"};
+  var WEEK=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  var $=function(id){return document.getElementById(id);};
+  var fmt=function(n){return n==null?"Sem dados":new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n);};
+  var allPerms=function(){var x=[];pGroups.forEach(function(g){g.items.forEach(function(item){x.push(item);});});return x;};
+  function notify(msg){var t=$("toast");t.textContent=msg;t.style.display="block";clearTimeout(notify.timer);notify.timer=setTimeout(function(){t.style.display="none";},4200);}
+  function header(title,subtitle){return '<div class="page-header"><div class="eyebrow">PORTAL OPERACIONAL · PRÉVIA</div><h1>'+title+'</h1><p>'+subtitle+'</p></div>';}
+  function banner(){return '<div class="notice notice-amber">AMBIENTE DE PRÉ-VISUALIZAÇÃO — todos os registros são ilustrativos. Os botões funcionam apenas nesta página e as alterações desaparecem ao atualizar.</div>';}
+  function status(user){return '<span class="tag '+(user.active?"green":"gray")+'">'+(user.active?"Ativo":"Suspenso")+'</span>';}
+  function profileText(user){return user.profile+(user.store?" · "+stores[user.store]:" · Todas as lojas");}
+  function userRow(user){return '<button class="user-row '+(st.user===user.id?"active":"")+'" data-action="user" data-id="'+user.id+'"><span class="user-mark">'+user.name.slice(0,2).toUpperCase()+'</span><span class="user-text"><strong>'+user.name+'</strong><small>'+profileText(user)+'</small></span>'+status(user)+'</button>';}
+  function permissionOptions(override){return '<option value="inherit" '+(override===undefined?"selected":"")+'>Herdar</option><option value="allow" '+(override===true?"selected":"")+'>Permitir</option><option value="deny" '+(override===false?"selected":"")+'>Bloquear</option>';}
+  function usersScreen(){
+    var u=users.find(function(v){return v.id===st.user;});
+    var left='<section class="panel"><div class="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione uma conta para configurar.</p></div><span class="chip">'+users.length+' contas fictícias</span></div><div class="users">'+users.map(userRow).join("")+'</div><p class="tiny-note">Na versão real, o login de cada usuário será gerenciado por autenticação segura. Esta prévia não cria usuários reais.</p></section>';
+    var right='<section class="panel">';
+    if(!u){right+='<div class="empty">Selecione um usuário.</div></section>';return '<div class="grid-two">'+left+right+'</div>';}
+    right+='<div class="panel-head"><div><h2>'+u.name+'</h2><p>'+profileText(u)+'</p></div></div>';
+    if(u.profile==="Vendedor"){
+      right+='<div class="form-row"><label for="userStore">Loja vinculada</label><select id="userStore">'+Object.keys(stores).map(function(k){return '<option value="'+k+'" '+(u.store===k?"selected":"")+'>'+stores[k]+'</option>';}).join("")+'</select></div>';
+      right+='<div class="btn-row"><button class="btn secondary" data-action="saveUserStore">Salvar loja (simulação)</button></div>';
+    } else right+='<div class="form-row"><label>Unidades</label><div class="small">Acesso administrativo às três lojas.</div></div>';
+    right+='<div class="rule"></div><div class="status-row"><div><strong>Conta '+(u.active?"ativa":"suspensa")+'</strong><small>Apenas o SuperAdmin pode alterar esta situação.</small></div>'+(u.profile==="SuperAdmin"?'': '<button class="btn secondary" data-action="toggleUser">'+(u.active?"Suspender":"Reativar")+'</button>')+'</div>';
+    if(u.profile==="Vendedor"){
+      right+='<div class="rule"></div><h2>Exceções individuais</h2><p class="help">Herdar usa a regra da loja. Permitir ou bloquear vale somente para este vendedor.</p><div class="scroll-perms">';
+      right+=pGroups.map(function(g){return '<div class="permission-group"><h3>'+g.name+'</h3>'+g.items.map(function(p){return '<div class="permission-row"><span>'+p[1]+'</span><select data-override="'+p[0]+'" aria-label="Exceção de '+p[1]+'">'+permissionOptions(u.overrides[p[0]])+'</select></div>';}).join("")+'</div>';}).join("");
+      right+='</div><button class="btn primary" data-action="saveOverrides">Salvar exceções (simulação)</button>';
+    }
+    right+='</section>';
+    return '<div class="grid-two">'+left+right+'</div>';
+  }
+  function groupsScreen(){
+    var left='<section class="panel"><div class="panel-head"><div><h2>Grupos de lojas</h2><p>Cada vendedor herda as permissões da sua unidade.</p></div></div><div class="users">'+Object.keys(stores).map(function(k){return '<button class="user-row '+(st.group===k?'active':'')+'" data-action="group" data-id="'+k+'"><span class="user-mark">⌂</span><span class="user-text"><strong>'+stores[k]+'</strong><small>'+groups[k].length+' permissões liberadas</small></span></button>';}).join("")+'</div></section>';
+    var right='<section class="panel"><div class="panel-head"><div><h2>Permissões — '+stores[st.group]+'</h2><p>Defina quais módulos e indicadores podem ser consultados.</p></div></div><div class="scroll-perms">';
+    right+=pGroups.map(function(g){return '<div class="permission-group"><h3>'+g.name+'</h3>'+g.items.map(function(p){return '<div class="permission-row"><label><input type="checkbox" data-group-perm="'+p[0]+'" '+(groups[st.group].includes(p[0])?'checked':'')+'> '+p[1]+'</label></div>';}).join("")+'</div>';}).join("");
+    right+='</div><button class="btn primary" data-action="saveGroup">Salvar permissões (simulação)</button><p class="tiny-note">O vendedor continua restrito à própria loja e nunca recebe permissão de edição.</p></section>';
+    return '<div class="grid-two">'+left+right+'</div>';
+  }
+  function auditScreen(){
+    return '<section class="panel"><div class="panel-head"><div><h2>Histórico de alterações</h2><p>Aqui ficarão registrados autor, momento e tipo de alteração.</p></div><span class="chip">Apenas SuperAdmin</span></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Alteração</th><th>Registro</th><th>Responsável</th></tr></thead><tbody>'+audit.map(function(e){return '<tr><td>'+e.time+'</td><td>'+e.action+'</td><td>'+e.detail+'</td><td>'+e.by+'</td></tr>';}).join("")+'</tbody></table></div><p class="tiny-note">Esses registros são exemplos de apresentação, não são auditorias reais.</p></section>';
+  }
+  function adminScreen(){
+    var tabs='<div class="tabs"><button data-action="tab" data-id="users" class="'+(st.tab==="users"?'active':'')+'">Usuários</button><button data-action="tab" data-id="groups" class="'+(st.tab==="groups"?'active':'')+'">Permissões por loja</button><button data-action="tab" data-id="audit" class="'+(st.tab==="audit"?'active':'')+'">Auditoria</button></div>';
+    return header("Configurações do sistema","Controle de usuários, lojas e permissões — exclusividade do SuperAdmin.")+banner()+tabs+(st.tab==="users"?usersScreen():st.tab==="groups"?groupsScreen():auditScreen());
+  }
+  function weekdays(ym){
+    if(!/^\d{4}-\d{2}$/.test(ym))return[];
+    var parts=ym.split("-").map(Number),year=parts[0],month=parts[1];
+    if(year<2020||year>2100||month<1||month>12)return[];
+    var num=new Date(year,month,0).getDate(),dates=[];
+    for(var day=1;day<=num;day++){
+      var dt=new Date(year,month-1,day,12);
+      if(dt.getDay()===0||dt.getDay()===6)continue;
+      dates.push({iso:ym+"-"+String(day).padStart(2,"0"),dow:WEEK[dt.getDay()]});
+    }
+    return dates;
+  }
+  function targetScreen(){
+    if(st.profile==="seller" && !groups.JOINVILLE.includes("targets.view")) return header("Metas diárias","Acesso de consulta por loja.")+banner()+'<div class="panel"><div class="empty">Acesso não permitido para o perfil simulado.</div></div>';
+    var allowed=st.profile==="seller"?["JOINVILLE"]:Object.keys(stores);
+    if(!allowed.includes(st.store))st.store=allowed[0];
+    var key=st.store+"|"+st.month,val=targets[key],min=mins[st.store],days=weekdays(st.month),off=closed[key]||[],open=days.filter(function(d){return !off.includes(d.iso);});
+    var value=typeof val==="number"?fmt(val):"Não cadastrada", daily=null;
+    var cents=typeof val==="number" && open.length?Math.round(val*100):null;
+    var base=cents!==null?Math.floor(cents/open.length):null,rem=cents!==null?cents%open.length:0;
+    var canEdit=st.profile!=="seller";
+    var filters='<div class="filters"><div class="form-row"><label for="storeSelect">Loja</label><select id="storeSelect">'+allowed.map(function(k){return '<option value="'+k+'" '+(k===st.store?'selected':'')+'>'+stores[k]+'</option>';}).join("")+'</select></div><div class="form-row"><label for="monthSelect">Mês de referência</label><input type="month" id="monthSelect" min="2020-01" max="2100-12" value="'+st.month+'"></div></div>';
+    var cards='<div class="kpis">'+[
+      ["Meta mensal",value,"Exemplo fictício"],["Dias de expediente",String(open.length),"Segunda a sexta, exceto dias fechados"],
+      ["Mínimo após meta",fmt(min),"Regra da loja"],["Faturamento realizado","Sem dados","Aguardando integração ao ERP"]
+    ].map(function(c){return '<div class="panel kpi"><span>'+c[0]+'</span><strong>'+c[1]+'</strong><small>'+c[2]+'</small></div>';}).join("")+'</div>';
+    var edit='<section class="panel"><div class="panel-head"><div><h2>Parâmetros da loja</h2><p>'+stores[st.store]+' · '+st.month+'</p></div></div>'+
+      '<div class="form-row"><label for="goal">Meta mensal (R$)</label><input type="number" min="0.01" step="0.01" value="'+(val==null?'':val)+'" id="goal" '+(canEdit?'':'disabled')+'><small>Valor apenas demonstrativo.</small></div>'+
+      (canEdit?'<button class="btn primary" data-action="saveGoal">Salvar meta (simulação)</button>':'<p class="tiny-note">Somente consulta para vendedores.</p>')+
+      '<div class="rule"></div><div class="form-row"><label for="minimum">Mínimo diário após atingir a meta (R$)</label><input type="number" min="0" step="0.01" id="minimum" value="'+(min==null?'':min)+'" '+(canEdit?'':'disabled')+'></div>'+
+      (canEdit?'<button class="btn secondary" data-action="saveMin">Salvar mínimo (simulação)</button>':'')+
+      '</section>';
+    var calendar='<section class="panel"><div class="panel-head"><div><h2>Dias de expediente</h2><p>Marque dias de fechamento da unidade.</p></div></div><div class="day-grid">'+days.map(function(d){var isClosed=off.includes(d.iso);return '<button class="calendar-day '+(isClosed?'closed':'')+'" aria-pressed="'+(isClosed?'true':'false')+'" data-action="day" data-id="'+d.iso+'" '+(canEdit?'':'disabled')+'><strong>'+d.iso.slice(-2)+'</strong><small>'+d.dow+'</small><em>'+(isClosed?'Fechado':'Aberto')+'</em></button>';}).join("")+'</div><p class="caption">Sábados e domingos não são contados. Feriados são excluídos manualmente.</p>'+(canEdit?'<button class="btn primary" data-action="saveDays">Salvar calendário (simulação)</button>':'')+'</section>';
+    var rows=open.map(function(d,i){daily=cents===null?null:(base+(i<rem?1:0))/100;return '<tr><td>'+d.iso.split("-").reverse().join("/")+'</td><td>'+d.dow+'</td><td>'+ (daily===null?"Sem meta":fmt(daily)) +'</td><td class="small">Aguardando importação</td></tr>';}).join("");
+    var plan='<section class="panel" style="margin-top:19px"><div class="panel-head"><div><h2>Distribuição inicial da meta</h2><p>Prévia orientativa. A meta dinâmica dependerá das vendas do ERP.</p></div><span class="chip">'+open.length+' dias</span></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Dia da semana</th><th>Meta diária-base</th><th>Faturamento</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+(!rows?'<p class="empty">Nenhum dia de expediente configurado.</p>':'')+'<p class="tiny-note">Após integrar o ERP, a meta do dia será recalculada considerando vendas até o dia anterior e dias úteis restantes. Após atingir a meta mensal, será usado o mínimo fixo da loja.</p></section>';
+    return header("Metas diárias","Cadastre metas mensais, selecione a unidade e defina dias de funcionamento.")+banner()+'<div class="notice notice-green">Faturamento realizado e atingimento continuam sem dados. Os valores de metas acima são somente exemplos para testar o visual.</div>'+filters+cards+'<div class="grid-two">'+edit+calendar+'</div>'+plan;
+  }
+  function render(){
+    var superadmin=st.profile==="superadmin", allowed=st.profile!=="seller"||groups.JOINVILLE.includes("targets.view");
+    if(!superadmin&&st.view==="admin")st.view=allowed?"targets":"restricted";
+    var entries='<div class="nav-disabled"><span class="symbol">▦</span> Visão geral <small>Em preparação</small></div>';
+    if(allowed)entries+='<button data-action="view" data-id="targets" class="'+(st.view==="targets"?'active':'')+'"><span class="symbol">▤</span> Metas diárias</button>';
+    entries+='<div class="nav-disabled"><span class="symbol">▥</span> Fechamento mensal <small>Em preparação</small></div>';
+    if(superadmin)entries+='<button data-action="view" data-id="admin" class="'+(st.view==="admin"?'active':'')+'"><span class="symbol">⚙</span> Configurações</button>';
+    $("nav").innerHTML=entries;
+    $("profile").value=st.profile;
+    $("bread").textContent=st.view==="admin"?"Configurações":st.view==="targets"?"Metas diárias":"Meu acesso";
+    $("content").innerHTML=st.view==="admin"&&superadmin?adminScreen():st.view==="targets"&&allowed?targetScreen():header("Meu acesso","Visualização das permissões atribuídas ao perfil.")+banner()+'<div class="panel empty">Não há módulos disponíveis para este perfil simulado.</div>';
+  }
+  document.addEventListener("click",function(event){
+    var btn=event.target.closest("button[data-action]");
+    if(!btn || btn.disabled)return;
+    var action=btn.dataset.action,id=btn.dataset.id;
+    if(action==="view"){st.view=id;render();return;}
+    if(action==="tab"){st.tab=id;render();return;}
+    if(action==="user"){st.user=id;render();return;}
+    if(action==="group"){st.group=id;render();return;}
+    if(action==="toggleUser"){
+      var user=users.find(function(v){return v.id===st.user;});
+      if(user.profile==="SuperAdmin"){notify("A conta SuperAdmin não pode ser suspensa.");return;}
+      user.active=!user.active;audit.unshift({time:"Agora",action:user.active?"Usuário reativado (prévia)":"Usuário suspenso (prévia)",detail:user.name,by:"SuperAdmin de exemplo"});render();notify("Mudança simulada apenas nesta página.");return;
+    }
+    if(action==="saveUserStore"){
+      var selected=$("userStore");var current=users.find(function(v){return v.id===st.user;});
+      if(current.profile==="Vendedor"&&stores[selected.value]){current.store=selected.value;render();notify("Loja alterada apenas na pré-visualização.");}return;
+    }
+    if(action==="saveOverrides"){
+      var u=users.find(function(v){return v.id===st.user;});u.overrides={};
+      document.querySelectorAll("[data-override]").forEach(function(select){if(select.value!=="inherit")u.overrides[select.dataset.override]=select.value==="allow";});
+      audit.unshift({time:"Agora",action:"Exceções individuais alteradas (prévia)",detail:u.name,by:"SuperAdmin de exemplo"});
+      render();notify("Exceções simuladas. Nenhum dado real foi alterado.");return;
+    }
+    if(action==="saveGroup"){
+      var granted=[];document.querySelectorAll("[data-group-perm]:checked").forEach(function(el){granted.push(el.dataset.groupPerm);});
+      groups[st.group]=granted;audit.unshift({time:"Agora",action:"Permissões atualizadas (prévia)",detail:stores[st.group],by:"SuperAdmin de exemplo"});
+      render();notify("Permissões simuladas apenas nesta página.");return;
+    }
+    if(action==="day"){
+      var key=st.store+"|"+st.month;var data=closed[key]||[];var index=data.indexOf(id);
+      if(index>=0)data.splice(index,1);else data.push(id);
+      closed[key]=data;render();notify("Calendário de exemplo alterado. Clique em salvar para simular o registro.");return;
+    }
+    if(action==="saveDays"){audit.unshift({time:"Agora",action:"Calendário editado (prévia)",detail:stores[st.store],by:"Administrador de exemplo"});notify("Calendário salvo somente nesta prévia.");return;}
+    if(action==="saveGoal"){
+      var g=Number($("goal").value);
+      if(!Number.isFinite(g)||g<=0||Math.round(g*100)!==g*100&&Math.abs(Math.round(g*100)-g*100)>1e-6){notify("Digite uma meta válida, com até duas casas decimais.");return;}
+      targets[st.store+"|"+st.month]=g;
+      audit.unshift({time:"Agora",action:"Meta editada (prévia)",detail:stores[st.store]+" / "+st.month,by:"Administrador de exemplo"});
+      render();notify("Meta salva somente nesta simulação.");return;
+    }
+    if(action==="saveMin"){
+      var min=Number($("minimum").value);
+      if(!Number.isFinite(min)||min<0||$("minimum").value===""){notify("Informe um mínimo diário válido.");return;}
+      mins[st.store]=Math.round(min*100)/100;render();notify("Mínimo diário alterado somente nesta simulação.");return;
+    }
+  });
+  document.addEventListener("change",function(event){
+    var e=event.target;
+    if(e.id==="profile"){
+      st.profile=e.value;st.view=st.profile==="superadmin"?"admin":"targets";st.store=st.profile==="seller"?"JOINVILLE":st.store;
+      render();notify("Perfil de demonstração alterado. Nenhum login foi realizado.");return;
+    }
+    if(e.id==="storeSelect"){st.store=e.value;render();return;}
+    if(e.id==="monthSelect"){st.month=e.value;render();return;}
+  });
+  st.view="admin";render();
+})();
+</script>
+</body>
+</html>
