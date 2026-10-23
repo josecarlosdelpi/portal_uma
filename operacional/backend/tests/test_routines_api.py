@@ -141,7 +141,7 @@ def test_whatsapp_plan_can_be_removed_before_day_off_with_audit(env):
     actor["user"]=seller
     assert c.request("DELETE",route,json={"expected_revision":1}).status_code==403
     actor["user"]=env[3]
-    removed=c.delete(route,json={"expected_revision":1})
+    removed=c.request("DELETE",route,json={"expected_revision":1})
     assert removed.status_code==200,removed.text
     assert removed.json()["deleted"] is True
     assert c.put("/api/v1/routines/whatsapp/2026-10-20/day-off",json={
