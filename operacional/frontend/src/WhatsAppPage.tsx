@@ -6,7 +6,6 @@ import {routinesApi,type WhatsAppSnapshot,type InstagramSnapshot,type WhatsAppPo
 type Props={token:string;profile:MyProfile};
 const currentMonth=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
 const shortDays=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
-const themes=["","Promoções","Lançamentos","Linha leve","Linha pesada","Tubos, adaptadores e conexões"];
 const statusLabel=(s:string)=>s==="publicado"?"Publicado":s==="arte_pronta"?"Arte pronta":"Planejado";
 function businessDates(year:number,month:number):string[]{
   const days=[];
