@@ -265,3 +265,107 @@ class ContactAttempt(Base):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+
+class WeeklyTask(Base):
+    """Versoes de rotinas semanais por loja, preservando historico de semanas anteriores."""
+    __tablename__ = "weekly_tasks"
+    __table_args__ = (
+        CheckConstraint("frequency IN ('weekly','once')", name="ck_weekly_task_frequency"),
+        CheckConstraint("scheduled_day BETWEEN 0 AND 6", name="ck_weekly_task_day"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    details: Mapped[str] = mapped_column(String(350), nullable=False, default="")
+    frequency: Mapped[str] = mapped_column(String(10), nullable=False)
+    scheduled_day: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_week: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+    end_week: Mapped[datetime | None] = mapped_column(DateTime())
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class WeeklyTaskCheck(Base):
+    __tablename__ = "weekly_task_checks"
+    task_id: Mapped[UUID] = mapped_column(ForeignKey("weekly_tasks.id", ondelete="RESTRICT"), primary_key=True)
+    week_start: Mapped[datetime] = mapped_column(DateTime(), primary_key=True)
+    done: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    checked_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class WeeklyCallGoal(Base):
+    __tablename__ = "weekly_call_goals"
+    __table_args__ = (CheckConstraint("goal BETWEEN 1 AND 9999", name="ck_weekly_call_goal"),)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+    week_start: Mapped[datetime] = mapped_column(DateTime(), primary_key=True)
+    goal: Mapped[int] = mapped_column(Integer, nullable=False)
+    confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    confirmed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class WhatsAppPost(Base):
+    __tablename__ = "whatsapp_posts"
+    __table_args__ = (
+        UniqueConstraint("year", "product_code_key", name="uq_whatsapp_year_product"),
+        CheckConstraint("status IN ('planejado','arte_pronta','publicado')", name="ck_whatsapp_status"),
+        CheckConstraint("revision >= 1", name="ck_whatsapp_revision"),
+    )
+    post_date: Mapped[datetime] = mapped_column(DateTime(), primary_key=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    product_code: Mapped[str] = mapped_column(String(55), nullable=False)
+    product_code_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    category: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    note: Mapped[str] = mapped_column(String(450), nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(15), nullable=False)
+    published_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class WhatsAppDayOff(Base):
+    __tablename__ = "whatsapp_days_off"
+    post_date: Mapped[datetime] = mapped_column(DateTime(), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(150), nullable=False, default="")
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class InstagramMonth(Base):
+    __tablename__ = "instagram_months"
+    __table_args__ = (
+        UniqueConstraint("store_code", "year", "month", name="uq_instagram_store_month"),
+        CheckConstraint("year BETWEEN 2020 AND 2100 AND month BETWEEN 1 AND 12", name="ck_instagram_month"),
+        CheckConstraint("planned BETWEEN 0 AND 500 AND completed BETWEEN 0 AND 500", name="ck_instagram_counts"),
+        CheckConstraint("revision >= 1", name="ck_instagram_revision"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    planned: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed: Mapped[int] = mapped_column(Integer, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class TrainingRecord(Base):
+    """Metadados de participacao. Assinaturas e PDFs exigem armazenamento privado futuro."""
+    __tablename__ = "training_records"
+    __table_args__ = (
+        CheckConstraint("step IN ('participou','pratica')", name="ck_training_step"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    participant_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    procedure: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[str] = mapped_column(String(45), nullable=False)
+    title: Mapped[str] = mapped_column(String(140), nullable=False, default="")
+    instructor: Mapped[str] = mapped_column(String(90), nullable=False)
+    happened_on: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+    step: Mapped[str] = mapped_column(String(15), nullable=False)
+    note: Mapped[str] = mapped_column(String(350), nullable=False, default="")
+    recorded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

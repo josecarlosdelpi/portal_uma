@@ -11,6 +11,8 @@ def test_schema_has_expected_core_tables():
         "monthly_closing_drafts", "monthly_closing_archives",
         "google_review_months", "supply_materials", "supply_stocks",
         "supply_movements", "contact_clients", "contact_attempts",
+        "weekly_tasks", "weekly_task_checks", "weekly_call_goals",
+        "whatsapp_posts", "whatsapp_days_off", "instagram_months", "training_records",
     }
 
 
