@@ -4,7 +4,9 @@ import { AuthProvider } from "react-oidc-context";
 import { WebStorageStateStore } from "oidc-client-ts";
 
 import { App } from "./App";
+import { UMA_LOGO_DATA_URI } from "./umaBrand";
 import "./styles.css";
+import "./institutional-theme.css";
 
 const authority = import.meta.env.VITE_OIDC_AUTHORITY;
 const clientId = import.meta.env.VITE_OIDC_CLIENT_ID;
@@ -31,7 +33,7 @@ root.render(
     ) : (
       <div className="login-stage">
         <main className="login-panel" aria-labelledby="setup-title">
-          <div className="login-brand">UMA <span>•</span> PORTAL</div>
+          <img className="login-logo-original" src={UMA_LOGO_DATA_URI} alt="Universo das Mangueiras"/>
           <div className="eyebrow">Versão operacional</div>
           <h1 id="setup-title">Acesso seguro em preparação</h1>
           <p>

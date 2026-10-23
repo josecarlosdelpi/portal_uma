@@ -5,6 +5,7 @@ import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
 import { TargetsPage } from "./TargetsPage";
 import { OverviewPage } from "./OverviewPage";
 import { ClosingPage } from "./ClosingPage";
+import { UMA_LOGO_DATA_URI } from "./umaBrand";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
 type Area = "access" | "targets" | "overview" | "closing";
@@ -116,7 +117,7 @@ export function App() {
   if (auth.error) return <div className="login-stage"><div className="login-panel"><h1>Falha na autenticação</h1><p>{auth.error.message}</p><button onClick={() => void auth.signinRedirect()}>Tentar novamente</button></div></div>;
   if (!auth.isAuthenticated) {
     return <div className="login-stage"><main className="login-panel">
-      <div className="login-brand">UMA <span>•</span> PORTAL</div>
+      <img className="login-logo-original" src={UMA_LOGO_DATA_URI} alt="Universo das Mangueiras"/>
       <div className="eyebrow">Versão operacional</div>
       <h1>Gestão da UMA, em um só lugar.</h1>
       <p>Entre com sua conta individual para acessar somente os dados autorizados.</p>
@@ -135,7 +136,7 @@ export function App() {
 
   return <div className="shell">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-logo">U</div><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
+      <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
       <div className="side-heading">NAVEGAÇÃO</div>
       <nav aria-label="Menu principal">
         {canViewOverview && <button className={"nav-item" + (area === "overview" ? " active" : "")}
