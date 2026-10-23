@@ -65,3 +65,16 @@ A implantação exige aplicar as migrações Alembic (agora também 0003), confi
 Foram adicionados `/api/v1/overview/{year}/{month}` e `/api/v1/monthly-closing/...`, com escopo por loja, ausência explícita de fonte de faturamento e versão auditada dos rascunhos. A migração `0004` adiciona tabelas de rascunho e snapshots imutáveis de fechamento. A edição e o arquivamento exigem perfil de gestão autenticado e a apresentação consolidada não pode ser acessada diretamente por vendedores.
 
 A interface React inclui Visão Geral, editor mensal, prioridades, apresentação de sete slides (até vinte minutos) e histórico de arquivos. Ainda é necessário integrar as informações comerciais oficiais e configurar as contas do provedor de identidade antes de uso com dados reais.
+
+
+## Provisionamento da primeira conta SuperAdmin
+
+Não existe usuário ou senha padrão. O procedimento futuro será feito por um operador técnico com acesso administrativo ao banco:
+
+1. Configurar o provedor de identidade OIDC (emissor, público/audiência e endpoint HTTPS JWKS).
+2. Criar a conta do responsável nesse provedor com autenticação forte e obter seu identificador **sub**. Nunca usar senha ou token pessoal como identificador.
+3. Fornecer ao processo técnico, somente durante essa operação, as variáveis `UMA_INITIAL_SUPERADMIN_SUBJECT`, `UMA_INITIAL_SUPERADMIN_NAME` e `UMA_CONFIRM_INITIAL_SUPERADMIN=I_UNDERSTAND_ONE_TIME`.
+4. Executar `python -m app.bootstrap` com o banco protegido, sem publicar variáveis, senhas ou identificadores no repositório.
+5. A rotina registra uma auditoria e recusa novas execuções se já houver SuperAdmin; não promove contas existentes nem cria senha.
+
+**Não execute esse provisionamento na demonstração estática e não habilite login real antes da homologação do serviço de identidade.** O DELPI Central permanece totalmente fora deste fluxo.
