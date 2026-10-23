@@ -4,11 +4,12 @@ Every mutation is restricted to the only system superadmin, is atomic with
 its audit event, and never grants write or cross-store permissions to sellers.
 """
 from uuid import UUID
+import re
 
 from sqlalchemy.exc import IntegrityError
 
 from app.admin_repository import AdminRepository
-from app.models import StoreGroup, User
+from app.models import AccessInvitation, StoreGroup, User
 from app.policy import READ_PERMISSIONS, STORE_CODES
 
 
@@ -88,6 +89,85 @@ class AdminService:
         self._save()
         return {"id": str(user.id), "display_name": user.display_name,
                 "profile": profile, "active": True, "stores": [store_code] if group else []}
+
+    @staticmethod
+    def _public_invitation(invite: AccessInvitation) -> dict:
+        return {
+            "id": str(invite.id),
+            "email": invite.email,
+            "display_name": invite.display_name,
+            "profile": invite.profile,
+            "store_code": invite.store_code,
+            "status": invite.status,
+            "revision": invite.revision,
+            "created_at": invite.created_at.isoformat(),
+            "delivery": "not_configured",
+        }
+
+    def list_invitations(self) -> list[dict]:
+        return [self._public_invitation(invite) for invite in self.repo.invitations()]
+
+    def prepare_invitation(self, *, email: str, name: str, profile: str,
+                           store_code: str | None) -> dict:
+        """Safe pre-registration only. Does not send email, mint tokens or create passwords."""
+        name = " ".join(name.strip().split())
+        email = email.strip()
+        email_key = email.casefold()
+        if not 2 <= len(name) <= 150:
+            raise AdminError(422, "Informe o nome do colaborador")
+        if (len(email_key) > 254 or not re.fullmatch(
+            r"[^@\s]+@[^@\s]+\.[^@\s]+", email_key
+        )):
+            raise AdminError(422, "Informe um e-mail valido")
+        if profile not in {"administrator", "seller"}:
+            raise AdminError(422, "Perfil invalido")
+        if profile == "seller":
+            if store_code not in STORE_CODES or self.repo.group_for_store(store_code) is None:
+                raise AdminError(422, "Selecione uma loja valida para o vendedor")
+        elif store_code is not None:
+            raise AdminError(422, "Administrador tem acesso as tres lojas")
+
+        existing = self.repo.invitation_by_email(email_key)
+        if existing is not None and existing.status != "cancelled":
+            raise AdminError(409, "Este e-mail ja tem um pre-cadastro")
+        if existing is None:
+            invite = self.repo.add_invitation(
+                email=email_key, email_key=email_key, name=name,
+                profile=profile, store_code=store_code, actor_id=self.actor.id,
+            )
+            action = "access.invitation.prepared"
+        else:
+            invite = existing
+            invite.email = email_key
+            invite.display_name = name
+            invite.profile = profile
+            invite.store_code = store_code
+            invite.status = "prepared"
+            invite.updated_by = self.actor.id
+            invite.revision += 1
+            action = "access.invitation.reopened"
+        self.repo.audit(self.actor, action, "access_invitation", str(invite.id),
+                        {"profile": profile, "store": store_code,
+                         "delivery": "not_configured"})
+        self._save()
+        return self._public_invitation(invite)
+
+    def cancel_invitation(self, invitation_id: UUID, expected_revision: int) -> dict:
+        invite = self.repo.invitation(invitation_id)
+        if invite is None:
+            raise AdminError(404, "Pre-cadastro nao encontrado")
+        if invite.revision != expected_revision:
+            raise AdminError(409, "O pre-cadastro foi alterado. Atualize a tela")
+        if invite.status != "prepared":
+            raise AdminError(409, "Somente pre-cadastros nao enviados podem ser cancelados")
+        invite.status = "cancelled"
+        invite.updated_by = self.actor.id
+        invite.revision += 1
+        self.repo.audit(self.actor, "access.invitation.cancelled",
+                        "access_invitation", str(invite.id),
+                        {"previous": "prepared", "current": "cancelled"})
+        self._save()
+        return self._public_invitation(invite)
 
     def replace_group_permissions(self, group_id: UUID, permissions: list[str]) -> dict:
         group = self.repo.group(group_id)

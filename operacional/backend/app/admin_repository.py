@@ -5,7 +5,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditEvent, GroupMembership, GroupPermission, StoreGroup, User,
+    AccessInvitation, AuditEvent, GroupMembership, GroupPermission, StoreGroup, User,
     UserPermissionOverride,
 )
 
@@ -29,6 +29,36 @@ class AdminRepository:
         self.db.add(user)
         self.db.flush()
         return user
+
+    def invitations(self) -> list[AccessInvitation]:
+        return list(self.db.scalars(
+            select(AccessInvitation).order_by(
+                AccessInvitation.created_at.desc(), AccessInvitation.id.desc()
+            )
+        ))
+
+    def invitation(self, invitation_id: UUID) -> AccessInvitation | None:
+        return self.db.get(AccessInvitation, invitation_id)
+
+    def invitation_by_email(self, email_key: str) -> AccessInvitation | None:
+        return self.db.scalar(
+            select(AccessInvitation).where(
+                AccessInvitation.email_key == email_key
+            ).with_for_update()
+        )
+
+    def add_invitation(self, *, email: str, email_key: str, name: str,
+                       profile: str, store_code: str | None,
+                       actor_id: UUID) -> AccessInvitation:
+        invitation = AccessInvitation(
+            id=uuid4(), email=email, email_key=email_key,
+            display_name=name, profile=profile, store_code=store_code,
+            status="prepared", revision=1,
+            prepared_by=actor_id, updated_by=actor_id,
+        )
+        self.db.add(invitation)
+        self.db.flush()
+        return invitation
 
     def groups(self) -> list[StoreGroup]:
         return list(self.db.scalars(select(StoreGroup).order_by(StoreGroup.store_code)))

@@ -61,6 +61,41 @@ def http_result(callback):
         raise HTTPException(status_code=error.status_code, detail=error.message) from error
 
 
+class PrepareInvitation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    display_name: str = Field(min_length=2, max_length=150)
+    email: str = Field(min_length=5, max_length=254)
+    profile: str = Field(pattern=r"^(administrator|seller)$")
+    store_code: str | None = None
+
+
+class CancelInvitation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+
+
+@router.get("/invitations")
+def invitations(admin: AdminService = Depends(service)) -> list[dict]:
+    return admin.list_invitations()
+
+
+@router.post("/invitations", status_code=201)
+def prepare_invitation(payload: PrepareInvitation,
+                       admin: AdminService = Depends(service)) -> dict:
+    return http_result(lambda: admin.prepare_invitation(
+        email=payload.email, name=payload.display_name,
+        profile=payload.profile, store_code=payload.store_code,
+    ))
+
+
+@router.delete("/invitations/{invitation_id}")
+def cancel_invitation(invitation_id: UUID, payload: CancelInvitation,
+                      admin: AdminService = Depends(service)) -> dict:
+    return http_result(lambda: admin.cancel_invitation(
+        invitation_id, payload.expected_revision,
+    ))
+
+
 @router.get("/users")
 def list_users(admin: AdminService = Depends(service)) -> list[dict]:
     return admin.list_users()

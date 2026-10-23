@@ -7,6 +7,8 @@ def test_admin_endpoints_require_authenticated_identity():
     client = TestClient(app)
     routes = [
         ("/api/v1/admin/users", "get", None),
+        ("/api/v1/admin/invitations", "get", None),
+        ("/api/v1/admin/invitations", "post", {"email": "worker@example.test", "display_name": "Worker", "profile": "seller", "store_code": "JOINVILLE"}),
         ("/api/v1/admin/users", "post", {"auth_subject": "x", "display_name": "Test", "profile": "seller", "store_code": "JOINVILLE"}),
         ("/api/v1/admin/groups", "get", None),
         ("/api/v1/admin/audit", "get", None),
