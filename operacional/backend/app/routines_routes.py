@@ -122,6 +122,15 @@ def save_post(post_date:date,body:WhatsAppInput,svc:RoutinesService=Depends(serv
     ))
 
 
+class DeletePost(Strict):
+    expected_revision:int=Field(ge=1)
+
+
+@router.delete("/whatsapp/{post_date}")
+def delete_post(post_date:date,body:DeletePost,svc:RoutinesService=Depends(service))->dict:
+    return checked(lambda:svc.delete_marketing(post_date,body.expected_revision))
+
+
 @router.put("/whatsapp/{post_date}/day-off")
 def day_off(post_date:date,body:DayOffInput,
             svc:RoutinesService=Depends(service))->dict:

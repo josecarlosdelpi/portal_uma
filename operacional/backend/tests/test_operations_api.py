@@ -83,6 +83,22 @@ def test_reviews_have_one_non_cumulative_reward_and_delivery(env):
         assert len([ev for ev in events if ev.action=="reviews.checked"])==2
 
 
+def test_review_tier_change_never_reuses_old_delivery_without_confirmation(env):
+    client,*_=env
+    route="/api/v1/operations/reviews/TUBARAO/2026/10"
+    first=client.put(route,json={"count":12,"checked_on":"2026-10-20",
+                                 "delivered_on":"2026-10-20","expected_revision":0})
+    assert first.status_code==200,first.text
+    old_delivery=client.put(route,json={"count":20,"checked_on":"2026-10-20",
+                                        "delivered_on":"2026-10-20","expected_revision":1})
+    assert old_delivery.status_code==422
+    pending=client.put(route,json={"count":20,"checked_on":"2026-10-20",
+                                   "delivered_on":None,"expected_revision":1})
+    assert pending.status_code==200,pending.text
+    assert pending.json()["tier"]=="maior"
+    assert pending.json()["delivered_on"] is None
+
+
 def test_stock_movement_is_transactional_and_has_no_negative_balance(env):
     client,identity,engine,admin,seller,_=env
     create=client.post("/api/v1/operations/supplies/materials",json={

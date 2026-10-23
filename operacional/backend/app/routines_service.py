@@ -189,6 +189,24 @@ class RoutinesService(OperationsService):
                 "revision":row.revision,"has_art_file":False,
                 "has_evidence_file":False}
 
+    def delete_marketing(self, when: date, expected: int) -> dict:
+        self.require("JOINVILLE", "whatsapp_status.edit")
+        row = self.db.scalar(
+            select(WhatsAppPost).where(
+                WhatsAppPost.post_date == start_of(when)
+            ).with_for_update()
+        )
+        if row is None:
+            raise OperationError(404, "Planejamento não encontrado")
+        self.revision(row, expected)
+        previous = self._post(row)
+        self.db.delete(row)
+        self.audit("whatsapp.plan.deleted", "whatsapp_post", when.isoformat(),
+                   {"previous": previous, "year": when.year})
+        self.commit()
+        return {"date": when.isoformat(), "deleted": True}
+
+
     def save_marketing(self,when:date,code:str,category:str,note:str,
                        status:str,expected:int)->dict:
         self.require("JOINVILLE","whatsapp_status.edit")

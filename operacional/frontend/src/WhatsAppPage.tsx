@@ -136,6 +136,12 @@ export function WhatsAppPage({token,profile}:Props){
           onClick={()=>void perform(()=>routinesApi.saveWhatsApp(token,day,{
             product_code:code,category,note,status,expected_revision:selected?.revision??0
           }),"Planejamento atualizado; repetição anual verificada.")}>Salvar programação</button>
+        {selected&&<button className="btn-secondary" disabled={working}
+          onClick={()=>{
+            if(!window.confirm("Excluir o planejamento desta data? A exclusão ficará na auditoria."))return;
+            void perform(()=>routinesApi.deleteWhatsApp(token,day,selected.revision),
+              "Planejamento removido com registro de auditoria.");
+          }}>Excluir programação deste dia</button>}
         <div className="routine-dayoff">
           <label><input type="checkbox" checked={!!dayOff} disabled={working||!!selected}
             onChange={e=>void perform(()=>routinesApi.dayOff(token,day,e.target.checked,offReason),

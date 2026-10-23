@@ -129,6 +129,28 @@ def test_status_calendar_deduplicates_products_annually(env):
     }).status_code==403
 
 
+def test_whatsapp_plan_can_be_removed_before_day_off_with_audit(env):
+    c,actor,engine,_,seller,_=env
+    route="/api/v1/routines/whatsapp/2026-10-20"
+    created=c.put(route,json={
+        "product_code":"Produto teste","status":"planejado","expected_revision":0
+    })
+    assert created.status_code==200,created.text
+    assert c.request("DELETE",route,json={"expected_revision":0}).status_code==409
+    actor["user"]=seller
+    assert c.request("DELETE",route,json={"expected_revision":1}).status_code==403
+    actor["user"]=env[3]
+    removed=c.delete(route,json={"expected_revision":1})
+    assert removed.status_code==200,removed.text
+    assert removed.json()["deleted"] is True
+    assert c.put("/api/v1/routines/whatsapp/2026-10-20/day-off",json={
+        "off":True,"reason":"Sem postagem"
+    }).status_code==200
+    with Session(engine) as db:
+        changes=[x.action for x in db.scalars(select(AuditEvent))]
+        assert "whatsapp.plan.deleted" in changes
+
+
 def test_instagram_is_manual_and_store_bound(env):
     c,actor,_,_,seller,_=env
     initial=c.get("/api/v1/routines/instagram/2026/10").json()

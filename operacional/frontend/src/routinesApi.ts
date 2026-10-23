@@ -47,6 +47,9 @@ export const routinesApi={
     product_code:string;category:string;note:string;
     status:"planejado"|"arte_pronta"|"publicado";expected_revision:number
   })=>request<WhatsAppPost>(token,`/api/v1/routines/whatsapp/${day}`,"PUT",body),
+  deleteWhatsApp:(token:string,day:string,expectedRevision:number)=>
+    request<{date:string;deleted:boolean}>(token,`/api/v1/routines/whatsapp/${day}`,
+      "DELETE",{expected_revision:expectedRevision}),
   dayOff:(token:string,day:string,off:boolean,reason:string)=>
     request<{date:string;off:boolean}>(token,`/api/v1/routines/whatsapp/${day}/day-off`,
       "PUT",{off,reason}),

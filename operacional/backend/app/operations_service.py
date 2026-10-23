@@ -128,6 +128,14 @@ class OperationsService:
             GoogleReviewMonth.year == year, GoogleReviewMonth.month == month,
         ).with_for_update())
         self.revision(row, expected)
+        # A entrega antiga não pode migrar silenciosamente para outra faixa.
+        if (row is not None and row.delivered_on is not None
+                and reward_tier(row.count) != reward_tier(count)
+                and delivered_on is not None
+                and delivered_on == row.delivered_on.date()):
+            raise OperationError(
+                422, "A faixa de premiação mudou. Confirme nova entrega ou deixe pendente."
+            )
         before = self._review(row, store)
         if row is None:
             row = GoogleReviewMonth(
