@@ -20,7 +20,6 @@ READ_PERMISSIONS = frozenset({
     "sales.previous_month.view",
     "sales.previous_year.view",
     "targets.view",
-    "monthly_closing.view",
     "telemarketing.view",
     "reviews.view",
     "supplies.view",
@@ -29,6 +28,9 @@ READ_PERMISSIONS = frozenset({
     "whatsapp_status.view",
     "instagram.view",
 })
+
+# Esta permissao divulga dados consolidados das tres lojas e nao pode ser herdada por vendedores.
+MANAGEMENT_READ_PERMISSIONS = frozenset({"monthly_closing.view"})
 
 WRITE_PERMISSIONS = frozenset({
     "sales.import",
@@ -50,7 +52,7 @@ GOVERNANCE_PERMISSIONS = frozenset({
     "audit.view",
     "security.manage",
 })
-OPERATIONAL_PERMISSIONS = READ_PERMISSIONS | WRITE_PERMISSIONS
+OPERATIONAL_PERMISSIONS = READ_PERMISSIONS | MANAGEMENT_READ_PERMISSIONS | WRITE_PERMISSIONS
 KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS
 
 

@@ -26,6 +26,48 @@
 .filters{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}.filters .form-row{margin:0;min-width:180px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:20px}.kpi{padding:19px 20px;min-height:132px}.kpi span{font-size:12px;color:#738a93}.kpi strong{display:block;font-size:clamp(20px,2.15vw,29px);letter-spacing:-1px;margin-top:17px;font-weight:850}.kpi small{display:block;font-size:10px;color:#8a9aa2;margin-top:7px}.day-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin:16px 0}.calendar-day{display:flex;flex-direction:column;align-items:center;gap:2px;border:1px solid #dce9eb;border-radius:10px;background:#f3f8f8;color:#1a3841;padding:8px 3px;min-width:0}.calendar-day strong{font-size:16px}.calendar-day small{font-size:10px;color:#7a909a}.calendar-day em{font-size:10px;color:#187a58;font-style:normal}.calendar-day.closed{background:#fff3e2;border-color:#eed7ae}.calendar-day.closed em{color:#986c2a}.caption{font-size:11px;color:#82989e}
 .toast{position:fixed;z-index:100;bottom:20px;right:20px;background:#19313c;color:#fff;max-width:390px;border-radius:11px;padding:13px 17px;box-shadow:0 14px 40px #0003;font-size:12px;display:none}
 @media(max-width:1050px){.grid-two{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:800px){.layout{grid-template-columns:1fr}.sidebar{min-height:0;padding:12px 18px}.brand{padding:4px;border:0}.nav{display:flex;flex-direction:row;flex-wrap:wrap}.nav button,.nav .nav-disabled{width:auto;padding:9px 10px}.side-heading,.side-note,.side-spacer,.side-bottom{display:none}.topbar{padding:12px 18px}.workspace{padding:25px 18px}}@media(max-width:550px){.preview-banner{align-items:flex-start;flex-direction:column}.kpis{gap:8px}.kpi{padding:13px;min-height:125px}.kpi strong{font-size:19px}.panel{padding:16px}.filters .form-row{flex:1;min-width:135px}.top-right{gap:6px}.avatar{display:none}.day-grid{gap:4px}.calendar-day{padding:7px 0}.user-row{flex-wrap:wrap}}
+
+/* Área de prévia: Visão Geral e apresentação mensal */
+.preview-revenue{background:#f3faf9;color:#167b72;border:1px solid #d6ebe7;padding:12px 15px;border-radius:11px;margin:15px 0;font-size:12px}
+.preview-store-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.preview-store{border:1px solid #e1ebed;background:#fcfefe;border-radius:12px;padding:14px}
+.preview-store h3{color:#197a80;margin:0 0 12px}.preview-store>div{border-top:1px solid #e8eff1;padding:10px 0;display:flex;justify-content:space-between;gap:9px;font-size:12px}
+.preview-editor{display:flex;flex-direction:column;gap:10px}.preview-editor label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#576e76;font-weight:750}
+.preview-editor textarea,.preview-editor input,.preview-editor select{border:1px solid #dbe5e9;padding:10px;border-radius:9px;background:#fff;color:#19313c;font:inherit}
+.preview-editor textarea{min-height:75px;resize:vertical}.preview-editor .preview-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.preview-priority-row{background:#f8fbfb;border:1px solid #e1ebed;border-radius:11px;padding:12px;margin:9px 0}
+.preview-priority-row>div{display:grid;grid-template-columns:2fr 1.2fr 1fr 1fr 1fr;gap:8px}
+.preview-priority-row label{min-width:0}.preview-priority-row input,.preview-priority-row select{width:100%;min-width:0}
+.preview-priority-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.preview-presenter{position:fixed;inset:0;z-index:200;background:#102832;color:#19313c;padding:15px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.preview-presenter-bar,.preview-presenter-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#d4e3e7}
+.preview-presenter-bar>strong{color:#fff}
+.preview-presenter-canvas{max-width:1300px;width:100%;margin:0 auto;min-height:520px;flex:1;border-radius:15px;background:white;display:flex;flex-direction:column;overflow:hidden}
+.preview-presenter-head{background:linear-gradient(105deg,#15424b,#176b71);color:white;padding:23px 30px}
+.preview-presenter-head small{color:#9de7df;font-size:11px;letter-spacing:1px;font-weight:800}
+.preview-presenter-head h1{font-size:clamp(24px,3.5vw,36px);margin:7px 0}
+.preview-presenter-body{flex:1;padding:28px;display:flex;flex-direction:column;gap:18px}
+.preview-presenter-foot{border-top:1px solid #e3ecee;padding:12px 28px;color:#82949d;font-size:10px}
+.preview-slide-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.preview-slide-stats>div{border:1px solid #e4ecee;background:#f6fafb;border-radius:10px;padding:15px;display:flex;flex-direction:column}
+.preview-slide-stats span{color:#788f99;font-size:11px}.preview-slide-stats strong{font-size:22px;margin-top:9px}
+.preview-slide-stores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.preview-slide-stores>div{border:1px solid #e4ecee;border-radius:10px;padding:14px}
+.preview-slide-stores h3{color:#117b81}.preview-slide-stores p{font-size:12px;border-top:1px solid #edf2f4;padding:8px 0;margin:0}
+.preview-slide-note{padding:14px;border-left:3px solid #00a7a6;background:#f1f8f8;white-space:pre-wrap;overflow-wrap:anywhere}
+.preview-deck-table{width:100%;border-collapse:collapse;font-size:12px}.preview-deck-table td,.preview-deck-table th{padding:10px;border-bottom:1px solid #e4ecee;text-align:left}
+.preview-deck-table th{background:#f1f8f8}
+.preview-deck-callout{text-align:center;color:#007b7e;font-weight:800;padding:20px}
+@media(max-width:850px){.preview-store-grid,.preview-slide-stores,.preview-slide-stats,.preview-editor .preview-columns{grid-template-columns:1fr}.preview-priority-row>div{grid-template-columns:1fr 1fr}.preview-presenter-canvas{min-height:400px}}
+@media print{
+ @page{size:A4 landscape;margin:8mm}
+ body{background:white}
+ .preview-presenter{position:static;padding:0;background:white;overflow:visible}
+ .preview-presenter-bar,.preview-presenter-controls,.preview-banner,.layout{display:none!important}
+ .preview-presenter-canvas{border:0;box-shadow:none;width:100%;height:auto}
+ .preview-presenter-head{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+}
+
 </style>
 </head>
 <body>
@@ -91,6 +133,26 @@
   var mins={"JOINVILLE":900,"TUBARAO":650,"ITAJAI":500};
   var closed={"JOINVILLE|2026-10":["2026-10-12"],"TUBARAO|2026-10":[],"ITAJAI|2026-10":[]};
   var st={view:"users",tab:"users",profile:"superadmin",user:"u2",group:"JOINVILLE",store:"JOINVILLE",month:"2026-10"};
+
+  // Conteúdo exclusivamente fictício desta prévia, perdido ao atualizar o navegador.
+  var closingDraft={
+    opening:"Agradecemos às equipes das três lojas pelo empenho durante o mês.",
+    stores:{JOINVILLE:"",TUBARAO:"",ITAJAI:""},
+    opportunities:"Revisar os processos de acompanhamento comercial e as oportunidades abertas.",
+    wins:"Reconhecer a colaboração entre lojas.",
+    improvements:"Registrar melhor as necessidades dos clientes.",
+    notices:"Revisar as prioridades comerciais do próximo mês.",
+    notes:{JOINVILLE:"",TUBARAO:"",ITAJAI:""},
+    priorities:[
+      {id:"demo-p1",what:"Revisar rotina de atendimento",owner:"Gestão",scope:"all",due:"2026-11-12",status:"pendente"},
+      {id:"demo-p2",what:"Conferir indicadores semanais",owner:"Gestão",scope:"JOINVILLE",due:"2026-11-18",status:"andamento"},
+      {id:"demo-p3",what:"Planejar divulgação dos produtos",owner:"Gestão",scope:"all",due:"2026-11-23",status:"pendente"}
+    ]
+  };
+  var slideIndex=0;
+  var slideDurations=[1,3,5,3,2,2,4];
+  var slideTitles=["Abertura","Resultado geral","Desempenho por loja","Atividades comerciais","Rotinas e qualidade","Reconhecimentos e avisos","Prioridades do próximo mês"];
+  var esc=function(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});};
   var WEEK=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
   var $=function(id){return document.getElementById(id);};
   var fmt=function(n){return n==null?"Sem dados":new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(n);};
@@ -172,22 +234,142 @@
     var plan='<section class="panel" style="margin-top:19px"><div class="panel-head"><div><h2>Distribuição inicial da meta</h2><p>Prévia orientativa. A meta dinâmica dependerá das vendas do ERP.</p></div><span class="chip">'+open.length+' dias</span></div><div class="table-wrap"><table><thead><tr><th>Data</th><th>Dia da semana</th><th>Meta diária-base</th><th>Faturamento</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+(!rows?'<p class="empty">Nenhum dia de expediente configurado.</p>':'')+'<p class="tiny-note">Após integrar o ERP, a meta do dia será recalculada considerando vendas até o dia anterior e dias úteis restantes. Após atingir a meta mensal, será usado o mínimo fixo da loja.</p></section>';
     return header("Metas diárias","Cadastre metas mensais, selecione a unidade e defina dias de funcionamento.")+banner()+'<div class="notice notice-green">Faturamento realizado e atingimento continuam sem dados. Os valores de metas acima são somente exemplos para testar o visual.</div>'+filters+cards+'<div class="grid-two">'+edit+calendar+'</div>'+plan;
   }
+
+  function overviewScreen(){
+    var allowed=st.profile==="seller"?["JOINVILLE"]:["JOINVILLE","TUBARAO","ITAJAI"];
+    var current=allowed.map(function(code){return {code:code,goal:targets[code+"|"+st.month]};});
+    var allGoals=current.length>0&&current.every(function(v){return typeof v.goal==="number";});
+    var sum=allGoals?current.reduce(function(n,x){return n+x.goal;},0):null;
+    var kpis=[
+      ["Meta do mês",sum===null?"Sem meta":fmt(sum),"Valores fictícios da prévia"],
+      ["Faturamento realizado","Sem dados","Aguardando ERP"],
+      ["Atingimento","Sem dados","Não será simulado"],
+      ["Última atualização de vendas","Não disponível","Integração pendente"]
+    ].map(function(k){return '<section class="panel kpi"><span>'+k[0]+'</span><strong>'+k[1]+'</strong><small>'+k[2]+'</small></section>';}).join("");
+    var tiles=current.map(function(x){return '<div class="preview-store"><h3>'+stores[x.code]+'</h3>'+
+      '<div><span>Meta</span><b>'+ (x.goal==null?"Sem meta":fmt(x.goal))+'</b></div>'+
+      '<div><span>Faturamento</span><b>Sem dados</b></div>'+
+      '<div><span>Cumprimento</span><b>Sem dados</b></div></div>';}).join("");
+    return header("Visão Geral",st.profile==="seller"?"Indicadores permitidos da sua loja.":"Resultados comerciais das três lojas.")+banner()+
+      '<div class="filters"><div class="form-row"><label for="overviewMonthSelect">Mês de referência</label><input type="month" id="overviewMonthSelect" value="'+esc(st.month)+'"></div></div>'+
+      '<div class="preview-revenue">O faturamento ainda não vem do ERP. A ausência de dados não significa que houve zero vendas.</div>'+
+      '<div class="kpis">'+kpis+'</div><section class="panel"><div class="panel-head"><div><h2>Desempenho por unidade</h2><p>Metas de exemplo, sem valores de faturamento fictícios.</p></div></div><div class="preview-store-grid">'+tiles+'</div></section>';
+  }
+  function closingInput(label,field,value){
+    return '<label>'+label+'<textarea maxlength="3000" data-closing-field="'+esc(field)+'">'+esc(value)+'</textarea></label>';
+  }
+  function closingScreen(){
+    var notes=['JOINVILLE','TUBARAO','ITAJAI'].map(function(code){
+      return closingInput('Comentário — '+stores[code],'store.'+code,closingDraft.stores[code]);
+    }).join("");
+    var storeNotes=['JOINVILLE','TUBARAO','ITAJAI'].map(function(code){
+      return closingInput('Recados — '+stores[code],'notes.'+code,closingDraft.notes[code]);
+    }).join("");
+    var priorities=closingDraft.priorities.map(function(p,i){return '<div class="preview-priority-row"><div class="preview-priority-bar"><strong>Prioridade '+(i+1)+'</strong><button class="btn secondary" data-action="removeClosingPriority" data-id="'+esc(p.id)+'">Retirar</button></div>'+
+      '<div>'+['what','owner','scope','due','status'].map(function(field){
+        var opts={scope:[["all","Todas as lojas"],["JOINVILLE","Joinville"],["TUBARAO","Tubarão"],["ITAJAI","Itajaí"]],status:[["pendente","Pendente"],["andamento","Em andamento"],["concluida","Concluída"]]};
+        var label={what:"Ação",owner:"Responsável",scope:"Loja",due:"Prazo",status:"Situação"}[field];
+        return '<label>'+label+(opts[field]?'<select data-closing-priority="'+esc(p.id)+'" data-field="'+field+'">'+opts[field].map(function(x){return '<option value="'+x[0]+'" '+(p[field]===x[0]?'selected':'')+'>'+x[1]+'</option>';}).join("")+'</select>':
+          '<input type="'+(field==="due"?"date":"text")+'" maxlength="300" data-closing-priority="'+esc(p.id)+'" data-field="'+field+'" value="'+esc(p[field])+'">')+'</label>';
+      }).join("")+'</div></div>';}).join("");
+    return header("Fechamento mensal","7 slides · 20 minutos · foco nos resultados das lojas.")+banner()+
+      '<div class="preview-revenue">As vendas, comparações e rotinas ainda não possuem integração real. Os textos e prioridades abaixo são demonstrações fictícias.</div>'+
+      '<div class="filters"><div class="form-row"><label for="closingMonthSelect">Competência</label><input type="month" id="closingMonthSelect" value="'+esc(st.month)+'"></div>'+
+      '<button class="btn primary" data-action="startSlides">▶ Apresentar sete slides</button><button class="btn secondary" data-action="saveClosingDraft">Salvar rascunho (simulação)</button></div>'+
+      '<div class="kpis">'+
+      '<section class="panel kpi"><span>Meta das três lojas</span><strong>'+ (["JOINVILLE","TUBARAO","ITAJAI"].every(function(s){return targets[s+"|"+st.month]!=null})?fmt(["JOINVILLE","TUBARAO","ITAJAI"].reduce(function(n,c){return n+targets[c+"|"+st.month];},0)):"Sem dados")+'</strong><small>Metas fictícias</small></section>'+
+      '<section class="panel kpi"><span>Faturamento</span><strong>Sem dados</strong><small>ERP pendente</small></section>'+
+      '<section class="panel kpi"><span>Apresentação</span><strong>7 slides</strong><small>20 minutos no total</small></section>'+
+      '<section class="panel kpi"><span>Prioridades</span><strong>'+closingDraft.priorities.length+'/5</strong><small>Recomendado: 3 a 5</small></section></div>'+
+      '<section class="panel"><div class="panel-head"><div><h2>Comentários para a apresentação</h2><p>Altere os textos para visualizar a apresentação; nada é enviado ao servidor.</p></div></div><div class="preview-editor">'+
+      closingInput("Mensagem de abertura","opening",closingDraft.opening)+'<div class="preview-columns">'+notes+'</div>'+
+      closingInput("Atividades e oportunidades comerciais","opportunities",closingDraft.opportunities)+
+      '<div class="preview-columns">'+closingInput("Conquistas","wins",closingDraft.wins)+closingInput("Melhorias","improvements",closingDraft.improvements)+closingInput("Avisos","notices",closingDraft.notices)+'</div><h2>Recados por loja</h2><div class="preview-columns">'+storeNotes+'</div>'+
+      '</div></section><section class="panel" style="margin-top:18px"><div class="panel-head"><div><h2>Prioridades do próximo mês</h2><p>De três a cinco ações acompanháveis.</p></div><span class="chip">'+closingDraft.priorities.length+' / 5</span></div>'+
+      '<div class="preview-editor">'+priorities+'</div><div class="btn-row">'+
+      '<button class="btn secondary" data-action="addClosingPriority" '+(closingDraft.priorities.length>=5?'disabled':'')+'>+ Adicionar prioridade</button>'+
+      '<button class="btn primary" data-action="startSlides">Visualizar apresentação</button></div>'+
+      '<p class="tiny-note">O sistema operacional terá versões arquivadas, comentários e auditoria reais após habilitar a autenticação.</p></section>';
+  }
+  function slideStat(name,value){
+    return '<div><span>'+esc(name)+'</span><strong>'+esc(value)+'</strong></div>';
+  }
+  function slideNote(value){
+    return '<div class="preview-slide-note">'+esc(value||"Ainda não registrado")+'</div>';
+  }
+  function slidesContent(index){
+    var codes=["JOINVILLE","TUBARAO","ITAJAI"];
+    var targetsAll=codes.every(function(code){return targets[code+"|"+st.month]!=null});
+    var goal=targetsAll?fmt(codes.reduce(function(sum,code){return sum+targets[code+"|"+st.month];},0)):"Sem meta cadastrada";
+    if(index===0)return '<div style="text-align:center;padding:35px 5px"><strong style="color:#027c81;letter-spacing:1.4px">UNIVERSO DAS MANGUEIRAS</strong><h2 style="font-size:clamp(29px,4.4vw,52px)">Fechamento Mensal UMA</h2><p>'+esc(st.month)+'</p><p>Joinville · Tubarão · Itajaí</p>'+slideNote(closingDraft.opening)+'</div>';
+    if(index===1)return '<div class="preview-slide-stats">'+slideStat("Faturamento consolidado","Sem dados")+slideStat("Meta consolidada",goal)+slideStat("Atingimento","Sem dados")+slideStat("Comparação mês anterior","Sem dados")+slideStat("Comparação ano anterior","Sem dados")+'</div><div class="preview-slide-note">O gráfico de evolução será ativado quando houver histórico oficial de vendas do ERP.</div>';
+    if(index===2)return '<div class="preview-slide-stores">'+codes.map(function(code){return '<div><h3>'+stores[code]+'</h3><p><b>Meta:</b> '+(targets[code+"|"+st.month]==null?"Sem meta":fmt(targets[code+"|"+st.month]))+'</p><p><b>Faturamento:</b> Sem dados</p><p><b>Atingimento:</b> Sem dados</p><h4>Comentário da gestão</h4>'+slideNote(closingDraft.stores[code])+'</div>';}).join("")+'</div>';
+    if(index===3)return '<div class="preview-slide-stats">'+slideStat("Ligações comerciais","Não monitorado")+slideStat("Clientes ativados","Não monitorado")+slideStat("Retornos comerciais","Não monitorado")+'</div><h3>Oportunidades comerciais</h3>'+slideNote(closingDraft.opportunities);
+    if(index===4)return '<table class="preview-deck-table"><thead><tr><th>Loja</th><th>Google</th><th>Checklists</th><th>Instagram</th></tr></thead><tbody>'+codes.map(function(c){return '<tr><td>'+stores[c]+'</td><td>Sem dados</td><td>Sem dados</td><td>Sem dados</td></tr>';}).join("")+'</tbody></table><div class="preview-slide-stats">'+slideStat("Status WhatsApp (UMA)","Não monitorado")+slideStat("Treinamentos","Não monitorado")+'</div>';
+    if(index===5)return '<div class="preview-slide-stores"><div><h3>O que fizemos bem?</h3>'+slideNote(closingDraft.wins)+'</div><div><h3>O que melhorar?</h3>'+slideNote(closingDraft.improvements)+'</div><div><h3>Avisos</h3>'+slideNote(closingDraft.notices)+'</div></div><h3>Recados por loja</h3>'+codes.map(function(c){return closingDraft.notes[c]?'<p><b>'+stores[c]+':</b> '+esc(closingDraft.notes[c])+'</p>':'';}).join("");
+    return '<div style="overflow:auto"><table class="preview-deck-table"><thead><tr><th>Ação</th><th>Responsável</th><th>Loja</th><th>Prazo</th><th>Situação</th></tr></thead><tbody>'+
+      closingDraft.priorities.map(function(p){return '<tr><td>'+esc(p.what)+'</td><td>'+esc(p.owner)+'</td><td>'+esc(stores[p.scope]||"Todas as lojas")+'</td><td>'+esc(p.due)+'</td><td>'+esc(p.status)+'</td></tr>';}).join("")+'</tbody></table></div>'+
+      '<div class="preview-slide-note">Pendências do mês anterior: ainda não disponíveis nesta prévia.</div><div class="preview-deck-callout">Transformar resultados e aprendizados em ações para o próximo mês.</div>';
+  }
+  function drawPresentation(){
+    var overlay=$("previewSlides");
+    if(!overlay)return;
+    overlay.innerHTML='<div class="preview-presenter-bar"><strong>PORTAL UMA · FECHAMENTO '+esc(st.month)+'</strong><span>Slide '+(slideIndex+1)+'/7 · '+slideDurations[slideIndex]+' min · Total 20 min</span><div class="btn-row"><button class="btn" data-action="printSlides">Imprimir / PDF</button><button class="btn" data-action="closeSlides">Fechar ✕</button></div></div>'+
+      '<div class="preview-presenter-canvas"><div class="preview-presenter-head"><small>0'+(slideIndex+1)+' · '+esc(slideTitles[slideIndex].toUpperCase())+'</small><h1>'+esc(slideTitles[slideIndex])+'</h1></div>'+
+      '<div class="preview-presenter-body">'+slidesContent(slideIndex)+'</div>'+
+      '<div class="preview-presenter-foot">UNIVERSO DAS MANGUEIRAS AUTOMOTIVAS · APRESENTAÇÃO SIMULADA · '+(slideIndex+1)+'/7</div></div>'+
+      '<div class="preview-presenter-controls"><button class="btn" data-action="slidePrev" '+(slideIndex===0?'disabled':'')+'>← Anterior</button><span>Use ← e → para navegar · Esc para sair</span><button class="btn primary" data-action="slideNext" '+(slideIndex===6?'disabled':'')+'>Próximo →</button></div>';
+  }
+  function openPresentation(){
+    if(st.profile==="seller")return;
+    slideIndex=0;
+    var overlay=document.createElement("section");
+    overlay.id="previewSlides";overlay.className="preview-presenter";overlay.setAttribute("role","dialog");
+    overlay.setAttribute("aria-modal","true");overlay.setAttribute("aria-label","Fechamento Mensal UMA - Simulação");
+    document.body.append(overlay);drawPresentation();
+  }
+
   function render(){
-    var superadmin=st.profile==="superadmin", allowed=st.profile!=="seller"||groups.JOINVILLE.includes("targets.view");
-    if(!superadmin&&st.view==="admin")st.view=allowed?"targets":"restricted";
-    var entries='<div class="nav-disabled"><span class="symbol">▦</span> Visão geral <small>Em preparação</small></div>';
-    if(allowed)entries+='<button data-action="view" data-id="targets" class="'+(st.view==="targets"?'active':'')+'"><span class="symbol">▤</span> Metas diárias</button>';
-    entries+='<div class="nav-disabled"><span class="symbol">▥</span> Fechamento mensal <small>Em preparação</small></div>';
-    if(superadmin)entries+='<button data-action="view" data-id="admin" class="'+(st.view==="admin"?'active':'')+'"><span class="symbol">⚙</span> Configurações</button>';
+    var superadmin=st.profile==="superadmin";
+    var targetsAllowed=st.profile!=="seller"||groups.JOINVILLE.includes("targets.view");
+    var overviewAllowed=st.profile!=="seller"||groups.JOINVILLE.includes("overview.view");
+    if(!superadmin&&st.view==="admin")st.view=overviewAllowed?"overview":(targetsAllowed?"targets":"restricted");
+    if(st.profile==="seller"&&st.view==="closing")st.view="overview";
+    var entries="";
+    if(overviewAllowed)entries+='<button data-action="view" data-id="overview" class="'+(st.view==="overview"?"active":"")+'"><span class="symbol">▦</span> Visão Geral</button>';
+    if(targetsAllowed)entries+='<button data-action="view" data-id="targets" class="'+(st.view==="targets"?"active":"")+'"><span class="symbol">▤</span> Metas diárias</button>';
+    if(st.profile!=="seller")entries+='<button data-action="view" data-id="closing" class="'+(st.view==="closing"?"active":"")+'"><span class="symbol">▥</span> Fechamento mensal</button>';
+    if(superadmin)entries+='<button data-action="view" data-id="admin" class="'+(st.view==="admin"?"active":"")+'"><span class="symbol">⚙</span> Configurações</button>';
     $("nav").innerHTML=entries;
     $("profile").value=st.profile;
-    $("bread").textContent=st.view==="admin"?"Configurações":st.view==="targets"?"Metas diárias":"Meu acesso";
-    $("content").innerHTML=st.view==="admin"&&superadmin?adminScreen():st.view==="targets"&&allowed?targetScreen():header("Meu acesso","Visualização das permissões atribuídas ao perfil.")+banner()+'<div class="panel empty">Não há módulos disponíveis para este perfil simulado.</div>';
+    $("bread").textContent=st.view==="admin"?"Configurações":st.view==="targets"?"Metas diárias":st.view==="overview"?"Visão Geral":st.view==="closing"?"Fechamento mensal":"Meu acesso";
+    $("content").innerHTML=st.view==="admin"&&superadmin?adminScreen():
+      st.view==="overview"&&overviewAllowed?overviewScreen():
+      st.view==="targets"&&targetsAllowed?targetScreen():
+      st.view==="closing"&&st.profile!=="seller"?closingScreen():
+      header("Meu acesso","Visualização das permissões atribuídas ao perfil.")+banner()+
+      '<div class="panel empty">Não há módulos disponíveis para este perfil simulado.</div>';
   }
+
   document.addEventListener("click",function(event){
     var btn=event.target.closest("button[data-action]");
     if(!btn || btn.disabled)return;
     var action=btn.dataset.action,id=btn.dataset.id;
+    if(action==="startSlides"){openPresentation();return;}
+    if(action==="closeSlides"){var old=$("previewSlides");if(old)old.remove();return;}
+    if(action==="slideNext"){slideIndex=Math.min(6,slideIndex+1);drawPresentation();return;}
+    if(action==="slidePrev"){slideIndex=Math.max(0,slideIndex-1);drawPresentation();return;}
+    if(action==="printSlides"){window.print();return;}
+    if(action==="saveClosingDraft"){notify("Rascunho simulado. As alterações desaparecem ao atualizar.");return;}
+    if(action==="addClosingPriority"){
+      if(closingDraft.priorities.length>=5)return;
+      closingDraft.priorities.push({id:"temp-"+Date.now(),what:"",owner:"",scope:"all",due:"2026-11-14",status:"pendente"});
+      render();return;
+    }
+    if(action==="removeClosingPriority"){
+      closingDraft.priorities=closingDraft.priorities.filter(function(p){return p.id!==id;});
+      render();return;
+    }
     if(action==="view"){st.view=id;render();return;}
     if(action==="tab"){st.tab=id;render();return;}
     if(action==="user"){st.user=id;render();return;}
@@ -234,12 +416,31 @@
   document.addEventListener("change",function(event){
     var e=event.target;
     if(e.id==="profile"){
-      st.profile=e.value;st.view=st.profile==="superadmin"?"admin":"targets";st.store=st.profile==="seller"?"JOINVILLE":st.store;
+      st.profile=e.value;st.view=st.profile==="superadmin"?"admin":"overview";st.store=st.profile==="seller"?"JOINVILLE":st.store;
       render();notify("Perfil de demonstração alterado. Nenhum login foi realizado.");return;
     }
     if(e.id==="storeSelect"){st.store=e.value;render();return;}
-    if(e.id==="monthSelect"){st.month=e.value;render();return;}
+    if(e.id==="monthSelect"||e.id==="overviewMonthSelect"||e.id==="closingMonthSelect"){st.month=e.value;render();return;}
   });
+  document.addEventListener("input",function(event){
+    var e=event.target;
+    if(e.dataset.closingField!==undefined){
+      var f=e.dataset.closingField.split(".");
+      if(f.length===1)closingDraft[f[0]]=e.value;
+      else if(f.length===2 && (f[0]==="stores"||f[0]==="notes")&&stores[f[1]])closingDraft[f[0]][f[1]]=e.value;
+    }
+    if(e.dataset.closingPriority){
+      var p=closingDraft.priorities.find(function(x){return x.id===e.dataset.closingPriority;});
+      if(p && ["what","owner","scope","due","status"].includes(e.dataset.field))p[e.dataset.field]=e.value;
+    }
+  });
+  document.addEventListener("keydown",function(e){
+    if(!$("previewSlides"))return;
+    if(e.key==="Escape"){$("previewSlides").remove();return;}
+    if(e.key==="ArrowLeft"){e.preventDefault();slideIndex=Math.max(0,slideIndex-1);drawPresentation();}
+    if(e.key==="ArrowRight"){e.preventDefault();slideIndex=Math.min(6,slideIndex+1);drawPresentation();}
+  });
+
   st.view="admin";render();
 })();
 </script>

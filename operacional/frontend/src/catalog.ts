@@ -35,7 +35,6 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
     help: "Consultas e apresentação gerencial.",
     permissions: [
       { code: "targets.view", name: "Metas diárias" },
-      { code: "monthly_closing.view", name: "Fechamento mensal" },
       { code: "telemarketing.view", name: "Televendas" },
     ],
   },

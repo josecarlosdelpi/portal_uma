@@ -84,3 +84,10 @@ def test_seller_permissions_never_apply_without_store_filter():
     p = seller()
     for permission in READ_PERMISSIONS:
         assert not can_access(p, permission, None)
+
+
+def test_consolidated_monthly_closing_is_never_granted_to_a_seller():
+    seller_with_override = seller(overrides={"monthly_closing.view": True})
+    assert not can_access(seller_with_override, "monthly_closing.view", "JOINVILLE")
+    manager = Principal(user_id="admin", profile="administrator")
+    assert can_access(manager, "monthly_closing.view")

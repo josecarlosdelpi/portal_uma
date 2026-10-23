@@ -2,7 +2,7 @@ name: Portal UMA - frontend operacional
 on:
   push:
     branches: [feat/base-operacional]
-    paths: ["operacional/frontend/**", ".github/workflows/operacional-frontend.yml"]
+    paths: ["operacional/frontend/**", "preview-operacional/**", ".github/workflows/operacional-frontend.yml"]
   pull_request:
     paths: ["operacional/frontend/**", ".github/workflows/operacional-frontend.yml"]
 permissions:
@@ -26,3 +26,5 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npm test
+      - name: Check visual preview (no live data)
+        run: npm run check:preview
