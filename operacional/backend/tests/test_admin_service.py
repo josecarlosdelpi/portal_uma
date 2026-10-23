@@ -18,7 +18,7 @@ class FakeAdminRepository:
     def __init__(self):
         self.actor = fake_user(superadmin=True)
         self.target = fake_user(profile="seller")
-        self.group = SimpleNamespace(id=uuid4(), store_code="JOINVILLE", active=True)
+        self.store_group = SimpleNamespace(id=uuid4(), store_code="JOINVILLE", active=True)
         self.changes = []
         self.events = []
         self.commits = 0
@@ -30,10 +30,10 @@ class FakeAdminRepository:
         return None
 
     def group(self, group_id):
-        return self.group if group_id == self.group.id else None
+        return self.store_group if group_id == self.store_group.id else None
 
     def group_for_store(self, store_code):
-        return self.group if store_code == "JOINVILLE" else None
+        return self.store_group if store_code == "JOINVILLE" else None
 
     def grants(self, group_id):
         return ["sales.view"]
@@ -77,12 +77,12 @@ def test_only_read_grants_for_store_group():
     repo = FakeAdminRepository()
     service = AdminService(repo, repo.actor)
     with pytest.raises(AdminError) as error:
-        service.replace_group_permissions(repo.group.id, ["sales.import"])
+        service.replace_group_permissions(repo.store_group.id, ["sales.import"])
     assert error.value.status_code == 422
     assert repo.events == [] and repo.commits == 0
 
     result = service.replace_group_permissions(
-        repo.group.id, ["sales.view", "sales.revenue.view"]
+        repo.store_group.id, ["sales.view", "sales.revenue.view"]
     )
     assert result["store"] == "JOINVILLE"
     assert repo.commits == 1

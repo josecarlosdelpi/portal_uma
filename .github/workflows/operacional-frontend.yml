@@ -1,0 +1,26 @@
+name: Portal UMA - frontend operacional
+on:
+  push:
+    branches: [feat/base-operacional]
+    paths: ["operacional/frontend/**", ".github/workflows/operacional-frontend.yml"]
+  pull_request:
+    paths: ["operacional/frontend/**", ".github/workflows/operacional-frontend.yml"]
+permissions:
+  contents: read
+jobs:
+  check-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: operacional/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Verify TypeScript and build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
