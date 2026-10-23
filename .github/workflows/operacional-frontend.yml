@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Update npm to stable release
+        run: npm install -g npm@11
       - name: Install
         run: npm install --no-audit --no-fund
       - name: Verify TypeScript and build
