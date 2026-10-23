@@ -90,10 +90,10 @@ def secure_result(call):
     except LocalAuthError as error:
         raise HTTPException(status_code=error.status_code, detail=error.message) from error
 
-def secret_response(call) -> JSONResponse:
+def secret_response(call, status_code: int = 200) -> JSONResponse:
     # Senhas provisórias não podem ser armazenadas por caches intermediários.
     return JSONResponse(
-        content=secure_result(call),
+        content=secure_result(call), status_code=status_code,
         headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
     )
 
@@ -105,7 +105,7 @@ def create_local_user(payload: NewLocalUser,
     return secret_response(lambda: LocalIdentityService(db).create_account(
         actor, username=payload.username, name=payload.display_name,
         profile=payload.profile, store_code=payload.store_code,
-    ))
+    ), status_code=201)
 
 
 @router.post("/users/{user_id}/reset-password")
