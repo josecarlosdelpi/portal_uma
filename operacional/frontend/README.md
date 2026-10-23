@@ -45,3 +45,11 @@ A API já suporta cadastro seguro mediante um identificador `sub` existente no p
 - Apresentação navegável de **7 slides, total 20 minutos** (1/3/5/3/2/2/4), com impressão e versão arquivada congelada.
 - Apresentação **consolidada** só pode ser acessada pela gestão. Usuários vendedores não recebem dados de outras lojas, ainda que recebam permissões para consulta local.
 - O provedor de autenticação OIDC e a base de vendas ainda estão pendentes. Arquivos atuais são identificados como **parciais — dados de vendas pendentes**.
+
+## Módulos operacionais sem ERP (incremento 6)
+
+- Avaliações Google: conferência **manual** de avaliações, faixas de 10 e 20, histórico e entrega coletiva não cumulativa.
+- Materiais e insumos: catálogo, mínimos por loja, entradas, retiradas, saldo bloqueando negativo, histórico de movimentações.
+- Televendas: carteira de clientes por loja, contato atribuído a vendedor ativo da unidade, anotações e retornos. **Não calcula compra, ativação ou comissão sem ERP.**
+- Vendedores continuam como **consulta somente** de acordo com as permissões aprovadas; gravações exclusivamente pelos administradores até que haja aprovação específica de novo fluxo de participação.
+- O visual usa agora o logotipo original embutido na v5.1 e o tema preto/dourado. A identidade foi reaproveitada sem modificar a demonstração pública.

@@ -6,9 +6,12 @@ import { TargetsPage } from "./TargetsPage";
 import { OverviewPage } from "./OverviewPage";
 import { ClosingPage } from "./ClosingPage";
 import { UMA_LOGO_DATA_URI } from "./umaBrand";
+import { ReviewsPage } from "./ReviewsPage";
+import { SuppliesPage } from "./SuppliesPage";
+import { ContactsPage } from "./ContactsPage";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
-type Area = "access" | "targets" | "overview" | "closing";
+type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts";
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir.";
 const profileLabel = (profile: string) =>
   profile === "superadmin" ? "SuperAdmin" : profile === "administrator" ? "Administrador" : "Vendedor";
@@ -105,10 +108,16 @@ export function App() {
       if (previous === "overview" && profile.features.overview) return previous;
       if (previous === "targets" && profile.features.targets) return previous;
       if (previous === "closing" && profile.features.monthly_closing) return previous;
+      if (previous === "reviews" && profile.features.reviews) return previous;
+      if (previous === "supplies" && profile.features.supplies) return previous;
+      if (previous === "contacts" && profile.features.telemarketing) return previous;
       if (previous === "access" && profile.profile === "superadmin") return previous;
       if (profile.features.overview) return "overview";
       if (profile.features.targets) return "targets";
       if (profile.features.monthly_closing) return "closing";
+      if (profile.features.reviews) return "reviews";
+      if (profile.features.supplies) return "supplies";
+      if (profile.features.telemarketing) return "contacts";
       return "access";
     });
   }, [profile]);
@@ -133,34 +142,49 @@ export function App() {
   const canViewTargets = profile?.features?.targets ?? false;
   const canViewOverview = profile?.features?.overview ?? false;
   const canViewClosing = profile?.features?.monthly_closing ?? false;
+  const canViewReviews = profile?.features?.reviews ?? false;
+  const canViewSupplies = profile?.features?.supplies ?? false;
+  const canViewContacts = profile?.features?.telemarketing ?? false;
 
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
-      <div className="side-heading">NAVEGAÇÃO</div>
+      <div className="side-heading">PAINEL DE CONTROLE</div>
       <nav aria-label="Menu principal">
-        {canViewOverview && <button className={"nav-item" + (area === "overview" ? " active" : "")}
-          onClick={() => setArea("overview")}>▦ &nbsp;Visão Geral</button>}
-        {!canViewOverview && <div className="nav-item disabled">▦ &nbsp;Visão Geral <span className="soon">Restrito</span></div>}
-        {canViewTargets && <button className={"nav-item" + (area === "targets" ? " active" : "")}
-          onClick={() => setArea("targets")}>▤ &nbsp;Metas diárias</button>}
-        {canViewClosing && <button className={"nav-item" + (area === "closing" ? " active" : "")}
-          onClick={() => setArea("closing")}>▥ &nbsp;Fechamento mensal</button>}
-        {isSuperAdmin && <button className={"nav-item" + (area === "access" ? " active" : "")}
-          onClick={() => { setArea("access"); setTab("usuarios"); }}>⚙ &nbsp;Configurações</button>}
+        {canViewOverview && <button className={"nav-item"+(area==="overview"?" active":"")}
+          onClick={()=>setArea("overview")}><span className="nav-icon">▦</span><span>Visão geral</span></button>}
+        <div className="nav-item disabled"><span className="nav-icon">↗</span><span>Vendas</span><span className="soon">ERP pendente</span></div>
+        {canViewContacts && <button className={"nav-item"+(area==="contacts"?" active":"")}
+          onClick={()=>setArea("contacts")}><span className="nav-icon">☎</span><span>Telemarketing</span></button>}
+        {canViewReviews && <button className={"nav-item"+(area==="reviews"?" active":"")}
+          onClick={()=>setArea("reviews")}><span className="nav-icon">★</span><span>Avaliações Google</span></button>}
+        {canViewSupplies && <button className={"nav-item"+(area==="supplies"?" active":"")}
+          onClick={()=>setArea("supplies")}><span className="nav-icon">▣</span><span>Materiais e insumos</span></button>}
+        <div className="nav-item disabled"><span className="nav-icon">☑</span><span>Checklist semanal</span></div>
+        {canViewTargets && <button className={"nav-item"+(area==="targets"?" active":"")}
+          onClick={()=>setArea("targets")}><span className="nav-icon">$</span><span>Metas diárias</span></button>}
+        <div className="nav-item disabled"><span className="nav-icon">▤</span><span>Status WhatsApp</span></div>
+        <div className="nav-item disabled"><span className="nav-icon">☰</span><span>Padrões e treinamento</span></div>
+        {canViewClosing && <button className={"nav-item"+(area==="closing"?" active":"")}
+          onClick={()=>setArea("closing")}><span className="nav-icon">◎</span><span>Fechamento Mensal</span></button>}
+        {isSuperAdmin && <button className={"nav-item"+(area==="access"?" active":"")}
+          onClick={()=>{setArea("access");setTab("usuarios");}}><span className="nav-icon">⚙</span><span>Configurações</span></button>}
       </nav>
       <div className="side-spacer"/>
       <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>
       <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="breadcrumb">Portal UMA <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
+      <header className="topbar"><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "reviews" ? "Avaliações Google" : area === "supplies" ? "Materiais e insumos" : area === "contacts" ? "Telemarketing" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
         <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={() => void auth.signoutRedirect()}>Sair</button></div>
       </header>
       <div className="workspace">
         {area === "overview" && profile ? <OverviewPage token={token} profile={profile} /> :
          area === "closing" && profile ? <ClosingPage token={token} profile={profile} /> :
-         area === "targets" && profile ? <TargetsPage token={token} profile={profile} /> : <>
+         area === "targets" && profile ? <TargetsPage token={token} profile={profile} /> :
+         area === "reviews" && profile ? <ReviewsPage token={token} profile={profile} /> :
+         area === "supplies" && profile ? <SuppliesPage token={token} profile={profile} /> :
+         area === "contacts" && profile ? <ContactsPage token={token} profile={profile} /> : <>
         <div className="page-header"><div><div className="eyebrow">PORTAL OPERACIONAL</div><h1>{isSuperAdmin ? "Configurações do sistema" : "Meu acesso ao Portal UMA"}</h1><p>Controle de usuários, unidades e permissões com registros de auditoria.</p></div></div>
         <div className="notice notice-amber">A versão operacional está em desenvolvimento. Não utilizar dados comerciais reais até a homologação.</div>
         {error && <div className="notice notice-error" role="alert">{error}</div>}

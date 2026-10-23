@@ -6,7 +6,7 @@ export type MyProfile = {
   display_name: string;
   profile: "superadmin" | "administrator" | "seller";
   stores: string[];
-  features: { targets: boolean; overview: boolean; monthly_closing: boolean };
+  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean };
 };
 
 export type PortalUser = {
@@ -147,7 +147,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(
+export async function request<T>(
   token: string, route: string,
   method = "GET", body?: unknown, signal?: AbortSignal,
 ): Promise<T> {

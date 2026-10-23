@@ -78,3 +78,9 @@ Não existe usuário ou senha padrão. O procedimento futuro será feito por um 
 5. A rotina registra uma auditoria e recusa novas execuções se já houver SuperAdmin; não promove contas existentes nem cria senha.
 
 **Não execute esse provisionamento na demonstração estática e não habilite login real antes da homologação do serviço de identidade.** O DELPI Central permanece totalmente fora deste fluxo.
+
+## Módulos não dependentes do ERP (incremento 6)
+
+A migração 0005 adiciona acompanhamento manual das avaliações Google, estoque de insumos próprio por loja (catálogo, saldos e livro de movimentações) e carteira/registro de ligações com nome do vendedor e próximas tentativas. As informações são separadas dos dados comerciais oficiais do ERP, possuem isolamento por loja, validação no servidor e auditoria.
+
+A equipe comercial **não recebe** permissão de escrita por esse incremento: preservamos a política inicialmente aprovada de vendedor somente leitura. Liberação de lançamentos pelos funcionários exigirá um fluxo próprio de autorização por ação, sem lhes dar permissão irrestrita para alterar cadastros ou outros usuários.
