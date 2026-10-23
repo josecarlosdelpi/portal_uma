@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from app.admin_routes import router as admin_router
+from app.operations_routes import router as operations_router
 from app.overview_routes import router as overview_router
 from app.closing_routes import router as closing_router
 from app.targets_routes import router as targets_router
@@ -19,6 +20,7 @@ app.include_router(admin_router)
 app.include_router(targets_router)
 app.include_router(overview_router)
 app.include_router(closing_router)
+app.include_router(operations_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
@@ -45,6 +47,9 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
         "features": {
             "targets": any(can_access(principal, "targets.view", store) for store in visible_stores(principal)),
             "overview": any(can_access(principal, "overview.view", store) for store in visible_stores(principal)),
+            "reviews": any(can_access(principal, "reviews.view", store) for store in visible_stores(principal)),
+            "supplies": any(can_access(principal, "supplies.view", store) for store in visible_stores(principal)),
+            "telemarketing": any(can_access(principal, "telemarketing.view", store) for store in visible_stores(principal)),
             "monthly_closing": (
                 (principal.is_superadmin or principal.profile == "administrator")
                 and can_access(principal, "monthly_closing.view")

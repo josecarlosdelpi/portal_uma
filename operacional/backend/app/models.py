@@ -162,3 +162,106 @@ class MonthlyClosingArchive(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+
+class GoogleReviewMonth(Base):
+    """Contagem manual conferida, nao consulta automatica ao Google."""
+    __tablename__ = "google_review_months"
+    __table_args__ = (
+        UniqueConstraint("store_code", "year", "month", name="uq_google_reviews_store_month"),
+        CheckConstraint("year BETWEEN 2020 AND 2100 AND month BETWEEN 1 AND 12", name="ck_google_month"),
+        CheckConstraint("count BETWEEN 0 AND 9999", name="ck_google_count"),
+        CheckConstraint("revision >= 1", name="ck_google_revision"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False)
+    checked_on: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
+    delivered_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    note: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class SupplyMaterial(Base):
+    __tablename__ = "supply_materials"
+    __table_args__ = (UniqueConstraint("name_key", name="uq_supply_material_name_key"),)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class SupplyStock(Base):
+    __tablename__ = "supply_stocks"
+    __table_args__ = (
+        CheckConstraint("balance >= 0", name="ck_supply_balance"),
+        CheckConstraint("minimum >= 0", name="ck_supply_minimum"),
+        CheckConstraint("revision >= 1", name="ck_supply_revision"),
+    )
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+    material_id: Mapped[UUID] = mapped_column(ForeignKey("supply_materials.id", ondelete="RESTRICT"), primary_key=True)
+    balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    minimum: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class SupplyMovement(Base):
+    __tablename__ = "supply_movements"
+    __table_args__ = (
+        CheckConstraint("quantity BETWEEN 1 AND 9999", name="ck_supply_move_qty"),
+        CheckConstraint("kind IN ('entrada','retirada')", name="ck_supply_move_kind"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    material_id: Mapped[UUID] = mapped_column(ForeignKey("supply_materials.id", ondelete="RESTRICT"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    resulting_balance: Mapped[int] = mapped_column(Integer, nullable=False)
+    note: Mapped[str] = mapped_column(String(180), nullable=False, default="")
+    actor_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ContactClient(Base):
+    """Carteira por loja, independente das vendas e sem distribuicao individual."""
+    __tablename__ = "contact_clients"
+    __table_args__ = (UniqueConstraint("store_code", "name_key", name="uq_client_name_store"),)
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    erp_code: Mapped[str | None] = mapped_column(String(50))
+    phone: Mapped[str | None] = mapped_column(String(40))
+    origin: Mapped[str] = mapped_column(String(25), nullable=False)
+    last_purchase_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ContactAttempt(Base):
+    """Registro de ligacao; nao equivale a venda, compra nem ativacao."""
+    __tablename__ = "contact_attempts"
+    __table_args__ = (
+        CheckConstraint("outcome IN ('apresentacao','sem_resposta','whatsapp','outro')", name="ck_call_outcome"),
+        CheckConstraint("revision >= 1", name="ck_call_revision"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    client_id: Mapped[UUID] = mapped_column(ForeignKey("contact_clients.id", ondelete="RESTRICT"), nullable=False)
+    seller_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    contacted_on: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(25), nullable=False)
+    next_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    note: Mapped[str] = mapped_column(String(240), nullable=False, default="")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
