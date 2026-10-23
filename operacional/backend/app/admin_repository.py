@@ -38,7 +38,11 @@ class AdminRepository:
         ))
 
     def invitation(self, invitation_id: UUID) -> AccessInvitation | None:
-        return self.db.get(AccessInvitation, invitation_id)
+        return self.db.scalar(
+            select(AccessInvitation).where(
+                AccessInvitation.id == invitation_id
+            ).with_for_update()
+        )
 
     def invitation_by_email(self, email_key: str) -> AccessInvitation | None:
         return self.db.scalar(

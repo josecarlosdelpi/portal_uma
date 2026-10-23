@@ -92,3 +92,6 @@ A migração 0006 prepara as tabelas de checklist semanal, metas de ligações, 
 ## Incremento 8 — acessos e convites preparados
 
 A migração `0007` cria `access_invitations` para pré-cadastrar colaboradores pelo SuperAdmin, com e-mail normalizado, perfil, loja, revisão e auditoria. O cadastro pendente **não é uma conta**: nenhum token, senha ou e-mail é emitido. O acesso somente será ativado após integração da identidade OIDC com correspondência verificada. Cancelamento preserva auditoria; a conta ativada só pode ser desativada por segurança. O SuperAdmin permanece único e não é criado por convites.
+
+
+Para detalhes específicos da infraestrutura Locaweb e da política de convites, consulte [Implantação e acessos](./IMPLANTACAO-E-ACESSOS.md).

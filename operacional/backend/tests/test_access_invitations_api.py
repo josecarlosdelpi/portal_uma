@@ -1,5 +1,5 @@
 """Prepared access invitations: role scoping, audit and no credential issuance."""
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -137,6 +137,34 @@ def test_invalid_invitation_is_rejected(env, payload):
     assert result.status_code == 422, result.text
     with Session(engine) as db:
         assert db.scalars(select(AccessInvitation)).first() is None
+
+
+def test_sent_invitation_cannot_be_cancelled_as_a_draft(env):
+    client, identity, engine, _, _ = env
+    base = "/api/v1/admin/invitations"
+    prepared = client.post(base, json={
+        "email": "future@example.test",
+        "display_name": "Future User", "profile": "seller",
+        "store_code": "JOINVILLE",
+    }).json()
+    with Session(engine) as db:
+        row = db.get(AccessInvitation, UUID(prepared["id"]))
+        # Future provider integration may move the invitation to "sent".
+        row.status = "sent"
+        db.commit()
+    attempt = client.request(
+        "DELETE", base + "/" + prepared["id"],
+        json={"expected_revision": prepared["revision"]},
+    )
+    assert attempt.status_code == 409
+    recreate = client.post(base, json={
+        "email": "future@example.test",
+        "display_name": "Different", "profile": "administrator",
+        "store_code": None,
+    })
+    assert recreate.status_code == 409
+    with Session(engine) as db:
+        assert db.get(AccessInvitation, UUID(prepared["id"])).status == "sent"
 
 
 def test_only_superadmin_can_administer_invitations(env):
