@@ -82,3 +82,13 @@ enviar, baixar, substituir ou remover arte e comprovante (JPG/PNG/WebP, até 3 M
 O `TrainingPage` permite anexar/baixar/remover documento PDF (até 5 MB).
 Somente o backend autenticado entrega arquivos; nada é exposto no protótipo
 estático público. Arquivos precisam de backup e HTTPS quando implantados.
+
+
+## Tarefas diárias e navegação integrada
+
+`DailyTasksPage.tsx` e `dailyTasksApi.ts` oferecem agenda por unidade e
+dia, responsáveis, prioridades, atualização de status, edição e exclusão.
+O backend controla as permissões `daily_tasks.view/edit`.
+O demo público unificado do SuperAdmin está em
+`preview-operacional/superadmin.html`: usa apenas dados fictícios, e suas
+páginas internas são as prévias já existentes com identidade UMA.

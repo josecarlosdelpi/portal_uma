@@ -1,5 +1,19 @@
 # Portal UMA
 
+### Demonstração unificada do SuperAdmin
+
+**[Abrir todas as funcionalidades em uma só demonstração](https://josecarlosdelpi.github.io/portal_uma/preview-operacional/superadmin.html)**
+
+Inclui Visão Geral, Metas Diárias, **Tarefas Diárias** (novo módulo com
+responsáveis, prioridades e acompanhamento), Fechamento Mensal de 7 slides,
+Telemarketing, Avaliações Google, Insumos, Checklist Semanal, Status WhatsApp e
+Instagram, Treinamentos, Usuários e senhas provisórias, Permissões e Auditoria.
+
+**Todos os dados da prévia são fictícios e alterados somente na sessão do navegador.**
+O código operacional (API/React/PostgreSQL) está separado da prévia e não está
+hospedado com login real. `index.html` continua sendo o protótipo v5.1 original.
+
+
 ## Código operacional — módulos sem ERP (26/10/2026)
 
 A aplicação **operacional** está em [`operacional/`](./operacional/), separada do

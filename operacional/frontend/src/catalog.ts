@@ -45,6 +45,7 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
       { code: "reviews.view", name: "Avaliações Google" },
       { code: "supplies.view", name: "Insumos" },
       { code: "checklist.view", name: "Checklist" },
+      { code: "daily_tasks.view", name: "Tarefas diárias" },
       { code: "training.view", name: "Treinamentos" },
       { code: "whatsapp_status.view", name: "Status WhatsApp" },
       { code: "instagram.view", name: "Instagram" },

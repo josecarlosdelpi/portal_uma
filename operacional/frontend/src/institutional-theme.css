@@ -205,3 +205,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .routine-file-actions .btn-primary,.routine-file-actions .btn-secondary{white-space:nowrap}
 @media(max-width:760px){.routine-file-item{grid-template-columns:1fr}
   .routine-file-actions input[type=file]{width:100%;max-width:100%}}
+
+
+/* Tarefas diarias - identidade UMA ouro, preto e superfices creme */
+.daily-task-list{display:flex;flex-direction:column;gap:12px}
+.daily-task-item{display:flex;align-items:start;justify-content:space-between;gap:18px;
+ padding:18px;border:1px solid #e7dfbc;background:#fffdf4;border-radius:13px}
+.daily-task-main{flex:1;min-width:220px}
+.daily-task-main h3{font-size:14px;color:#191919;margin:9px 0 6px}
+.daily-task-main p{font-size:12px;color:#655e46;margin:5px 0 9px;line-height:1.55}
+.daily-task-main small{display:block;color:#72694d;font-size:11px;margin-top:5px}
+.daily-task-top{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.daily-task-priority{border-radius:30px;padding:5px 10px;font-size:11px;font-weight:750}
+.daily-task-priority-alta{background:#ffe1dd;color:#a32925}
+.daily-task-priority-normal{background:#fff2bb;color:#806200}
+.daily-task-priority-baixa{background:#e6f5e7;color:#286b35}
+.daily-task-progress{background:#fff0c7;color:#805c00;padding:5px 10px;border-radius:25px;font-size:11px}
+.daily-task-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:330px}
+.daily-task-actions .btn-primary,.daily-task-actions .btn-secondary{white-space:nowrap}
+.daily-task-danger{color:#a23535!important;border-color:#e4b4b4!important}
+.daily-filter{display:flex;align-items:center;gap:7px;font-size:12px}
+.daily-filter input{accent-color:#d1aa00}
+@media(max-width:820px){.daily-task-item{flex-direction:column}.daily-task-actions{max-width:none;justify-content:flex-start}}
