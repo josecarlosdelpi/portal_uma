@@ -1,0 +1,27 @@
+# Segredos / ambientes locais
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+# Frontend
+node_modules/
+dist/
+# Artefatos locais
+*.sqlite
+*.sqlite3
+coverage/
+.coverage
+*.xlsx
+*.xls
+*.csv
+*.pdf

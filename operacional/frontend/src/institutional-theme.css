@@ -1,0 +1,207 @@
+
+/* Identidade institucional reproduzida da versão demonstrativa UMA v5.1:
+   amarelo/dourado, preto, fundo creme, logotipo institucional. */
+:root{--uma-black:#000;--uma-gold:#ffd900;--uma-gold-dark:#e0bc00;--uma-ink:#151515;--uma-bg:#faf9f2;--uma-border:#e7e2d0}
+body{color:var(--uma-ink);background:linear-gradient(180deg,#faf9f2 0%,#f3f1e8 100%)}
+.sidebar{background:linear-gradient(180deg,#000,#171717);color:#eaeaea;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;flex-direction:column;align-items:stretch;gap:5px;border-bottom:1px solid #ffffff1f;padding:0 8px 22px}
+.brand .brand-logo-image{width:100%;height:95px;object-fit:contain;background:#000;flex-shrink:0}
+.brand>div{text-align:center}.brand strong{color:white;font-size:17px}.brand small{color:#c8c8c8}
+.side-heading{color:#d2b300}.nav-item{color:#dfdfdf;border:1px solid transparent;font-weight:650}
+.nav-item:hover{background:#ffd90017;color:white;border-color:#ffd90038}
+.nav-item.active{background:linear-gradient(90deg,#ffd9002e,#ffd90014);border:1px solid #ffd90059;color:white;box-shadow:inset 0 0 0 1px #ffd9000f}
+.nav-item.disabled{color:#d0d0d0;border-color:transparent}
+.sidebar-note{border:1px solid #ffd90038;background:#ffd90014;color:#fff}
+.sidebar-note strong{color:#fff}.sidebar-note p,.sidebar-bottom{color:#d8d8d8}
+.topbar{background:#ffffffed;border-bottom:1px solid #ece4b5;position:sticky;top:0;z-index:9;backdrop-filter:blur(15px)}
+.avatar{color:#161616;background:#fff3b5;border-color:#f0dd78}
+.page-header h1{color:#151515;font-weight:820;letter-spacing:-1.3px}
+.eyebrow{color:#746000;letter-spacing:1.4px}.eyebrow:before{content:"";width:6px;height:6px;border-radius:50%;background:#e6bf00}
+.panel,.user-row{border-color:#e7e2d0;background:#fff}.panel{box-shadow:0 12px 34px #00000014}
+.notice-amber{background:#fff9df;border-color:#f1de91;color:#645623}
+.notice-success{background:#fff6c0;border-color:#f0dc77;color:#554500}
+.count,.chip,.pill-green{background:#fff5ba;color:#4a4100}
+.tab.active{background:#ffd900;color:#151515;border-color:#e0bc00}
+.user-row:hover,.user-row.selected{background:#fffbea;border-color:#d9b100}
+.user-avatar{background:#fff2b3;color:#4d3f00}
+.btn-primary{background:linear-gradient(180deg,#ffd900,#e0bc00);color:#151515;border-color:#e0bc00;box-shadow:0 7px 15px #e0bc0038;font-weight:850}
+.btn-secondary{background:#fff8cf;color:#4a4100;border-color:#dfcc6e}.btn-ghost{border-color:#d9cf9d;color:#302b14}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:#e8c300}
+.permissions h4,.closing-stat,.overview-store,.closing-slide-store{background:#fffdf4;border-color:#ebe3bb}
+.check-line input{accent-color:#d9b100}
+.target-kpi,.overview-kpi{border-top:3px solid #e5c300}
+.day-tile{background:#fffbed;border-color:#ece0ad}.day-tile span{color:#826e00}
+.closing-slide-header,.hero{background:linear-gradient(108deg,#000,#1d1d1d 65%,#363012);color:white}
+.closing-slide-header span:first-child{color:#ffe252}.closing-brand-mark{color:#ffd900}
+.closing-cover-brand,.closing-finale{color:#9e8300}
+.closing-note{background:#fff9e3;border-left-color:#e0bb00}
+.closing-unavailable,.closing-slide-comment{background:#fff9e5;border-color:#ebdfac}
+.closing-quality>div:first-child,.closing-priorities-head{background:#fff8d6}
+.closing-overlay,.closing-presenter-bar,.closing-presenter-bottom{background:#0a0a0a}
+.login-stage{background:linear-gradient(160deg,#030303,#29230a)}
+.login-panel{border:1px solid #e2c341;background:#fffdf6}
+.login-logo-original{display:block;max-width:270px;width:100%;height:150px;object-fit:contain;border-radius:12px;background:#000;margin:0 auto 22px}
+.overview-store h3,.closing-slide-store h3{color:#8c7300}
+.closing-action{background:#fffdf6;border-color:#e9e0bb}.closing-previous{background:#fffae9;border-color:#efdfa9}
+@media(max-width:940px){
+ .sidebar{position:static;height:auto;padding:12px 15px;display:flex;flex-direction:column;align-items:stretch;gap:8px}
+ .brand{flex-direction:row;align-items:center;justify-content:center;width:100%;min-width:0;padding:0 0 7px;border:0}
+ .brand .brand-logo-image{width:116px;height:50px}
+ .side-heading,.sidebar-note,.side-spacer,.sidebar-bottom{display:none}
+ .sidebar nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap:5px;overflow:visible}
+ .sidebar .nav-item,.sidebar .nav-item.disabled{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;
+    padding:8px 4px;min-height:58px;gap:4px;text-align:center;white-space:normal;font-size:11px}
+ .nav-item span.soon{display:none}
+}
+@media(max-width:650px){
+ .brand .brand-logo-image{width:104px;height:44px}
+ .sidebar{padding:10px 9px 12px}
+ .sidebar nav{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .sidebar .nav-item,.sidebar .nav-item.disabled{font-size:10px;min-height:64px;padding:6px 2px}
+ .topbar{position:static}
+}
+@media print{.closing-slide-header{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+
+/* Rotinas administrativas e informativas, com cartões no padrão UMA institucional. */
+.nav-icon{display:inline-flex;width:22px;justify-content:center;font-size:18px;flex-shrink:0}
+.nav-item span:last-child:not(.soon){flex:1}
+.sidebar .nav-item{gap:12px}
+.routine-filters{display:flex;align-items:end;gap:13px;flex-wrap:wrap;margin-bottom:20px}
+.routine-filters label,.routine-form-grid label{display:flex;flex-direction:column;gap:6px;color:#635a3b;font-size:11px;font-weight:800}
+.routine-filters input,.routine-filters select,
+.routine-form-grid input,.routine-form-grid select,.routine-form-grid textarea{
+ min-height:41px;border:1px solid #dbd4b3;border-radius:9px;padding:8px 12px;color:#25231b;background:#fff;
+}
+.routine-filters label{min-width:180px}
+.routine-filters .chip{margin-left:auto}
+.routine-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin:20px 0}
+.routine-kpis .panel{border-top:3px solid #e8c300}
+.routine-kpis span{display:block;font-size:12px;color:#716a52}
+.routine-kpis strong{display:block;font-size:clamp(20px,2.2vw,30px);margin:8px 0;font-weight:850}
+.routine-kpis small{font-size:11px;color:#88806a}
+.routine-storecards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.routine-storecards .panel{border-top:3px solid #e8c300}
+.routine-storecards h2{font-size:15px;margin:0 0 15px}
+.routine-big{font-size:24px;display:block;margin-bottom:12px}
+.routine-meta{display:flex;justify-content:space-between;border-top:1px solid #f0e9ce;padding:10px 0;font-size:12px}
+.routine-storecards small{font-size:11px;color:#827b62}
+.routine-form-panel,.routine-columns{margin-top:19px}
+.routine-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin:15px 0 20px}
+.routine-form-grid .routine-wide{grid-column:1/-1}
+.routine-columns{grid-template-columns:minmax(320px,1fr) minmax(320px,1fr)}
+.routine-alert{background:#fff0d3;color:#906220;border-radius:12px;padding:5px 10px;font-weight:800;font-size:11px}
+.routine-good{background:#fff9cf;color:#675500;border-radius:12px;padding:5px 10px;font-weight:800;font-size:11px}
+.routine-form-panel .table-wrap{margin-top:15px}
+@media(max-width:1100px){.routine-storecards{grid-template-columns:1fr 1fr}.routine-columns{grid-template-columns:1fr}}
+@media(max-width:940px){.sidebar .nav-item{gap:4px}.nav-icon{width:auto}}
+@media(max-width:650px){.routine-kpis,.routine-storecards,.routine-form-grid{grid-template-columns:1fr}
+.routine-filters label{flex:1;min-width:130px}.routine-filters .chip{width:100%;margin-left:0}
+}
+
+/* Checklist, calendário de marketing e capacitação: acabamento institucional UMA. */
+.routine-call-progress{display:flex;flex-direction:column;gap:9px;margin:17px 0}
+.routine-call-progress>strong{font-size:23px;color:#151515}
+.routine-call-progress small{color:#786d42;font-size:11px}
+.routine-progress-track{width:100%;height:12px;background:#f5eed1;border-radius:12px;overflow:hidden}
+.routine-progress-track>div{height:100%;background:linear-gradient(90deg,#d0a900,#ffd900);border-radius:12px}
+.routine-task-list{display:flex;flex-direction:column;gap:9px}
+.routine-task{border:1px solid #e9e1bb;border-radius:11px;padding:12px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.routine-task>div:first-child{flex:1;min-width:180px}
+.routine-task small{font-size:10px;color:#847e6d}.routine-task strong{display:block;margin:4px 0;font-size:12px}
+.routine-task p{font-size:11px;margin:2px 0;color:#807a65}
+.routine-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:18px}
+.routine-cal-day{border:1px solid #e8dfb5;border-radius:10px;background:#fffdf5;min-height:87px;
+ display:flex;flex-direction:column;gap:5px;justify-content:center;align-items:center;color:#151515}
+.routine-cal-day strong{font-size:19px}.routine-cal-day small{color:#847e6d;font-size:10px}
+.routine-cal-day span{font-size:10px;color:#796e40;text-align:center}
+.routine-cal-day:hover,.routine-cal-day.selected{border-color:#d9b100;background:#fff4b8}
+.routine-cal-day.off{background:#f6eee9;border-color:#dacbbf}
+.routine-cal-day.published{background:#fff3cf;border-color:#dfb836}
+.routine-dayoff{margin-top:15px;padding:14px;background:#fff9e8;border:1px solid #eadcae;
+ border-radius:11px;display:flex;gap:10px;flex-direction:column}
+.routine-dayoff label{display:flex;align-items:center;gap:9px;font-size:12px}
+.routine-dayoff input[type=checkbox]{accent-color:#d9b100}
+.routine-dayoff input:not([type=checkbox]){min-height:39px;padding:8px 10px;border:1px solid #ded4a2;border-radius:8px}
+.routine-dayoff small{color:#8f7057;font-size:11px}
+.routine-instagram-card{background:#fffdf5;border:1px solid #e9dfb9;border-radius:11px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.routine-instagram-card span{font-size:19px;font-weight:850}.routine-instagram-card small{font-size:11px;color:#857b59}
+.routine-procedures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin:21px 0}
+.routine-procedures .panel{display:flex;flex-direction:column;align-items:start}
+.routine-procedures h2{font-size:17px;margin:9px 0 4px}
+.routine-procedures p{font-size:12px;line-height:1.6;color:#6a6659;flex:1}
+.routine-procedure-code{font-size:10px;font-weight:850;letter-spacing:1px;color:#816900}
+@media(max-width:1100px){.routine-calendar{grid-template-columns:repeat(5,minmax(0,1fr))}
+.routine-procedures{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.routine-calendar{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.routine-cal-day{min-height:72px}.routine-cal-day strong{font-size:16px}
+.routine-procedures{grid-template-columns:1fr}}
+
+/* Cadastro de acesso via convite preparado: institucional UMA */
+.access-invitations{margin:0 0 20px}
+.access-invitations .panel-head{align-items:start}
+.access-invitations h3{font-size:14px;margin:23px 0 12px}
+.access-invitations h3 .chip{margin-left:8px}
+.access-invite-form{border:1px solid #e6d9a4;background:#fffdf4;border-radius:12px;padding:18px;margin-top:18px}
+.access-invite-form h3{margin:0 0 12px}
+.access-invite-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px}
+.access-invite-grid label{display:flex;flex-direction:column;gap:7px;color:#6b5d2d;font-size:11px;font-weight:770}
+.access-invite-grid input,.access-invite-grid select{min-height:42px;padding:9px 12px;
+ border:1px solid #e1d5a1;border-radius:9px;background:#fff;color:#222}
+.access-invite-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+ padding:15px 0;border-top:1px solid #e9e1c0}
+.access-invite-identity{display:flex;flex-direction:column;align-items:start;gap:5px;min-width:0}
+.access-invite-identity strong{font-size:13px;color:#151515}
+.access-invite-identity small{font-size:11px;color:#7a7362;overflow-wrap:anywhere}
+.access-invite-state{background:#fff2bc;color:#75600d;border-radius:11px;padding:5px 9px;
+ font-size:10px;font-weight:800}
+.access-invite-history{margin:16px 0}
+.access-invite-history summary{font-size:12px;font-weight:700;cursor:pointer;color:#75600d}
+.access-password-info{padding:16px;margin-top:21px;border:1px solid #e9dfb1;
+ border-radius:11px;background:#fffbec;font-size:12px}
+.access-password-info strong{color:#53451b}
+.access-password-info p{color:#786b46;line-height:1.6}
+@media(max-width:690px){.access-invite-grid{grid-template-columns:1fr}
+.access-invite-row{align-items:start;flex-direction:column}
+.access-invitations .panel-head{flex-direction:column;align-items:start}}
+
+/* Senha provisória individual, login e exclusão: visual UMA */
+.local-login-form{display:flex;flex-direction:column;gap:14px;text-align:left;margin-top:24px}
+.local-login-form label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:760;color:#665a34}
+.local-login-form input{min-height:44px;padding:11px 12px;background:#fff;
+ border:1px solid #dccd8d;border-radius:9px;color:#211e17;font:inherit}
+.local-login-form .btn-primary{align-self:stretch;min-height:45px}
+.local-login-panel{max-width:470px}
+.local-login-panel .login-logo-original{display:block;margin:0 auto 16px}
+.local-login-help{font-size:11px;color:#7d745f;line-height:1.6;margin-top:12px}
+.local-account-actions{display:flex;gap:10px;flex-wrap:wrap;margin:17px 0}
+.local-delete-action{color:#9f2828;border-color:#e7b6b6}
+.local-delete-action:hover{background:#fff1f1}
+.local-account-form{padding:18px;margin:17px 0;background:#fffdf4;
+ border:1px solid #e8dba1;border-radius:11px}
+.local-account-form h3{margin:0 0 11px;font-size:15px}
+.local-account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;margin-bottom:14px}
+.local-account-grid label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:760;color:#675a34}
+.local-account-grid input,.local-account-grid select{background:white;color:#231f18;
+ border:1px solid #dfd19c;border-radius:9px;padding:10px 12px;min-height:42px}
+.local-secret-once{border:1px solid #dec371;background:#fff6c9;
+ padding:18px;border-radius:12px;margin:18px 0}
+.local-secret-once h3{margin:0 0 8px;font-size:16px}
+.local-secret-once p{font-size:12px;color:#746236}
+.local-secret-once code{display:block;margin:8px 0 12px;font-size:17px;
+ font-weight:800;overflow-wrap:anywhere;color:#1d1a14}
+.local-secret-once .btn-row{margin:11px 0}
+@media(max-width:640px){.local-account-grid{grid-template-columns:1fr}}
+
+/* Arquivos operacionais privados: imagens do Status e PDFs de treinamento */
+.routine-file-list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.routine-file-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1.6fr);
+  align-items:center;gap:14px;padding:15px;background:#fffdf4;border:1px solid #eae0b9;
+  border-radius:11px}
+.routine-file-item strong{display:block;font-size:13px;color:#242016}
+.routine-file-item p{font-size:11px;color:#726344;margin:6px 0 0;overflow-wrap:anywhere}
+.routine-file-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.routine-file-actions input[type=file]{min-width:0;max-width:260px;font-size:11px;
+  background:#fff;color:#443e2d;padding:8px;border:1px dashed #c6b675;border-radius:8px}
+.routine-file-actions .btn-primary,.routine-file-actions .btn-secondary{white-space:nowrap}
+@media(max-width:760px){.routine-file-item{grid-template-columns:1fr}
+  .routine-file-actions input[type=file]{width:100%;max-width:100%}}

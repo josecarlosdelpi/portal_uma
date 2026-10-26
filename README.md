@@ -1,5 +1,26 @@
 # Portal UMA
 
+## Código operacional — módulos sem ERP (26/10/2026)
+
+A aplicação **operacional** está em [`operacional/`](./operacional/), separada do
+protótipo `index.html`, que permanece uma demonstração pública com dados fictícios.
+
+A versão operacional usa **React/TypeScript + FastAPI + PostgreSQL** e já possui:
+avaliações Google manuais por loja, insumos (entradas, retiradas e histórico),
+clientes e ligações, checklist semanal, calendário WhatsApp anual sem repetição de
+produtos, Instagram, treinamentos e autenticação local sem e-mail (senha provisória
+individual e troca obrigatória no primeiro login). Inclui **anexos privados**
+de imagens de Status/comprovantes e PDFs de treinamento, guardados no PostgreSQL.
+
+**O código estar no GitHub não significa que o sistema esteja implantado.**
+A hospedagem do backend, banco de produção, HTTPS e DNS do subdomínio
+`portal.universodasmangueiras.com.br` ainda precisam ser configurados e
+homologados antes de utilização pelas lojas. Não enviar dados reais à
+demonstração pública nem inserir senhas no repositório.
+
+Detalhes de instalação e segurança: [Implantação e acessos](./operacional/IMPLANTACAO-E-ACESSOS.md).
+
+
 Protótipo demonstrativo de gestão comercial da **Universo das Mangueiras Automotivas (UMA)**.
 
 ## Versão disponível
