@@ -33,7 +33,7 @@ verify("index.html", [
 verify("rotinas.html", [
   "Avaliações no Google", "Materiais e insumos", "Televendas e ligações",
   "Checklist semanal", "Status WhatsApp / Instagram", "Padrões e treinamento",
-  "Anexar arte", "Anexar PDF",
+  "attachWhatsApp", "Anexar PDF",
 ]);
 
 verify("acessos.html", [
