@@ -452,7 +452,7 @@ document.addEventListener("click",function(e){
   else {
     var file=$("opFile-"+category)?.files?.[0];
     if(!file){toast("Escolha uma imagem antes de anexar.");return;}
-    if(file.size<1||file.size>3*1024*1024||!(/\\.(jpg|jpeg|png|webp)$/i).test(file.name)||
+    if(file.size<1||file.size>3*1024*1024||!(/[.](jpg|jpeg|png|webp)$/i).test(file.name)||
        !["image/jpeg","image/png","image/webp"].includes(file.type)){
       toast("Selecione JPG, PNG ou WebP com até 3 MB.");return;
     }
@@ -466,7 +466,7 @@ document.addEventListener("click",function(e){
   else {
     var fileInput=document.querySelector('[data-training-file="'+id+'"]'),file=fileInput?.files?.[0];
     if(!file){toast("Escolha um PDF antes de anexar.");return;}
-    if(file.size<1||file.size>5*1024*1024||!(/\\.pdf$/i).test(file.name)||
+    if(file.size<1||file.size>5*1024*1024||!(/[.]pdf$/i).test(file.name)||
        !["application/pdf","application/octet-stream"].includes(file.type)){
       toast("Selecione PDF de até 5 MB.");return;
     }
