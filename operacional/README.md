@@ -1,5 +1,12 @@
 # Portal UMA — versão operacional (início)
 
+> **Incremento atual (26/10/2026):** avaliações Google (conferência manual), catálogo e movimentação de insumos,
+> carteira e ligações, checklist semanal, calendário WhatsApp/Instagram e treinamentos possuem API
+> persistente e telas React. Anexos de artes, comprovantes e PDFs são protegidos e guardados no
+> PostgreSQL, com limite de tamanho e auditoria (migração `0009`). Todos funcionam sem ERP.
+> A operação das três lojas **ainda exige implantação privada do backend, banco e HTTPS**;
+> a prévia do GitHub Pages continua usando dados fictícios.
+
 > **Atualização vigente (23/10/2026):** a API e o frontend já possuem login local por nome de usuário, senha provisória individual, troca obrigatória, exclusão lógica, redefinição e provisionamento local do SuperAdmin. Esta versão **não está publicada com dados reais**. O texto dos incrementos anteriores abaixo permanece como histórico; consulte [Implantação e Acessos](./IMPLANTACAO-E-ACESSOS.md) para o estado atual.
 
 Este diretório contém a evolução operacional do Portal UMA. O protótipo **v5.1**, em `/index.html`, permanece intacto e é exclusivamente demonstrativo.
@@ -97,3 +104,31 @@ A migração `0007` cria `access_invitations` para pré-cadastrar colaboradores 
 
 
 Para detalhes específicos da infraestrutura Locaweb e da política de convites, consulte [Implantação e acessos](./IMPLANTACAO-E-ACESSOS.md).
+
+## Incremento 9 — anexos operacionais privados
+
+Foi implementado o armazenamento de **arquivos pequenos dentro do PostgreSQL**, sem pasta
+pública, sem URLs abertas e sem depender do ERP: uma arte e um comprovante de publicação por
+data no calendário compartilhado; um PDF por participação em treinamento. Não há assinatura
+eletrônica implícita e o Google/WhatsApp/Instagram continuam sem APIs oficiais conectadas.
+O registro de avaliações Google é por conferência **manual**, não por leitura automática.
+
+- Somente JPG/PNG/WebP até **3 MB** para artes/comprovantes; somente PDF até **5 MB**
+  para treinamento. O backend valida o conteúdo e a extensão, além do tamanho.
+- Cada download exige autenticação e o acesso correspondente (calendário global ou
+  loja do treinamento). Criação, substituição e exclusão exigem perfil de gestão.
+- O nome original, o SHA-256, o tamanho, a revisão e as operações de upload/exclusão
+  ficam registrados na auditoria, **sem armazenar conteúdo binário no log**.
+- O calendário impede repetição de código de produto durante o mesmo ano; o histórico
+  de publicações e o vínculo dos anexos são separados do ERP.
+- Exclusão do planejamento do WhatsApp também exclui os anexos daquela data.
+- As respostas dos arquivos são `no-store`, `nosniff` e sempre indicam download.
+- **Capacidade/custo:** os arquivos ocupam espaço do PostgreSQL. Antes de operar em
+  produção, contratar/configurar armazenamento e backups apropriados e testar uma
+  restauração; revisar o uso do banco e migrar para armazenamento de objetos se necessário.
+- Configurar no gateway/proxy HTTPS também um limite global para uploads, além do
+  limite verificado na API.
+
+Módulos desenvolvidos não significam sistema já colocado no ar: não há conta real,
+servidor de aplicação nem banco operacional publicados em `portal.universodasmangueiras.com.br`.
+A escolha do provedor e do TLS permanecerá independente do código.

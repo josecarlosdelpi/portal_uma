@@ -70,3 +70,15 @@ A API já suporta cadastro seguro mediante um identificador `sub` existente no p
 - O status **Preparado — não enviado** é explícito. Não enviamos e-mails, não criamos conta no provedor, não geramos senha, link de ativação ou sessão enquanto o provedor OIDC não estiver configurado.
 - Contas já ativadas continuam com suspensão/reativação; não há remoção física de usuários, para preservar auditoria.
 - Próxima integração obrigatória: convites reais pelo provedor escolhido, vínculo seguro do e-mail verificado à identidade OIDC, redefinição de senha e controle de expiração/recuperação. Nunca ativar usuário com e-mail não verificado ou confiar em dados informados pelo navegador.
+
+
+## Módulos ERP-independentes e arquivos privados (26/10/2026)
+
+O frontend operacional já tem telas para avaliações Google manuais, insumos por
+loja com entradas/retiradas, registro de clientes/ligações, checklist semanal,
+calendário anual de status WhatsApp com códigos sem repetição, Instagram por loja,
+treinamentos e gestão de usuários locais. O componente `WhatsAppPage` permite
+enviar, baixar, substituir ou remover arte e comprovante (JPG/PNG/WebP, até 3 MB).
+O `TrainingPage` permite anexar/baixar/remover documento PDF (até 5 MB).
+Somente o backend autenticado entrega arquivos; nada é exposto no protótipo
+estático público. Arquivos precisam de backup e HTTPS quando implantados.

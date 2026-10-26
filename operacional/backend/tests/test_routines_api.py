@@ -121,7 +121,7 @@ def test_status_calendar_deduplicates_products_annually(env):
     }).status_code==422
     payload=c.get("/api/v1/routines/whatsapp/2026/10").json()
     assert len(payload["posts"])==1
-    assert payload["attachments_enabled"] is False
+    assert payload["attachments_enabled"] is True
     actor["user"]=seller
     assert c.get("/api/v1/routines/whatsapp/2026/10").status_code==200
     assert c.put("/api/v1/routines/whatsapp/2026-10-23",json={

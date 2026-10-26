@@ -66,3 +66,25 @@ Obrigatório configurar infraestrutura, HTTPS, backup, autenticação forte (esp
 ## 3. Perguntas pendentes à Locaweb
 
 No painel (sem publicar segredos): verificar **Banco de dados** (MySQL/PostgreSQL disponíveis), **Domínios** (subdomínio/pasta), **Certificado SSL** (causa de DNS Pendente), **Configurações** (possibilidades de arquivos estáticos e restrições de execução). Pedir ao suporte por escrito: “Hospedagem I Linux permite hospedar uma interface React estática em subdomínio com HTTPS? Há suporte a processo contínuo Python ASGI/FastAPI ou somente PHP? Quais bancos e limitações estão incluídos?”.
+
+
+## 5. Módulos sem ERP — anexos (migração 0009)
+
+As rotinas podem ser alimentadas manualmente sem integração ao ERP: avaliações Google,
+insumos, clientes e ligações, checklist, planejamento WhatsApp e Instagram, treinamentos.
+
+A API oferece upload, download e exclusão de **artes e evidências de publicação**
+(JPEG/PNG/WebP até 3 MB por arquivo) e de documentos de treinamento (PDF até 5 MB).
+Os bytes são armazenados em **tabelas privadas PostgreSQL**, não no GitHub Pages,
+na pasta da Locaweb ou em links públicos; a permissão é verificada a cada chamada.
+O controle de acesso exige administrador ou SuperAdmin para alteração; vendedores
+mantêm consulta somente por loja, conforme aprovação anterior.
+
+Backups PostgreSQL com os anexos precisam de **restauração testada** e retenção adequada.
+Configurar limites de upload também no proxy e monitorar consumo de disco.
+Os PDFs de treinamentos **não são assinaturas digitais**; autenticação forte e
+termos adequados são requisito para futura assinatura. O Google e os serviços
+de publicação seguem com conferência e registro manual.
+
+As rotas ficam em `app/attachments_routes.py`; controles de formato, tamanho,
+escopo, auditoria e revisões em `app/attachments_service.py`.

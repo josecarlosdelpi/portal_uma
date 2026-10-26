@@ -7,14 +7,18 @@ export type WeeklySnapshot={
   store_code:string;week_start:string;week_end:string;items:WeeklyTask[];
   calls:{count:number;target:number;reached:boolean;confirmed:boolean}
 };
+export type PrivateFileInfo={
+  name:string;media_type:string;size:number;revision:number
+};
 export type WhatsAppPost={
   date:string;product_code:string;category:string;note:string;
   status:"planejado"|"arte_pronta"|"publicado";published_on:string|null;
-  revision:number;has_art_file:false;has_evidence_file:false
+  revision:number;has_art_file:boolean;has_evidence_file:boolean;
+  files:{art?:PrivateFileInfo;evidence?:PrivateFileInfo}
 };
 export type WhatsAppSnapshot={
   year:number;month:number;scope:string;posts:WhatsAppPost[];
-  days_off:{date:string;reason:string}[];attachments_enabled:false
+  days_off:{date:string;reason:string}[];attachments_enabled:boolean
 };
 export type InstagramRow={
   store_code:string;planned:number|null;completed:number|null;revision:number
@@ -23,7 +27,8 @@ export type InstagramSnapshot={year:number;month:number;stores:InstagramRow[]};
 export type TrainingEntry={
   id:string;store_code:string;participant_id:string;participant:string;procedure:string;
   version:string;title:string;instructor:string;happened_on:string;
-  step:"participou"|"pratica";note:string;signed:false;document_attached:false
+  step:"participou"|"pratica";note:string;signed:false;
+  document_attached:boolean;document:PrivateFileInfo|null
 };
 
 export const routinesApi={

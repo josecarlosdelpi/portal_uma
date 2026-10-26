@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useState} from "react";
 import type {MyProfile} from "./api";
 import {labelStore} from "./catalog";
+import {attachmentsApi} from "./attachmentsApi";
 import {operationsApi,type TeamMember} from "./operationsApi";
 import {routinesApi,type TrainingEntry} from "./routinesApi";
 
@@ -25,6 +26,8 @@ export function TrainingPage({token,profile}:Props){
   const [hour,setHour]=useState("09:00");
   const [step,setStep]=useState<"participou"|"pratica">("participou");
   const [note,setNote]=useState("");
+  const [documentId,setDocumentId]=useState("");
+  const [documentFile,setDocumentFile]=useState<File|null>(null);
   const [loading,setLoading]=useState(false);
   const [working,setWorking]=useState(false);
   const [error,setError]=useState("");
@@ -44,6 +47,10 @@ export function TrainingPage({token,profile}:Props){
   },[token,store,canWrite]);
   useEffect(()=>{void refresh();},[refresh]);
   useEffect(()=>{setParticipant(current=>people.some(p=>p.id===current)?current:people[0]?.id??"");},[people]);
+  useEffect(()=>{
+    setDocumentId(current=>entries.some(p=>p.id===current)?current:entries[0]?.id??"");
+    setDocumentFile(null);
+  },[entries]);
 
   async function save(){
     setWorking(true);setError("");setMessage("");
@@ -57,13 +64,46 @@ export function TrainingPage({token,profile}:Props){
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao registrar.");}
     finally{setWorking(false);}
   }
+
+  const selectedDocument=entries.find(x=>x.id===documentId);
+
+  async function uploadDocument(){
+    if(!documentFile||!selectedDocument)return;
+    setWorking(true);setError("");setMessage("");
+    try{
+      await attachmentsApi.uploadTraining(
+        token,store,documentId,documentFile,selectedDocument.document?.revision??0
+      );
+      setDocumentFile(null);
+      await refresh();
+      setMessage("PDF vinculado ao treinamento. Isso não representa assinatura eletrônica.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível anexar PDF.");}
+    finally{setWorking(false);}
+  }
+
+  async function downloadDocument(record:TrainingEntry){
+    if(!record.document)return;
+    setError("");
+    try{await attachmentsApi.downloadTraining(token,store,record.id,record.document.name);}
+    catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível baixar PDF.");}
+  }
+
+  async function deleteDocument(record:TrainingEntry){
+    if(!record.document||!window.confirm("Excluir o PDF anexado? A ação será auditada."))return;
+    setWorking(true);setError("");setMessage("");
+    try{
+      await attachmentsApi.deleteTraining(token,store,record.id,record.document.revision);
+      await refresh();setMessage("PDF removido. Histórico da ação preservado.");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível excluir o PDF.");}
+    finally{setWorking(false);}
+  }
   return <section>
     <div className="page-header"><div><div className="eyebrow">CLAREZA E CAPACITAÇÃO</div>
       <h1>Padrões e treinamento</h1>
       <p>Registre procedimentos, versões, participantes e verificação prática por loja.</p></div></div>
     <div className="notice notice-amber">Os procedimentos abaixo ainda são rascunhos.
-      O registro de participação não comprova ciência assinada: anexos PDF e assinatura
-      eletrônica só serão habilitados após configurar armazenamento privado e consentimentos.</div>
+      PDFs de apoio podem ser anexados em armazenamento privado. O registro de participação
+      e o anexo não representam assinatura eletrônica ou ciência formal do colaborador.</div>
     {error&&<div className="notice notice-error" role="alert">{error}</div>}
     {message&&<div className="notice notice-success" role="status">{message}</div>}
     <div className="routine-procedures">
@@ -112,15 +152,46 @@ export function TrainingPage({token,profile}:Props){
         !version.trim()||!instructor.trim()||!day||!hour}
         onClick={()=>void save()}>Registrar participação</button>
     </article>}
+
+    {canWrite&&entries.length>0&&<article className="panel routine-form-panel">
+      <div className="panel-head"><div><h2>Anexar documento ao treinamento</h2>
+        <p>PDF privado de até 5 MB, sem assinatura eletrônica automática.</p></div></div>
+      <div className="routine-form-grid">
+        <label className="routine-wide">Registro de treinamento
+          <select value={documentId} onChange={e=>setDocumentId(e.target.value)}>
+            {entries.map(row=><option key={row.id} value={row.id}>
+              {row.participant} — {row.procedure} ({row.happened_on.slice(0,10)})
+            </option>)}
+          </select>
+        </label>
+        <label className="routine-wide">Documento PDF
+          <input type="file" accept=".pdf,application/pdf"
+            key={documentId+"-"+(selectedDocument?.document?.revision??0)}
+            disabled={working} onChange={e=>setDocumentFile(e.target.files?.[0]??null)}/>
+        </label>
+      </div>
+      {selectedDocument?.document&&<p className="small-note">
+        Atual: {selectedDocument.document.name} · revisão {selectedDocument.document.revision}.
+        Anexar outro PDF substitui o arquivo atual e registra a operação.
+      </p>}
+      <button className="btn-primary" disabled={!documentFile||!selectedDocument||working}
+        onClick={()=>void uploadDocument()}>{working?"Salvando…":"Anexar PDF"}</button>
+    </article>}
     <article className="panel routine-form-panel">
       <div className="panel-head"><div><h2>Histórico de treinamentos</h2>
         <p>Registros administrativos por colaborador e procedimento.</p></div></div>
       <div className="table-wrap"><table><thead><tr><th>Data</th><th>Colaborador</th>
-        <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>Assinatura</th></tr></thead>
+        <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>PDF</th><th>Assinatura</th></tr></thead>
         <tbody>{entries.map(entry=><tr key={entry.id}>
           <td>{new Date(entry.happened_on).toLocaleString("pt-BR")}</td>
           <td>{entry.participant}</td><td>{entry.procedure}</td><td>{entry.version}</td>
           <td>{entry.step==="pratica"?"Prática verificada":"Participação registrada"}</td>
+          <td>{entry.document?
+            <div className="routine-file-actions">
+              <button className="btn-secondary" onClick={()=>void downloadDocument(entry)}>Baixar PDF</button>
+              {canWrite&&<button className="btn-secondary" disabled={working}
+                onClick={()=>void deleteDocument(entry)}>Excluir PDF</button>}
+            </div>:"Não anexado"}</td>
           <td><span className="routine-alert">Pendente</span></td>
         </tr>)}</tbody></table></div>
       {entries.length===0&&<p className="empty">Nenhum treinamento cadastrado nesta loja.</p>}

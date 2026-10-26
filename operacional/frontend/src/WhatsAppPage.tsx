@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import type {MyProfile} from "./api";
 import {labelStore} from "./catalog";
+import {attachmentsApi} from "./attachmentsApi";
 import {routinesApi,type WhatsAppSnapshot,type InstagramSnapshot,type WhatsAppPost} from "./routinesApi";
 
 type Props={token:string;profile:MyProfile};
@@ -27,6 +28,8 @@ export function WhatsAppPage({token,profile}:Props){
   const [note,setNote]=useState("");
   const [status,setStatus]=useState<WhatsAppPost["status"]>("planejado");
   const [offReason,setOffReason]=useState("");
+  const [artFile,setArtFile]=useState<File|null>(null);
+  const [evidenceFile,setEvidenceFile]=useState<File|null>(null);
   const [igStore,setIgStore]=useState(profile.stores[0]??"");
   const [igPlanned,setIgPlanned]=useState("0");
   const [igDone,setIgDone]=useState("0");
@@ -58,10 +61,12 @@ export function WhatsAppPage({token,profile}:Props){
   },[dates,day]);
   const selected=posts?.posts.find(x=>x.date===day);
   const dayOff=posts?.days_off.find(x=>x.date===day);
+  const attachments=selected?.files??{};
   useEffect(()=>{
     setCode(selected?.product_code??"");setCategory(selected?.category??"");
     setNote(selected?.note??"");setStatus(selected?.status??"planejado");
     setOffReason(dayOff?.reason??"");
+    setArtFile(null);setEvidenceFile(null);
   },[day,posts,selected?.product_code,selected?.revision,dayOff?.reason]);
   const currentIg=instagram?.stores.find(x=>x.store_code===igStore);
   useEffect(()=>{
@@ -76,6 +81,19 @@ export function WhatsAppPage({token,profile}:Props){
     finally{setWorking(false);}
   }
 
+
+  async function downloadFile(kind:"art"|"evidence",name:string){
+    setError("");
+    try{await attachmentsApi.downloadWhatsApp(token,day,kind,name);}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao baixar anexo.");}
+  }
+
+  const attachmentRows=[
+    {kind:"art" as const, label:"Arte do Status", file:artFile,setFile:setArtFile,
+      current:attachments.art},
+    {kind:"evidence" as const,label:"Comprovante da publicação",file:evidenceFile,
+      setFile:setEvidenceFile,current:attachments.evidence},
+  ];
   const planned=posts?.posts.length??0;
   const ready=posts?.posts.filter(x=>x.status==="arte_pronta").length??0;
   const published=posts?.posts.filter(x=>x.status==="publicado").length??0;
@@ -84,8 +102,8 @@ export function WhatsAppPage({token,profile}:Props){
       <h1>Status do WhatsApp</h1><p>Calendário único da UMA, sem repetir o mesmo código de produto durante o ano.</p>
     </div></div>
     <div className="notice notice-amber">
-      O controle de códigos e publicações já pode ser preparado. O envio real ao WhatsApp
-      não está conectado, e anexos de artes ou comprovantes ainda aguardam armazenamento privado.</div>
+      O controle de códigos e publicações é manual. As artes e os comprovantes podem
+      ser anexados em armazenamento privado, mas o envio automático ao WhatsApp ainda não está conectado.</div>
     {error&&<div className="notice notice-error" role="alert">{error}</div>}
     {message&&<div className="notice notice-success" role="status">{message}</div>}
     <div className="routine-filters"><label>Mês de referência<input type="month" min="2020-01" max="2100-12"
@@ -95,7 +113,7 @@ export function WhatsAppPage({token,profile}:Props){
     {hasStatus&&posts&&!loading&&<>
       <div className="routine-kpis">
         <div className="panel"><span>Dias programados</span><strong>{planned}</strong><small>Produtos sem repetição anual</small></div>
-        <div className="panel"><span>Arte pronta</span><strong>{ready}</strong><small>Confirmação manual — arquivo ainda não anexado</small></div>
+        <div className="panel"><span>Arte pronta</span><strong>{ready}</strong><small>Etapa manual · anexo opcional</small></div>
         <div className="panel"><span>Publicados</span><strong>{published}</strong><small>Controle manual das publicações</small></div>
       </div>
       <article className="panel">
@@ -117,7 +135,7 @@ export function WhatsAppPage({token,profile}:Props){
       </article>
       {canWrite&&<article className="panel routine-form-panel">
         <div className="panel-head"><div><h2>Programar ou atualizar uma data</h2>
-          <p>{day.split("-").reverse().join("/")} · nenhum arquivo será enviado nesta fase.</p></div></div>
+          <p>{day.split("-").reverse().join("/")} · anexos enviados separadamente após salvar o produto.</p></div></div>
         <div className="routine-form-grid">
           <label>Código do produto<input maxLength={55} value={code} disabled={!!dayOff}
             onChange={e=>setCode(e.target.value)} placeholder="Ex.: MM 22002"/></label>
@@ -151,12 +169,52 @@ export function WhatsAppPage({token,profile}:Props){
           {!!selected&&<small>Para marcar sem postagem, é necessário retirar a programação existente desta data.</small>}
         </div>
       </article>}
+
+      {selected&&<article className="panel routine-form-panel">
+        <div className="panel-head"><div><h2>Artes e comprovantes da data</h2>
+          <p>Arquivos privados protegidos por login. Aceita JPG, PNG ou WebP, até 3 MB cada.</p>
+        </div></div>
+        <div className="routine-file-list">
+          {attachmentRows.map(row=><div className="routine-file-item" key={row.kind}>
+            <div><strong>{row.label}</strong>
+              <p>{row.current?
+                row.current.name+" · "+(row.current.size/1024).toFixed(0)+" KB":
+                "Nenhum anexo enviado"}</p>
+            </div>
+            <div className="routine-file-actions">
+              {row.current&&<button className="btn-secondary" disabled={working}
+                onClick={()=>void downloadFile(row.kind,row.current!.name)}>Baixar</button>}
+              {canWrite&&<>
+                <input aria-label={"Selecionar "+row.label} type="file"
+                  key={day+"-"+row.kind+"-"+(row.current?.revision??0)}
+                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                  disabled={working} onChange={e=>row.setFile(e.target.files?.[0]??null)}/>
+                <button className="btn-primary" disabled={working||!row.file}
+                  onClick={()=>void perform(async()=>{
+                    if(!row.file)return;
+                    await attachmentsApi.uploadWhatsApp(
+                      token,day,row.kind,row.file,row.current?.revision??0
+                    );
+                    row.setFile(null);
+                  },row.label+" anexado com sucesso.")}>Anexar / substituir</button>
+                {row.current&&<button className="btn-secondary" disabled={working}
+                  onClick={()=>{
+                    if(!window.confirm("Remover "+row.label+"? O histórico da operação será mantido."))return;
+                    void perform(()=>attachmentsApi.deleteWhatsApp(
+                      token,day,row.kind,row.current!.revision
+                    ),"Anexo removido. A exclusão foi auditada.");
+                  }}>Excluir anexo</button>}
+              </>}
+            </div>
+          </div>)}
+        </div>
+      </article>}
       <article className="panel routine-form-panel"><div className="panel-head"><div><h2>Histórico do calendário</h2>
         <p>Produtos planejados e confirmados no mês.</p></div></div>
         <div className="table-wrap"><table><thead><tr><th>Data</th><th>Produto</th><th>Categoria</th>
-          <th>Etapa</th><th>Publicação</th></tr></thead><tbody>{posts.posts.map(p=><tr key={p.date}>
+          <th>Etapa</th><th>Publicação</th><th>Anexos</th></tr></thead><tbody>{posts.posts.map(p=><tr key={p.date}>
           <td>{p.date}</td><td>{p.product_code}</td><td>{p.category||"—"}</td>
-          <td>{statusLabel(p.status)}</td><td>{p.published_on?"Registrada":"Pendente"}</td>
+          <td>{statusLabel(p.status)}</td><td>{p.published_on?"Registrada":"Pendente"}</td><td>{[p.has_art_file?"Arte":null,p.has_evidence_file?"Comprovante":null].filter(Boolean).join(" e ")||"—"}</td>
         </tr>)}</tbody></table></div>
       </article>
     </>}

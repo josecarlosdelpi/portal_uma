@@ -191,3 +191,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  font-weight:800;overflow-wrap:anywhere;color:#1d1a14}
 .local-secret-once .btn-row{margin:11px 0}
 @media(max-width:640px){.local-account-grid{grid-template-columns:1fr}}
+
+/* Arquivos operacionais privados: imagens do Status e PDFs de treinamento */
+.routine-file-list{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.routine-file-item{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1.6fr);
+  align-items:center;gap:14px;padding:15px;background:#fffdf4;border:1px solid #eae0b9;
+  border-radius:11px}
+.routine-file-item strong{display:block;font-size:13px;color:#242016}
+.routine-file-item p{font-size:11px;color:#726344;margin:6px 0 0;overflow-wrap:anywhere}
+.routine-file-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.routine-file-actions input[type=file]{min-width:0;max-width:260px;font-size:11px;
+  background:#fff;color:#443e2d;padding:8px;border:1px dashed #c6b675;border-radius:8px}
+.routine-file-actions .btn-primary,.routine-file-actions .btn-secondary{white-space:nowrap}
+@media(max-width:760px){.routine-file-item{grid-template-columns:1fr}
+  .routine-file-actions input[type=file]{width:100%;max-width:100%}}
