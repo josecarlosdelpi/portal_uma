@@ -1,0 +1,54 @@
+# Homologacao somente no computador do operador.
+# Nunca publicar esta composicao em servidor acessivel pela internet.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: portal_uma_hml
+      POSTGRES_USER: portal_hml
+      POSTGRES_PASSWORD: ${UMA_HML_DB_PASSWORD:?Defina UMA_HML_DB_PASSWORD no arquivo .env}
+    volumes:
+      - uma_hml_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal_hml -d portal_uma_hml"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [internal]
+  api:
+    image: python:3.12-slim
+    working_dir: /workspace/backend
+    volumes:
+      - ../backend:/workspace/backend:ro
+    environment:
+      DATABASE_URL: postgresql+psycopg://portal_hml:${UMA_HML_DB_PASSWORD:?Defina UMA_HML_DB_PASSWORD}@db:5432/portal_uma_hml
+      APP_ENV: development
+      CORS_ORIGINS: http://127.0.0.1:5173
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    command: >
+      sh -c "pip install '.[dev]' &&
+             alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [internal]
+  ui:
+    image: node:22-alpine
+    working_dir: /workspace/frontend
+    volumes:
+      - ../frontend:/workspace/frontend:ro
+      - uma_hml_node_modules:/workspace/frontend/node_modules
+    environment:
+      VITE_DEV_PROXY_TARGET: http://api:8000
+      VITE_API_BASE_URL: ""
+    command: sh -c "npm install --no-audit --no-fund --package-lock=false && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on: [api]
+    networks: [internal]
+networks:
+  internal: {}
+volumes:
+  uma_hml_db: {}
+  uma_hml_node_modules: {}
