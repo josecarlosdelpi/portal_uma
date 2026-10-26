@@ -7,6 +7,7 @@ from app.admin_routes import router as admin_router
 from app.operations_routes import router as operations_router
 from app.routines_routes import router as routines_router
 from app.local_routes import router as local_router
+from app.attachments_routes import router as attachments_router
 from app.overview_routes import router as overview_router
 from app.closing_routes import router as closing_router
 from app.targets_routes import router as targets_router
@@ -25,6 +26,7 @@ app.include_router(closing_router)
 app.include_router(operations_router)
 app.include_router(routines_router)
 app.include_router(local_router)
+app.include_router(attachments_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),

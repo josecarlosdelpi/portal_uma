@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, Numeric, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -443,4 +443,50 @@ class LocalSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WhatsAppFile(Base):
+    """Private artwork or publication evidence, never served as a public static URL."""
+    __tablename__ = "whatsapp_files"
+    __table_args__ = (
+        CheckConstraint("kind IN ('art','evidence')", name="ck_whatsapp_file_kind"),
+        CheckConstraint("byte_length BETWEEN 1 AND 3145728", name="ck_whatsapp_file_size"),
+        CheckConstraint("revision >= 1", name="ck_whatsapp_file_revision"),
+    )
+    post_date: Mapped[datetime] = mapped_column(
+        ForeignKey("whatsapp_posts.post_date", ondelete="RESTRICT"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(10), primary_key=True)
+    original_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class TrainingDocument(Base):
+    """Small private PDF attached to training record; does NOT constitute e-signature."""
+    __tablename__ = "training_documents"
+    __table_args__ = (
+        CheckConstraint("byte_length BETWEEN 1 AND 5242880", name="ck_training_pdf_size"),
+        CheckConstraint("revision >= 1", name="ck_training_pdf_revision"),
+    )
+    training_id: Mapped[UUID] = mapped_column(
+        ForeignKey("training_records.id", ondelete="RESTRICT"), primary_key=True
+    )
+    original_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(30), nullable=False, default="application/pdf")
+    byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

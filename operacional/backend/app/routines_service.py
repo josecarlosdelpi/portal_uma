@@ -3,11 +3,11 @@ from datetime import date, datetime, timedelta, time
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    ContactAttempt, InstagramMonth, TrainingRecord, User,
+    ContactAttempt, InstagramMonth, TrainingRecord, TrainingDocument, WhatsAppFile, User,
     WeeklyCallGoal, WeeklyTask, WeeklyTaskCheck, WhatsAppDayOff, WhatsAppPost,
 )
 from app.operations_service import (
@@ -176,18 +176,33 @@ class RoutinesService(OperationsService):
             func.extract("year",WhatsAppDayOff.post_date)==year,
             func.extract("month",WhatsAppDayOff.post_date)==month,
         ).order_by(WhatsAppDayOff.post_date)).all()
+        metadata=self.db.execute(
+            select(WhatsAppFile.post_date, WhatsAppFile.kind,
+                   WhatsAppFile.original_name, WhatsAppFile.media_type,
+                   WhatsAppFile.byte_length, WhatsAppFile.revision)
+            .where(WhatsAppFile.post_date.in_([row.post_date for row in posts]))
+        ).all() if posts else []
+        files={}
+        for when,kind,name,media_type,size,revision in metadata:
+            files.setdefault(day_iso(when),{})[kind]={
+                "name":name,"media_type":media_type,
+                "size":size,"revision":revision,
+            }
         return {"year":year,"month":month,"scope":"global_uma",
-                "posts":[self._post(row) for row in posts],
+                "posts":[self._post(row, files.get(day_iso(row.post_date))) for row in posts],
                 "days_off":[{"date":day_iso(row.post_date),"reason":row.reason} for row in days_off],
-                "attachments_enabled":False}
+                "attachments_enabled":True}
 
     @staticmethod
-    def _post(row:WhatsAppPost)->dict:
+    def _post(row:WhatsAppPost, files:dict|None=None)->dict:
+        attached=files or {}
         return {"date":day_iso(row.post_date),"product_code":row.product_code,
                 "category":row.category,"note":row.note,"status":row.status,
                 "published_on":row.published_on.isoformat() if row.published_on else None,
-                "revision":row.revision,"has_art_file":False,
-                "has_evidence_file":False}
+                "revision":row.revision,
+                "files":attached,
+                "has_art_file":"art" in attached,
+                "has_evidence_file":"evidence" in attached}
 
     def delete_marketing(self, when: date, expected: int) -> dict:
         self.require("JOINVILLE", "whatsapp_status.edit")
@@ -199,10 +214,15 @@ class RoutinesService(OperationsService):
         if row is None:
             raise OperationError(404, "Planejamento não encontrado")
         self.revision(row, expected)
+        file_names=[item[0] for item in self.db.execute(
+            select(WhatsAppFile.kind).where(WhatsAppFile.post_date==start_of(when))
+        ).all()]
         previous = self._post(row)
+        self.db.execute(delete(WhatsAppFile).where(WhatsAppFile.post_date==start_of(when)))
         self.db.delete(row)
         self.audit("whatsapp.plan.deleted", "whatsapp_post", when.isoformat(),
-                   {"previous": previous, "year": when.year})
+                   {"previous": previous, "files_removed":file_names,
+                    "year": when.year})
         self.commit()
         return {"date": when.isoformat(), "deleted": True}
 
@@ -319,17 +339,26 @@ class RoutinesService(OperationsService):
             .order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
             .limit(limit)
         ).all()
-        return [self._training(row,name) for row,name in rows]
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]
 
     @staticmethod
-    def _training(row:TrainingRecord,name:str)->dict:
+    def _training(row:TrainingRecord,name:str,document:dict|None=None)->dict:
         return {
             "id":str(row.id),"store_code":row.store_code,
             "participant_id":str(row.participant_id),"participant":name,
             "procedure":row.procedure,"version":row.version,"title":row.title,
             "instructor":row.instructor,"happened_on":row.happened_on.isoformat(),
             "step":row.step,"note":row.note,
-            "signed":False,"document_attached":False,
+            "signed":False,"document_attached":document is not None,
+            "document":document,
         }
 
     def add_training(self,store:str,participant_id:UUID,procedure:str,version:str,

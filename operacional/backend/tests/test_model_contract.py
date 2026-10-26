@@ -12,7 +12,7 @@ def test_schema_has_expected_core_tables():
         "google_review_months", "supply_materials", "supply_stocks",
         "supply_movements", "contact_clients", "contact_attempts",
         "weekly_tasks", "weekly_task_checks", "weekly_call_goals",
-        "whatsapp_posts", "whatsapp_days_off", "instagram_months", "training_records",
+        "whatsapp_posts", "whatsapp_files", "training_documents", "whatsapp_days_off", "instagram_months", "training_records",
     }
 
 

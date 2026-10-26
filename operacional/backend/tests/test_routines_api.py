@@ -201,3 +201,153 @@ def test_all_routes_reject_unauthenticated():
             "/api/v1/routines/trainings/JOINVILLE",
         ]:
             assert c.get(route).status_code==401
+
+
+# Anexos privados: a API serve binários apenas a usuários autenticados e autorizados.
+from base64 import b64decode
+from uuid import UUID
+from app.models import WhatsAppFile, TrainingDocument
+
+SMALL_PNG=b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII="
+)
+SMALL_PDF=b"%PDF-1.4\\n1 0 obj<</Type/Catalog>>endobj\\n%%EOF\\n".replace(b"\\n",b"\n")
+
+
+def test_art_upload_is_private_versioned_and_audited(env):
+    c,actor,engine,admin,seller,other=env
+    day="2026-10-19"
+    route=f"/api/v1/routines/whatsapp/{day}"
+    file_route=route+"/files/art"
+    missing=c.put(file_route+"?expected_revision=0",files={
+        "file":("arte.png", SMALL_PNG, "image/png")
+    })
+    assert missing.status_code==404,missing.text
+    assert c.put(route,json={"product_code":"Produto_A","status":"planejado",
+                             "expected_revision":0}).status_code==200
+
+    saved=c.put(file_route+"?expected_revision=0",files={
+        "file":("arte.png", SMALL_PNG, "image/png")
+    })
+    assert saved.status_code==200,saved.text
+    assert saved.json()["revision"]==1
+    assert saved.json()["size"]==len(SMALL_PNG)
+    assert "content" not in saved.json()
+    assert c.put(file_route+"?expected_revision=0",files={
+        "file":("nova.png", SMALL_PNG, "image/png")
+    }).status_code==409
+    month=c.get("/api/v1/routines/whatsapp/2026/10").json()
+    listed=next(p for p in month["posts"] if p["date"]==day)
+    assert month["attachments_enabled"] is True
+    assert listed["has_art_file"] and not listed["has_evidence_file"]
+    assert listed["files"]["art"]["name"]=="arte.png"
+    assert "content" not in str(listed["files"])
+    downloaded=c.get(file_route)
+    assert downloaded.status_code==200
+    assert downloaded.content==SMALL_PNG
+    assert downloaded.headers["cache-control"]=="private, no-store"
+    assert downloaded.headers["x-content-type-options"]=="nosniff"
+    assert downloaded.headers["content-disposition"].startswith("attachment")
+
+    actor["user"]=seller
+    assert c.get(file_route).status_code==200
+    assert c.put(file_route+"?expected_revision=1",files={
+        "file":("arte.png", SMALL_PNG, "image/png")
+    }).status_code==403
+    actor["user"]=other
+    assert c.get(file_route).status_code==403
+    actor["user"]=admin
+    deleted=c.delete(file_route+"?expected_revision=1")
+    assert deleted.status_code==200,deleted.text
+    assert c.get(file_route).status_code==404
+    with Session(engine) as db:
+        actions=[a.action for a in db.scalars(select(AuditEvent))]
+        assert "whatsapp.file.saved" in actions
+        assert "whatsapp.file.deleted" in actions
+
+
+def test_art_and_evidence_validate_bytes_format_size_and_cleanup(env):
+    c,actor,engine,*_=env
+    day="2026-10-20"
+    base=f"/api/v1/routines/whatsapp/{day}"
+    assert c.put(base,json={"product_code":"Válvula 2026",
+                            "status":"planejado","expected_revision":0}).status_code==200
+    file_url=base+"/files/art?expected_revision=0"
+    assert c.put(file_url,files={"file":("malicioso.svg",
+                 b"<svg onload=alert(1)>","image/svg+xml")}).status_code==422
+    assert c.put(file_url,files={"file":("arquivo.pdf",
+                 SMALL_PDF,"application/pdf")}).status_code==422
+    assert c.put(file_url,files={"file":("arte.jpg",
+                 SMALL_PNG,"image/jpeg")}).status_code==422
+    assert c.put(file_url,files={"file":("arte.png",
+                 b"x"*(3*1024*1024+1),"image/png")}).status_code==413
+    recorded=c.put(base+"/files/evidence?expected_revision=0",files={
+        "file":("publicacao.png", SMALL_PNG, "image/png")
+    })
+    assert recorded.status_code==200
+    assert c.get("/api/v1/routines/whatsapp/2026/10").json()["posts"][0][
+        "has_evidence_file"] is True
+    removed=c.request("DELETE",base,json={"expected_revision":1})
+    assert removed.status_code==200,removed.text
+    with Session(engine) as db:
+        assert db.scalars(select(WhatsAppFile)).first() is None
+        assert "evidence" in db.scalars(select(AuditEvent)).all()[-1].details["files_removed"]
+
+
+def test_training_pdf_per_store_not_a_signature(env):
+    c,actor,engine,admin,seller,other=env
+    body={
+        "participant_id":str(seller.id),"procedure":"POP-COM-01",
+        "version":"0.1","title":"Treinamento",
+        "instructor":"Gestão","happened_on":"2026-10-21T09:00:00",
+        "step":"participou"
+    }
+    record=c.post("/api/v1/routines/trainings/JOINVILLE",json=body)
+    assert record.status_code==201,record.text
+    training_id=record.json()["id"]
+    link=f"/api/v1/routines/trainings/JOINVILLE/{training_id}/document"
+    assert c.get(link).status_code==404
+    wrong=c.put(link+"?expected_revision=0",files={
+        "file":("imagem.jpg",SMALL_PNG,"image/jpeg")
+    })
+    assert wrong.status_code==422
+    uploaded=c.put(link+"?expected_revision=0",files={
+        "file":("presenca.pdf",SMALL_PDF,"application/pdf")
+    })
+    assert uploaded.status_code==200,uploaded.text
+    assert uploaded.json()["revision"]==1
+    rows=c.get("/api/v1/routines/trainings/JOINVILLE").json()
+    assert rows[0]["document_attached"] is True
+    assert rows[0]["document"]["name"]=="presenca.pdf"
+    assert rows[0]["signed"] is False
+    actor["user"]=seller
+    response=c.get(link)
+    assert response.status_code==200
+    assert response.content==SMALL_PDF
+    assert c.put(link+"?expected_revision=1",files={
+        "file":("presenca.pdf",SMALL_PDF,"application/pdf")
+    }).status_code==403
+    actor["user"]=other
+    assert c.get(link).status_code==403
+    actor["user"]=admin
+    assert c.get(f"/api/v1/routines/trainings/TUBARAO/{training_id}/document").status_code==404
+    assert c.delete(link+"?expected_revision=2").status_code==409
+    assert c.delete(link+"?expected_revision=1").status_code==200
+    assert c.get(link).status_code==404
+    with Session(engine) as db:
+        assert db.scalars(select(TrainingDocument)).first() is None
+        actions=[a.action for a in db.scalars(select(AuditEvent))]
+        assert "training.document.saved" in actions
+        assert "training.document.deleted" in actions
+
+
+def test_private_attachments_require_authentication():
+    with TestClient(app) as client:
+        for uri in [
+            "/api/v1/routines/whatsapp/2026-10-19/files/art",
+            "/api/v1/routines/trainings/JOINVILLE/"+str(uuid4())+"/document",
+        ]:
+            assert client.get(uri).status_code==401
+            assert client.put(uri+"?expected_revision=0",files={
+                "file":("a.png",SMALL_PNG,"image/png")
+            }).status_code==401
