@@ -91,3 +91,13 @@ def test_consolidated_monthly_closing_is_never_granted_to_a_seller():
     assert not can_access(seller_with_override, "monthly_closing.view", "JOINVILLE")
     manager = Principal(user_id="admin", profile="administrator")
     assert can_access(manager, "monthly_closing.view")
+
+
+def test_daily_task_permissions_follow_read_only_policy():
+    manager = Principal(user_id="m", profile="administrator")
+    assert can_access(manager, "daily_tasks.view", "TUBARAO")
+    assert can_access(manager, "daily_tasks.edit", "ITAJAI")
+    seller_joi = seller(grants=["daily_tasks.view"], overrides={"daily_tasks.edit": True})
+    assert can_access(seller_joi, "daily_tasks.view", "JOINVILLE")
+    assert not can_access(seller_joi, "daily_tasks.view", "TUBARAO")
+    assert not can_access(seller_joi, "daily_tasks.edit", "JOINVILLE")
