@@ -1,7 +1,7 @@
 name: Portal UMA - frontend operacional
 on:
   push:
-    branches: [feat/base-operacional]
+    branches: [main, feat/base-operacional]
     paths: ["operacional/frontend/**", "preview-operacional/**", ".github/workflows/operacional-frontend.yml"]
   pull_request:
     paths: ["operacional/frontend/**", ".github/workflows/operacional-frontend.yml"]
