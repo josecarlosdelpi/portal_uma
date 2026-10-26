@@ -1,5 +1,40 @@
 # Portal UMA
 
+### Demonstração unificada do SuperAdmin
+
+**[Abrir todas as funcionalidades em uma só demonstração](https://josecarlosdelpi.github.io/portal_uma/preview-operacional/superadmin.html)**
+
+Inclui Visão Geral, Metas Diárias, **Tarefas Diárias** (novo módulo com
+responsáveis, prioridades e acompanhamento), Fechamento Mensal de 7 slides,
+Telemarketing, Avaliações Google, Insumos, Checklist Semanal, Status WhatsApp e
+Instagram, Treinamentos, Usuários e senhas provisórias, Permissões e Auditoria.
+
+**Todos os dados da prévia são fictícios e alterados somente na sessão do navegador.**
+O código operacional (API/React/PostgreSQL) está separado da prévia e não está
+hospedado com login real. `index.html` continua sendo o protótipo v5.1 original.
+
+
+## Código operacional — módulos sem ERP (26/10/2026)
+
+A aplicação **operacional** está em [`operacional/`](./operacional/), separada do
+protótipo `index.html`, que permanece uma demonstração pública com dados fictícios.
+
+A versão operacional usa **React/TypeScript + FastAPI + PostgreSQL** e já possui:
+avaliações Google manuais por loja, insumos (entradas, retiradas e histórico),
+clientes e ligações, checklist semanal, calendário WhatsApp anual sem repetição de
+produtos, Instagram, treinamentos e autenticação local sem e-mail (senha provisória
+individual e troca obrigatória no primeiro login). Inclui **anexos privados**
+de imagens de Status/comprovantes e PDFs de treinamento, guardados no PostgreSQL.
+
+**O código estar no GitHub não significa que o sistema esteja implantado.**
+A hospedagem do backend, banco de produção, HTTPS e DNS do subdomínio
+`portal.universodasmangueiras.com.br` ainda precisam ser configurados e
+homologados antes de utilização pelas lojas. Não enviar dados reais à
+demonstração pública nem inserir senhas no repositório.
+
+Detalhes de instalação e segurança: [Implantação e acessos](./operacional/IMPLANTACAO-E-ACESSOS.md).
+
+
 Protótipo demonstrativo de gestão comercial da **Universo das Mangueiras Automotivas (UMA)**.
 
 ## Versão disponível

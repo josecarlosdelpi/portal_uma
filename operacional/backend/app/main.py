@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.admin_routes import router as admin_router
 from app.operations_routes import router as operations_router
 from app.routines_routes import router as routines_router
+from app.daily_tasks_routes import router as daily_tasks_router
 from app.local_routes import router as local_router
 from app.attachments_routes import router as attachments_router
 from app.overview_routes import router as overview_router
@@ -25,6 +26,7 @@ app.include_router(overview_router)
 app.include_router(closing_router)
 app.include_router(operations_router)
 app.include_router(routines_router)
+app.include_router(daily_tasks_router)
 app.include_router(local_router)
 app.include_router(attachments_router)
 app.add_middleware(
@@ -57,6 +59,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
             "supplies": any(can_access(principal, "supplies.view", store) for store in visible_stores(principal)),
             "telemarketing": any(can_access(principal, "telemarketing.view", store) for store in visible_stores(principal)),
             "checklist": any(can_access(principal, "checklist.view", s) for s in visible_stores(principal)),
+            "daily_tasks": any(can_access(principal, "daily_tasks.view", s) for s in visible_stores(principal)),
             "whatsapp_status": any(can_access(principal, "whatsapp_status.view", s) for s in visible_stores(principal)),
             "instagram": any(can_access(principal, "instagram.view", s) for s in visible_stores(principal)),
             "training": any(can_access(principal, "training.view", s) for s in visible_stores(principal)),

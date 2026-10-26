@@ -490,3 +490,28 @@ class TrainingDocument(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class DailyTask(Base):
+    """Tarefa de data especifica por loja, com responsavel e exclusao logica."""
+    __tablename__ = "daily_tasks"
+    __table_args__ = (
+        CheckConstraint("status IN ('pendente','em_andamento','concluida')", name="ck_daily_task_status"),
+        CheckConstraint("priority IN ('baixa','normal','alta')", name="ck_daily_task_priority"),
+        CheckConstraint("revision >= 1", name="ck_daily_task_revision"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    due_on: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    details: Mapped[str] = mapped_column(String(400), nullable=False, default="")
+    priority: Mapped[str] = mapped_column(String(10), nullable=False, default="normal")
+    status: Mapped[str] = mapped_column(String(15), nullable=False, default="pendente")
+    assignee_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

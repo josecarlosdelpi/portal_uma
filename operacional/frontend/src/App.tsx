@@ -9,12 +9,13 @@ import { ReviewsPage } from "./ReviewsPage";
 import { SuppliesPage } from "./SuppliesPage";
 import { ContactsPage } from "./ContactsPage";
 import { ChecklistPage } from "./ChecklistPage";
+import { DailyTasksPage } from "./DailyTasksPage";
 import { WhatsAppPage } from "./WhatsAppPage";
 import { TrainingPage } from "./TrainingPage";
 import { AccountsManager, TemporaryPasswordNotice } from "./AccountsManager";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
-type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "whatsapp" | "training";
+type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training";
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir.";
 const profileLabel = (profile: string) =>
   profile === "superadmin" ? "SuperAdmin" : profile === "administrator" ? "Administrador" : "Vendedor";
@@ -114,6 +115,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (previous === "supplies" && profile.features.supplies) return previous;
       if (previous === "contacts" && profile.features.telemarketing) return previous;
       if (previous === "checklist" && profile.features.checklist) return previous;
+      if (previous === "daily" && profile.features.daily_tasks) return previous;
       if (previous === "whatsapp" && (profile.features.whatsapp_status||profile.features.instagram)) return previous;
       if (previous === "training" && profile.features.training) return previous;
       if (previous === "access" && profile.profile === "superadmin") return previous;
@@ -124,6 +126,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (profile.features.supplies) return "supplies";
       if (profile.features.telemarketing) return "contacts";
       if (profile.features.checklist) return "checklist";
+      if (profile.features.daily_tasks) return "daily";
       if (profile.features.whatsapp_status||profile.features.instagram) return "whatsapp";
       if (profile.features.training) return "training";
       return "access";
@@ -141,6 +144,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   const canViewSupplies = profile?.features?.supplies ?? false;
   const canViewContacts = profile?.features?.telemarketing ?? false;
   const canViewChecklist = profile?.features?.checklist ?? false;
+  const canViewDaily = profile?.features?.daily_tasks ?? false;
   const canViewWhatsApp = (profile?.features?.whatsapp_status??false)||(profile?.features?.instagram??false);
   const canViewTraining = profile?.features?.training ?? false;
 
@@ -160,6 +164,8 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
           onClick={()=>setArea("supplies")}><span className="nav-icon">▣</span><span>Materiais e insumos</span></button>}
         {canViewChecklist && <button className={"nav-item"+(area==="checklist"?" active":"")}
           onClick={()=>setArea("checklist")}><span className="nav-icon">☑</span><span>Checklist semanal</span></button>}
+        {canViewDaily && <button className={"nav-item"+(area==="daily"?" active":"")}
+          onClick={()=>setArea("daily")}><span className="nav-icon">☷</span><span>Tarefas diárias</span></button>}
         {canViewTargets && <button className={"nav-item"+(area==="targets"?" active":"")}
           onClick={()=>setArea("targets")}><span className="nav-icon">$</span><span>Metas diárias</span></button>}
         {canViewWhatsApp && <button className={"nav-item"+(area==="whatsapp"?" active":"")}
@@ -176,7 +182,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "reviews" ? "Avaliações Google" : area === "supplies" ? "Materiais e insumos" : area === "contacts" ? "Telemarketing" : area === "checklist" ? "Checklist semanal" : area === "whatsapp" ? "Status WhatsApp" : area === "training" ? "Padrões e treinamento" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
+      <header className="topbar"><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "reviews" ? "Avaliações Google" : area === "supplies" ? "Materiais e insumos" : area === "contacts" ? "Telemarketing" : area === "checklist" ? "Checklist semanal" : area === "daily" ? "Tarefas diárias" : area === "whatsapp" ? "Status WhatsApp" : area === "training" ? "Padrões e treinamento" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
         <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={onLogout}>Sair</button></div>
       </header>
       <div className="workspace">
@@ -187,6 +193,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
          area === "supplies" && profile ? <SuppliesPage token={token} profile={profile} /> :
          area === "contacts" && profile ? <ContactsPage token={token} profile={profile} /> :
          area === "checklist" && profile ? <ChecklistPage token={token} profile={profile} /> :
+         area === "daily" && profile ? <DailyTasksPage token={token} profile={profile} /> :
          area === "whatsapp" && profile ? <WhatsAppPage token={token} profile={profile} /> :
          area === "training" && profile ? <TrainingPage token={token} profile={profile} /> : <>
         <div className="page-header"><div><div className="eyebrow">PORTAL OPERACIONAL</div><h1>{isSuperAdmin ? "Configurações do sistema" : "Meu acesso ao Portal UMA"}</h1><p>Controle de usuários, unidades e permissões com registros de auditoria.</p></div></div>

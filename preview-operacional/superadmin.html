@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex,nofollow"/>
+<title>Portal UMA | Demonstração completa do SuperAdmin</title>
+<meta name="description" content="Demonstração integrada do Portal UMA com recursos do SuperAdmin. Dados inteiramente fictícios e sem acesso ao ERP."/>
+<style>
+:root{--black:#080808;--nav:#171717;--gold:#ffd900;--paper:#fffdf5;--bg:#f6f4ec;--muted:#8d8c82}
+*{box-sizing:border-box}html,body{margin:0;height:100%;font:13px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:#211f19}
+button{font:inherit;cursor:pointer}a{color:inherit}
+button:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.shell{min-height:100vh;display:grid;grid-template-columns:258px minmax(0,1fr)}
+.sidebar{background:linear-gradient(168deg,#000 0%,#191919 100%);color:#e5e5e5;display:flex;flex-direction:column;
+  min-height:100vh;height:100vh;position:sticky;top:0;overflow-y:auto;scrollbar-width:thin;border-right:3px solid #b89600}
+.brand{display:flex;align-items:center;gap:12px;padding:24px 16px 19px;border-bottom:1px solid #444}
+.brand-logo{width:55px;height:55px;display:flex;align-items:center;justify-content:center;background:#000;
+  color:var(--gold);font-size:19px;font-weight:1000;border-radius:10px;overflow:hidden;border:1px solid #786100}
+.brand-logo img{width:100%;height:100%;object-fit:contain}
+.brand strong{display:block;color:#ffd900;font-size:15px;font-weight:950;letter-spacing:.07em}
+.brand small{display:block;color:#c4be9b;font-size:10px}
+.side-heading{font-size:10px;color:#a09c8b;font-weight:850;letter-spacing:.11em;padding:20px 18px 9px}
+.side-section{border:0;padding:6px 0 13px;display:grid;gap:2px}
+.side-label{color:#9a977d;font-size:10px;font-weight:900;padding:9px 18px 5px;letter-spacing:.1em;text-transform:uppercase}
+.side-button{display:flex;align-items:center;gap:12px;text-align:left;background:transparent;color:#dfdfdf;border:0;
+ padding:10px 13px 10px 18px;min-height:40px;width:100%;border-left:3px solid transparent;font-size:12px}
+.side-button:hover{background:#2b2a21}.side-button.active{background:linear-gradient(90deg,#b89700,#806a00);color:#fff;
+ border-left-color:var(--gold);font-weight:800}
+.symbol{font-size:16px;width:22px;text-align:center;opacity:.9}
+.soon{margin-left:auto;color:#e4c878;font-size:10px}
+.side-button:disabled{opacity:.6;cursor:not-allowed}.sidebar-end{margin-top:auto;padding:15px 18px 18px}
+.sidebar-end p{margin:0;background:#282414;color:#dfd2a0;border-radius:10px;padding:12px;font-size:11px}
+.main{min-width:0;min-height:100vh;display:flex;flex-direction:column;background:#f7f5ed}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:65px;background:#fff;
+ padding:13px 23px;border-bottom:1px solid #e9dfb3;position:sticky;top:0;z-index:3}
+.crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.crumb b{font-weight:850}.crumb span{color:#b0a780}
+.badges{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.badge{border-radius:30px;font-size:10px;font-weight:850;padding:6px 11px;background:#fff5bc;color:#695300}
+.badge.dark{background:#151515;color:#ffd900}
+.banner{display:flex;justify-content:space-between;gap:12px;padding:11px 23px;background:#fff9da;
+ color:#705a22;border-bottom:1px solid #efdb91;font-size:12px}
+.banner b{color:#40340d}.banner a{font-weight:800}
+.view{flex:1;position:relative;min-height:0;display:flex;flex-direction:column}
+.pane{flex:1;display:none;min-height:0}.pane.active{display:block}
+.pane iframe{border:0;display:block;width:100%;height:calc(100vh - 110px);min-height:620px;background:#fffdf5}
+.footer{padding:9px 23px;background:#fff;border-top:1px solid #e8e1c6;
+ color:#7a735a;font-size:10px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.mobile-note{display:none}
+@media(max-width:900px){.shell{grid-template-columns:1fr}.sidebar{height:auto;max-height:none;min-height:auto;position:static;border-right:0}
+ .brand{padding:12px 14px}.side-heading{padding:9px 14px 0}
+ .side-section{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;padding:5px 10px 12px}
+ .side-label{display:none}.side-button{flex:0 0 auto;width:auto;white-space:nowrap;padding:8px 12px;min-height:40px;
+ border:1px solid #414141;border-radius:8px}.side-button.active{border-color:#ffe451}
+ .sidebar-end{display:none}.topbar{position:static;min-height:50px;padding:10px 14px}
+ .banner{padding:10px 14px}.pane iframe{height:calc(100vh - 170px);min-height:620px}
+ .mobile-note{display:block;padding:3px 12px 12px;color:#b5ad87;font-size:11px}
+}
+@media(max-width:540px){.badges .badge:not(.dark){display:none}.banner{flex-wrap:wrap}.footer{display:none}
+.pane iframe{height:calc(100vh - 155px)}}
+</style></head>
+<body>
+<div class="shell">
+  <aside class="sidebar" aria-label="Menu completo do SuperAdmin">
+    <div class="brand">
+      <div class="brand-logo" id="logoBox"><span id="logoFallback">UMA</span><img id="logo" hidden alt="Universo das Mangueiras"/></div>
+      <div><strong>PORTAL UMA</strong><small>Visão completa · SuperAdmin</small></div>
+    </div>
+    <div class="side-heading">TODOS OS MÓDULOS</div>
+    <nav id="nav" class="side-section" aria-label="Áreas do Portal UMA"></nav>
+    <p class="mobile-note">Deslize o menu para ver outras áreas.</p>
+    <div class="sidebar-end"><p><strong>Prévia sem dados reais</strong><br/>
+      Explore as telas e os botões. Nenhuma alteração será feita nos sistemas da UMA.</p></div>
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <div class="crumb">Universo das Mangueiras <span>/</span> <b id="crumb">Visão geral</b></div>
+      <div class="badges"><span class="badge">Dados fictícios</span><span class="badge dark">SuperAdmin · Demonstração</span></div>
+    </header>
+    <div class="banner">
+      <span><b>Apresentação completa do Portal UMA</b> · Você pode navegar por todos os módulos em um só lugar.</span>
+      <a href="../index.html" target="_blank" rel="noopener noreferrer">Versão original v5.1</a>
+    </div>
+    <main class="view">
+      <section class="pane" data-source="core" aria-label="Metas, visão geral e fechamento"><iframe title="Telas administrativas e fechamento mensal" loading="eager" allow="fullscreen" allowfullscreen></iframe></section>
+      <section class="pane" data-source="routines" aria-label="Rotinas operacionais"><iframe title="Telas operacionais da UMA" loading="lazy" allow="fullscreen" allowfullscreen></iframe></section>
+      <section class="pane" data-source="daily" aria-label="Tarefas diárias"><iframe title="Tarefas diárias da UMA" loading="lazy" allow="fullscreen" allowfullscreen></iframe></section>
+      <section class="pane" data-source="access" aria-label="Usuários e senhas"><iframe title="Gestão de usuários e senhas provisórias" loading="lazy" allow="fullscreen" allowfullscreen></iframe></section>
+    </main>
+    <footer class="footer"><span>Prévia de desenvolvimento — sem autenticação, API, banco ou ERP</span>
+      <span>Desenvolvimento operacional independente do site institucional · UMA</span></footer>
+  </div>
+</div>
+<script>
+"use strict";
+(function(){
+  const catalog=[
+    {kind:"group",title:"Gestão e resultados"},
+    {id:"overview",label:"Visão geral",icon:"▦",source:"core",page:"overview"},
+    {id:"targets",label:"Metas diárias",icon:"▤",source:"core",page:"targets"},
+    {id:"daily",label:"Tarefas diárias",icon:"☷",source:"daily"},
+    {id:"closing",label:"Fechamento Mensal · 7 slides",icon:"◈",source:"core",page:"closing"},
+    {kind:"disabled",label:"Vendas",icon:"↗",note:"ERP"},
+    {kind:"group",title:"Lojas e rotinas"},
+    {id:"contacts",label:"Ligações e clientes",icon:"☎",source:"routines",page:"contacts"},
+    {id:"reviews",label:"Avaliações Google",icon:"★",source:"routines",page:"reviews"},
+    {id:"supplies",label:"Materiais e insumos",icon:"▣",source:"routines",page:"supplies"},
+    {id:"checklist",label:"Checklist semanal",icon:"☑",source:"routines",page:"checklist"},
+    {id:"whatsapp",label:"Status WhatsApp / Instagram",icon:"▤",source:"routines",page:"whatsapp"},
+    {id:"training",label:"Treinamentos",icon:"☰",source:"routines",page:"training"},
+    {kind:"group",title:"Configurações e segurança"},
+    {id:"access",label:"Usuários e senhas",icon:"♙",source:"access"},
+    {id:"permissions",label:"Permissões por loja",icon:"⚙",source:"core",page:"admin",tab:"groups"},
+    {id:"audit",label:"Histórico e auditoria",icon:"☷",source:"core",page:"admin",tab:"audit"},
+    {id:"userRules",label:"Perfis e restrições",icon:"♟",source:"core",page:"admin",tab:"users"}
+  ];
+  const filenames={core:"./index.html",routines:"./rotinas.html",
+    daily:"./diarias.html",access:"./acessos.html"};
+  const $=id=>document.getElementById(id);
+  let selected="overview";
+  const panes=Array.from(document.querySelectorAll(".pane"));
+  const ready=new Set();
+  function nav(){
+    $("nav").innerHTML=catalog.map(item=>{
+      if(item.kind==="group")return '<div class="side-label">'+item.title+'</div>';
+      if(item.kind==="disabled")return '<button class="side-button" disabled title="Dados de vendas dependem do ERP"><span class="symbol">'+
+        item.icon+'</span>'+item.label+' <span class="soon">'+item.note+'</span></button>';
+      return '<button class="side-button '+(item.id===selected?"active":"")+'" data-id="'+item.id+'" type="button">'+
+        '<span class="symbol">'+item.icon+'</span>'+item.label+'</button>';
+    }).join("");
+  }
+  function inject(doc,source){
+    const style=doc.createElement("style");
+    style.textContent=[
+      ".preview-banner,.ribbon,.topbar,.layout > aside,.sidebar{display:none!important}",
+      ".layout{display:block!important;min-height:0!important}",
+      ".main{width:100%!important;min-width:0!important;max-width:none!important;min-height:0!important}",
+      ".workspace{max-width:1400px!important;margin:0 auto!important;padding:22px!important}",
+      ".footer{display:none!important}",
+      "html,body{min-height:0!important}"
+    ].join("\n");
+    doc.head.appendChild(style);
+    const logo=doc.querySelector(".brand-logo-image");
+    if(logo&&!$("logo").src){
+      $("logo").src=logo.src;
+      $("logo").hidden=false;$("logoFallback").hidden=true;
+    }
+    if(source==="daily"){
+      // Diarias has no sidebar, its heading and filters remain intact.
+    }
+  }
+  function gotoInternal(item){
+    if(!item||!item.page)return;
+    const frame=document.querySelector('.pane[data-source="'+item.source+'"] iframe');
+    let doc;
+    try{doc=frame.contentDocument;}catch{return;}
+    if(!doc||!doc.querySelector("body"))return;
+    const selector=item.source==="routines"?
+      'button[data-action="nav"][data-id="'+item.page+'"]':
+      'button[data-action="view"][data-id="'+item.page+'"]';
+    const button=doc.querySelector(selector);
+    if(button)button.click();
+    if(item.tab){
+      const tab=doc.querySelector('button[data-action="tab"][data-id="'+item.tab+'"]');
+      if(tab)tab.click();
+    }
+  }
+  function select(id,updateHash=true){
+    const item=catalog.find(x=>x.id===id&&x.source);
+    if(!item)return;
+    selected=id;
+    nav();$("crumb").textContent=item.label;
+    panes.forEach(pane=>pane.classList.toggle("active",pane.dataset.source===item.source));
+    const pane=panes.find(el=>el.dataset.source===item.source);
+    const iframe=pane.querySelector("iframe");
+    if(!iframe.dataset.initialized){
+      iframe.dataset.initialized="true";
+      iframe.addEventListener("load",()=>{
+        try{inject(iframe.contentDocument,item.source);ready.add(item.source);}
+        catch{iframe.title+=" — apresentação indisponível neste navegador";}
+        const current=catalog.find(x=>x.id===selected);
+        if(current&&current.source===item.source)gotoInternal(current);
+      });
+      iframe.src=filenames[item.source];
+    }else if(ready.has(item.source))gotoInternal(item);
+    if(updateHash)history.replaceState(null,"","#"+encodeURIComponent(id));
+  }
+  $("nav").addEventListener("click",event=>{
+    const button=event.target.closest("button[data-id]");
+    if(button)select(button.dataset.id);
+  });
+  window.addEventListener("hashchange",()=>select(decodeURIComponent(location.hash.slice(1)),false));
+  const initial=decodeURIComponent(location.hash.slice(1));
+  select(catalog.some(x=>x.id===initial&&x.source)?initial:"overview",false);
+})();
+</script></body></html>
