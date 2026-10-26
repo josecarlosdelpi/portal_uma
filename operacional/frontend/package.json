@@ -1,0 +1,28 @@
+{
+  "name": "portal-uma-operacional",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "check": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check:preview": "node scripts/check-preview.mjs"
+  },
+  "dependencies": {
+    "oidc-client-ts": "^3.3.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-oidc-context": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.0",
+    "vitest": "^4.0.0"
+  }
+}
