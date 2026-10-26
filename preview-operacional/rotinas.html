@@ -187,6 +187,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:780px){.op-panels,.op-card-grid,.op-proc{grid-template-columns:repeat(2,1fr)}.op-days{grid-template-columns:repeat(5,1fr)}.op-split{grid-template-columns:1fr}}
 @media(max-width:520px){.op-panels,.op-card-grid,.op-form,.op-proc{grid-template-columns:1fr}
 .op-form .wide{grid-column:auto}.op-days{grid-template-columns:repeat(4,1fr)}}
+.op-file-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:12px 0;border-top:1px solid #eae0bb}
+.op-file-row strong{font-size:12px;min-width:140px}.op-file-row span{font-size:11px;color:#7e734e}
+.op-file-row input[type=file],.op-file-cell input[type=file]{max-width:230px;min-width:180px;font-size:11px}
+.op-file-cell{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.op-file-cell .btn{font-size:11px}
 </style></head><body>
 <div class="preview-banner" role="note"><strong>PRÉ-VISUALIZAÇÃO · ROTINAS OPERACIONAIS</strong>
   <span>Todos os dados, pessoas e valores são fictícios. Nenhuma informação é enviada a servidores.</span>
@@ -224,7 +230,7 @@ var DATA={
  goals:{JOINVILLE:20,TUBARAO:12,ITAJAI:10},
  whatsapp:[{date:"2026-10-19",code:"MM 22002",status:"publicado",category:"Promoção"}],
  instagram:{"JOINVILLE|2026-10":{planned:12,done:7},"TUBARAO|2026-10":{planned:8,done:5},"ITAJAI|2026-10":{planned:6,done:4}},
- trainings:[]
+ trainings:[], whatsappFiles:{}, trainingDocs:{}
 };
 var $=function(id){return document.getElementById(id);};
 var esc=function(value){return String(value===undefined||value===null?"":value).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});};
@@ -325,10 +331,22 @@ function whatsapp(){
  var entries=DATA.whatsapp.filter(function(p){return p.date.slice(0,7)===S.month});
  if(!businessDays(S.month).includes(S.date))S.date=businessDays(S.month)[0];
  var chosen=DATA.whatsapp.find(function(p){return p.date===S.date});
+ var attachments=DATA.whatsappFiles[S.date]||{};
  var calendar=businessDays(S.month).map(function(d){var p=DATA.whatsapp.find(function(x){return x.date===d});return '<button class="'+(S.date===d?"active":"")+(p?.status==="publicado"?" published":"")+'" data-action="chooseDay" data-id="'+d+'"><strong>'+d.slice(-2)+'</strong><small>'+(p?.status==="publicado"?"Publicado":p?.status==="arte_pronta"?"Arte pronta":p?"Planejado":"Sem produto")+'</small></button>';}).join("");
  var ig=DATA.instagram[S.store+"|"+S.month]||{planned:0,done:0};
+ var attachPanel=chosen?'<article class="panel op-sub"><h2>Artes e comprovantes (simulação)</h2>'+
+ '<p class="op-note">O backend operacional guarda arquivos privados; nesta demonstração apenas o nome do arquivo é mostrado, sem envio real.</p>'+
+ ["art","evidence"].map(function(kind){
+  var info=attachments[kind],heading=kind==="art"?"Arte do Status":"Comprovante de publicação";
+  return '<div class="op-file-row"><strong>'+heading+'</strong>'+
+    '<span>'+(info?esc(info.name)+" · "+Math.round(info.size/1024)+" KB":"Não anexado")+'</span>'+
+    (S.profile==="seller"?"":'<input type="file" id="opFile-'+kind+'" accept=".jpg,.jpeg,.png,.webp,image/png,image/jpeg,image/webp" aria-label="Selecionar '+heading+'">'+
+      '<button class="btn secondary" data-action="attachWhatsApp" data-kind="'+kind+'">Anexar '+(kind==="art"?"arte":"comprovante")+'</button>'+
+      (info?'<button class="btn secondary" data-action="removeWhatsApp" data-kind="'+kind+'">Remover</button>':""))+'</div>';
+ }).join("")+'</article>':"";
+
  return title("Status WhatsApp / Instagram","Calendário único da UMA e controle mensal por unidade.")+banner()+filters(true)+
- '<div class="op-help">Não repetir código de produto durante o mesmo ano. Artes, comprovantes e postagem automática não estão conectados.</div>'+
+ '<div class="op-help">Não repetir código de produto durante o mesmo ano. Artes e comprovantes podem ser simulados abaixo; envio automático ao WhatsApp não está conectado.</div>'+
  '<div class="op-panels">'+stat("Programados",entries.length,"Na agenda única")+
  stat("Publicados",entries.filter(function(p){return p.status==="publicado"}).length,"Confirmação manual")+
  stat("Instagram",ig.done+" / "+ig.planned,"Realizados / previstos")+'</div>'+
@@ -341,13 +359,14 @@ function whatsapp(){
  '<label>Previstos<input type="number" min="0" max="500" id="igPlanned" value="'+ig.planned+'"></label>'+
  '<label>Realizados<input type="number" min="0" max="500" id="igDone" value="'+ig.done+'"></label>'+
  '</div><button class="btn primary" data-action="saveInstagram">Salvar resultados</button></article></div>')+
+ attachPanel+
  '<article class="panel op-sub"><h2>Histórico de Status</h2><div class="table-wrap"><table><thead><tr><th>Data</th><th>Código</th><th>Etapa</th></tr></thead><tbody>'+
  entries.map(function(p){return '<tr><td>'+p.date+'</td><td>'+esc(p.code)+'</td><td>'+p.status+'</td></tr>';}).join("")+'</tbody></table></div></article>';
 }
 function training(){
  var count=DATA.trainings.filter(function(t){return t.store===S.store});
  return title("Padrões e treinamento","Registros de participação por colaborador e procedimento.")+banner()+filters(false)+
- '<div class="op-help">POP-COM-01, POP-COM-02 e POP-COM-03 são rascunhos. Não existe assinatura válida nem armazenamento de PDF nesta prévia.</div>'+
+ '<div class="op-help">POP-COM-01, POP-COM-02 e POP-COM-03 são rascunhos. Anexos PDF podem ser simulados abaixo, mas não são enviados ou armazenados nesta prévia; nenhuma assinatura válida é gerada.</div>'+
  '<div class="op-proc">'+[
  ["POP-COM-01","Atendimento e cotação"],["POP-COM-02","Prospecção e reativação"],["POP-COM-03","Demanda não atendida"]
  ].map(function(p){return '<div class="panel"><span class="op-status warn">'+p[0]+' · Rascunho 0.1</span><h3>'+p[1]+'</h3><p class="op-note">Procedimento não aprovado.</p></div>';}).join("")+'</div>'+
@@ -356,8 +375,16 @@ function training(){
  '<label>Procedimento<select id="trainPop"><option>POP-COM-01</option><option>POP-COM-02</option><option>POP-COM-03</option></select></label>'+
  '<label>Etapa<select id="trainStep"><option value="participou">Participação registrada</option><option value="pratica">Prática verificada</option></select></label>'+
  '</div><button class="btn primary" data-action="addTraining">Registrar participação (simulação)</button></article>')+
- '<article class="panel op-sub"><h2>Histórico de treinamentos</h2><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>POP</th><th>Etapa</th><th>Assinatura</th></tr></thead><tbody>'+
- count.map(function(r){return '<tr><td>'+esc(r.seller)+'</td><td>'+r.pop+'</td><td>'+r.step+'</td><td>Não disponível</td></tr>';}).join("")+'</tbody></table></div></article>';
+ '<article class="panel op-sub"><h2>Histórico de treinamentos</h2><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>POP</th><th>Etapa</th><th>Documento PDF</th><th>Assinatura</th></tr></thead><tbody>'+
+ count.map(function(r){
+   var meta=DATA.trainingDocs[r.id];
+   return '<tr><td>'+esc(r.seller)+'</td><td>'+r.pop+'</td><td>'+r.step+'</td><td>'+
+      (meta?esc(meta.name):"Não anexado")+
+      (S.profile==="seller"?"":'<div class="op-file-cell"><input type="file" data-training-file="'+r.id+'" accept=".pdf,application/pdf" aria-label="PDF para '+esc(r.seller)+'">'+
+        '<button class="btn secondary" data-action="attachTraining" data-id="'+r.id+'">Anexar PDF</button>'+
+        (meta?'<button class="btn secondary" data-action="removeTraining" data-id="'+r.id+'">Remover</button>':"")+'</div>')+
+      '</td><td>Não disponível</td></tr>';
+ }).join("")+'</tbody></table></div></article>';
 }
 function render(){
  if(S.profile==="seller")S.store="JOINVILLE";
@@ -416,13 +443,43 @@ document.addEventListener("click",function(e){
   DATA.whatsapp=DATA.whatsapp.filter(function(x){return x.date!==S.date});
   DATA.whatsapp.push({date:S.date,code:val,status:$("postStatus").value,category:""});
  }
+ if(kind==="attachWhatsApp"||kind==="removeWhatsApp"){
+  if(!DATA.whatsapp.some(function(p){return p.date===S.date})){toast("Registre um produto primeiro.");return;}
+  var category=b.dataset.kind;
+  if(!["art","evidence"].includes(category))return;
+  if(!DATA.whatsappFiles[S.date])DATA.whatsappFiles[S.date]={};
+  if(kind==="removeWhatsApp")delete DATA.whatsappFiles[S.date][category];
+  else {
+    var file=$("opFile-"+category)?.files?.[0];
+    if(!file){toast("Escolha uma imagem antes de anexar.");return;}
+    if(file.size<1||file.size>3*1024*1024||!(/\\.(jpg|jpeg|png|webp)$/i).test(file.name)||
+       !["image/jpeg","image/png","image/webp"].includes(file.type)){
+      toast("Selecione JPG, PNG ou WebP com até 3 MB.");return;
+    }
+    DATA.whatsappFiles[S.date][category]={name:file.name,size:file.size};
+  }
+ }
+ if(kind==="attachTraining"||kind==="removeTraining"){
+  var row=DATA.trainings.find(function(t){return t.id===id});
+  if(!row){toast("Treinamento não encontrado.");return;}
+  if(kind==="removeTraining")delete DATA.trainingDocs[id];
+  else {
+    var fileInput=document.querySelector('[data-training-file="'+id+'"]'),file=fileInput?.files?.[0];
+    if(!file){toast("Escolha um PDF antes de anexar.");return;}
+    if(file.size<1||file.size>5*1024*1024||!(/\\.pdf$/i).test(file.name)||
+       !["application/pdf","application/octet-stream"].includes(file.type)){
+      toast("Selecione PDF de até 5 MB.");return;
+    }
+    DATA.trainingDocs[id]={name:file.name,size:file.size};
+  }
+ }
  if(kind==="saveInstagram"){
   var planned=Number($("igPlanned").value),done=Number($("igDone").value);
   if(!Number.isInteger(planned)||!Number.isInteger(done)||planned<0||done<0){toast("Informe contagens inteiras.");return;}
   DATA.instagram[S.store+"|"+S.month]={planned:planned,done:done};
  }
  if(kind==="addTraining"){
-  DATA.trainings.unshift({store:S.store,seller:$("trainSeller").value,pop:$("trainPop").value,step:$("trainStep").value});
+  DATA.trainings.unshift({id:"tr-"+Date.now(),store:S.store,seller:$("trainSeller").value,pop:$("trainPop").value,step:$("trainStep").value});
  }
  render();toast("Alteração demonstrativa: nada foi salvo no sistema real.");
 });
