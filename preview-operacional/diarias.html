@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="robots" content="noindex,nofollow"/>
+<title>Portal UMA | Tarefas diárias — prévia SuperAdmin</title>
+<style>
+:root{--ink:#191919;--muted:#716a55;--gold:#ffd900;--line:#e7dfc3;--paper:#fffdf5;--bg:#f6f4ea}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #dfb600;outline-offset:2px}
+a{color:inherit}.preview-banner{background:#171717;color:#ffeb89;display:flex;gap:18px;align-items:center;justify-content:space-between;padding:11px 21px;font-size:12px}
+.preview-banner a{color:#ffeb89}
+.workspace{max-width:1380px;margin:0 auto;padding:26px}
+.eyebrow{font-size:11px;letter-spacing:.16em;color:#9e7e00;font-weight:800}
+h1{font-size:clamp(25px,3vw,36px);margin:4px 0 6px;letter-spacing:-.025em}
+h2{font-size:17px;margin:0 0 5px}.subtitle{color:var(--muted);margin:0 0 21px;font-size:13px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 5px 26px #28251008}
+.notice{border:1px solid #e6cc7d;background:#fff9da;border-radius:9px;padding:13px 16px;font-size:12px;color:#69541d;margin-bottom:18px}
+.filters{display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:750;color:#514b3a}
+input:not([type=checkbox]),select,textarea{background:#fff;border:1px solid #d8d0ab;border-radius:8px;padding:9px 11px;min-height:40px;color:#27231b}
+input[type=checkbox]{accent-color:#cb9b00}
+.filters label{min-width:190px}.btn{border:1px solid #d7cda0;border-radius:8px;padding:9px 15px;font-weight:750;font-size:12px;min-height:39px;background:#fff7cf;color:#29240f}
+.btn-primary{background:#ffd900;border-color:#ffd900;color:#000}.btn:hover{filter:brightness(.97)}.btn-danger{color:#9a2525;border-color:#d7a5a5;background:#fff8f8}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:20px}
+.kpi{padding:17px 19px;border-top:3px solid #ffd900}.kpi span{display:block;color:#82745d;font-size:12px}
+.kpi strong{font-size:30px;display:block;color:#181818;margin:4px 0}.kpi small{color:#80755e}
+.columns{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(290px,1fr);gap:17px;align-items:start}
+.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}.head p{font-size:12px;color:#786e5b;margin:0}
+.tasks{display:flex;flex-direction:column;gap:12px}
+.task{display:flex;justify-content:space-between;gap:13px;background:#fffdf4;border:1px solid #e5dbb5;border-radius:11px;padding:14px}
+.task h3{font-size:14px;margin:7px 0 4px}.task p{margin:2px 0 7px;color:#625c4e;font-size:12px}
+.task small{color:#857861;font-size:11px}.task .actions{display:flex;align-items:start;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tag{display:inline-block;font-size:10px;font-weight:800;border-radius:30px;padding:4px 9px;margin-right:6px}
+.tag.high{background:#ffe1dc;color:#aa2727}.tag.normal{background:#fff0b6;color:#816300}
+.tag.low{background:#e4f4e5;color:#246c35}.tag.done{background:#dff3e6;color:#28713c}
+.tag.progress{background:#e0edfb;color:#285d97}.tag.pending{background:#f4ece1;color:#776149}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.form-grid .wide{grid-column:1/-1}textarea{width:100%;resize:vertical}.form-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:15px}
+.empty{padding:24px;color:#867b66;text-align:center;border:1px dashed #d8cba8;border-radius:10px}
+.audit{margin-top:16px}.audit h2{margin-bottom:8px}.audit ul{margin:0;padding-left:18px;color:#7b715d;font-size:12px}.audit li{padding:3px 0}
+.footer{color:#80745d;font-size:11px;margin:16px 0 0}.hint{padding:10px 12px;margin:12px 0;border-radius:8px;background:#fff1c7;font-size:12px;color:#765f19}
+.check{display:flex;flex-direction:row;gap:7px;align-items:center;margin-left:auto;white-space:nowrap}
+@media(max-width:1000px){.columns{grid-template-columns:1fr}}
+@media(max-width:700px){.workspace{padding:15px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.task{flex-direction:column}.task .actions{justify-content:flex-start}.filters{align-items:stretch}.filters label{flex:1}.preview-banner{flex-wrap:wrap}}
+</style></head>
+<body>
+<div class="preview-banner"><strong>DEMONSTRAÇÃO UMA · SUPERADMIN · DADOS FICTÍCIOS</strong>
+<span>As alterações existem apenas nesta página e desaparecem ao recarregar.</span>
+<a href="./superadmin.html">Ver todos os módulos</a></div>
+<main class="workspace">
+  <div class="eyebrow">GESTÃO DO DIA A DIA</div>
+  <h1>Tarefas diárias</h1>
+  <p class="subtitle">Organize a rotina das três lojas, distribua responsabilidades e acompanhe as conclusões.</p>
+  <div class="notice"><strong>Simulação:</strong> esta tela não está conectada ao banco de dados. No sistema real, as tarefas terão controle por loja, revisão, registro de quem alterou e exclusão com auditoria.</div>
+  <div class="filters">
+    <label>Unidade<select id="store"><option value="JOINVILLE">Joinville</option>
+      <option value="TUBARAO">Tubarão</option><option value="ITAJAI">Itajaí</option></select></label>
+    <label>Data<input id="date" type="date" min="2020-01-01" max="2100-12-31"/></label>
+    <button class="btn" id="today" type="button">Hoje</button>
+    <label class="check"><input id="onlyOpen" type="checkbox"/> Somente abertas</label>
+  </div>
+  <div class="kpis">
+    <div class="panel kpi"><span>Tarefas previstas</span><strong id="kpiTotal">0</strong><small>Da loja e data escolhidas</small></div>
+    <div class="panel kpi"><span>Pendentes</span><strong id="kpiPending">0</strong><small>A iniciar</small></div>
+    <div class="panel kpi"><span>Em andamento</span><strong id="kpiDoing">0</strong><small>Em execução</small></div>
+    <div class="panel kpi"><span>Concluídas</span><strong id="kpiDone">0</strong><small>Confirmadas pela gestão</small></div>
+  </div>
+  <div class="columns">
+    <section class="panel">
+      <div class="head"><div><h2>Atividades programadas</h2>
+        <p>Acompanhamento diário com situação e responsável.</p></div></div>
+      <div id="taskList" class="tasks"></div>
+    </section>
+    <section class="panel">
+      <div class="head"><div><h2 id="formHeading">Cadastrar tarefa</h2>
+        <p>Simule criação, edição e alterações de status.</p></div></div>
+      <form id="form">
+        <div class="form-grid">
+          <label class="wide">Descrição<input id="title" maxlength="120" required minlength="3" placeholder="Ex.: Conferir pendências do dia"/></label>
+          <label class="wide">Orientações<textarea id="details" maxlength="400" rows="3" placeholder="Observações da gestão"></textarea></label>
+          <label>Prioridade<select id="priority"><option value="baixa">Baixa</option>
+            <option selected value="normal">Normal</option><option value="alta">Alta</option></select></label>
+          <label>Responsável<select id="assignee"><option value="">Equipe da loja</option></select></label>
+          <label id="statusGroup" hidden>Situação<select id="status">
+            <option value="pendente">Pendente</option><option value="em_andamento">Em andamento</option>
+            <option value="concluida">Concluída</option></select></label>
+        </div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" id="submit">Cadastrar tarefa</button>
+          <button class="btn" type="button" id="cancel" hidden>Cancelar edição</button></div>
+      </form>
+      <p class="hint">Na versão real, vendedores podem consultar as tarefas de sua loja, mas somente os administradores podem criar, alterar ou concluir.</p>
+    </section>
+  </div>
+  <section class="panel audit">
+    <h2>Histórico demonstrativo da gestão</h2>
+    <ul id="audit"></ul>
+  </section>
+  <p class="footer">Portal UMA · Prévia visual do SuperAdmin · Sem integração com ERP, autenticação ou banco operacional</p>
+</main>
+<script>
+"use strict";
+(function(){
+  const $=id=>document.getElementById(id);
+  const esc=t=>String(t).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const dateStr=()=>{
+    const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),
+      String(d.getDate()).padStart(2,"0")].join("-");
+  };
+  const staff={JOINVILLE:["Colaborador A (exemplo)","Colaborador B (exemplo)"],
+    TUBARAO:["Colaborador C (exemplo)","Colaborador D (exemplo)"],
+    ITAJAI:["Colaborador E (exemplo)"]};
+  const day=dateStr();
+  let counter=6,editing=null;
+  let records=[
+    {id:1,store:"JOINVILLE",date:day,title:"Conferir pedidos pendentes",details:"Separar os que precisam de retorno.",priority:"alta",status:"pendente",assignee:staff.JOINVILLE[0]},
+    {id:2,store:"JOINVILLE",date:day,title:"Verificar organização do balcão",details:"Conferir limpeza e exposição.",priority:"normal",status:"em_andamento",assignee:""},
+    {id:3,store:"JOINVILLE",date:day,title:"Revisar contato com clientes",details:"Priorizar retornos agendados.",priority:"normal",status:"concluida",assignee:staff.JOINVILLE[1]},
+    {id:4,store:"TUBARAO",date:day,title:"Conferir materiais de consumo",details:"Verificar reposição necessária.",priority:"alta",status:"pendente",assignee:staff.TUBARAO[0]},
+    {id:5,store:"TUBARAO",date:day,title:"Acompanhar solicitações",details:"Conferir atendimento.",priority:"normal",status:"concluida",assignee:""},
+    {id:6,store:"ITAJAI",date:day,title:"Atualizar rotina de atendimento",details:"Revisar pendências da unidade.",priority:"baixa",status:"pendente",assignee:staff.ITAJAI[0]}
+  ];
+  let audit=["Tarefas iniciais de demonstração — SuperAdmin fictício"];
+  $("date").value=day;
+  function describe(status){return ({pendente:"Pendente",em_andamento:"Em andamento",concluida:"Concluída"})[status];}
+  function reset(){
+    editing=null;$("form").reset();$("formHeading").textContent="Cadastrar tarefa";
+    $("submit").textContent="Cadastrar tarefa";$("cancel").hidden=true;$("statusGroup").hidden=true;
+    people();
+  }
+  function people(){
+    const previous=$("assignee").value;
+    $("assignee").innerHTML='<option value="">Equipe da loja</option>'+
+      staff[$("store").value].map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join("");
+    if(staff[$("store").value].includes(previous))$("assignee").value=previous;
+  }
+  function render(){
+    const store=$("store").value,date=$("date").value,filtered=records.filter(r=>r.store===store&&r.date===date);
+    $("kpiTotal").textContent=String(filtered.length);
+    $("kpiPending").textContent=String(filtered.filter(r=>r.status==="pendente").length);
+    $("kpiDoing").textContent=String(filtered.filter(r=>r.status==="em_andamento").length);
+    $("kpiDone").textContent=String(filtered.filter(r=>r.status==="concluida").length);
+    const visible=filtered.filter(r=>!$("onlyOpen").checked||r.status!=="concluida");
+    $("taskList").innerHTML=visible.length?visible.map(r=>'<article class="task">'+
+      '<div><div><span class="tag '+({baixa:"low",normal:"normal",alta:"high"}[r.priority])+'">'+
+      esc(({baixa:"Baixa",normal:"Normal",alta:"Alta"})[r.priority])+'</span>'+
+      '<span class="tag '+({pendente:"pending",em_andamento:"progress",concluida:"done"}[r.status])+'">'+describe(r.status)+'</span></div>'+
+      '<h3>'+esc(r.title)+'</h3><p>'+esc(r.details||"Sem observações")+'</p>'+
+      '<small>Responsável: '+esc(r.assignee||"Equipe da loja")+'</small></div>'+
+      '<div class="actions"><button class="btn '+(r.status!=="concluida"?"btn-primary":"")+'" data-done="'+r.id+'">'+
+        (r.status==="concluida"?"Reabrir":"Concluir")+'</button>'+
+      '<button class="btn" data-edit="'+r.id+'">Editar</button>'+
+      '<button class="btn btn-danger" data-delete="'+r.id+'">Excluir</button></div></article>').join(""):
+      '<div class="empty">'+($("onlyOpen").checked?"Nenhuma tarefa aberta nesta data.":"Nenhuma tarefa cadastrada nesta data.")+'</div>';
+    $("audit").innerHTML=audit.slice(0,8).map(line=>'<li>'+esc(line)+'</li>').join("");
+  }
+  function record(message){audit.unshift(message+" — SuperAdmin fictício · "+new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}));}
+  $("store").addEventListener("change",()=>{reset();render();});
+  $("date").addEventListener("change",()=>{reset();render();});
+  $("onlyOpen").addEventListener("change",render);
+  $("today").addEventListener("click",()=>{$("date").value=dateStr();reset();render();});
+  $("cancel").addEventListener("click",reset);
+  $("form").addEventListener("submit",e=>{
+    e.preventDefault();
+    const title=$("title").value.trim(),date=$("date").value,store=$("store").value;
+    if(title.length<3||!date)return;
+    if(editing!==null){
+      const row=records.find(r=>r.id===editing);
+      if(!row)return;
+      row.title=title;row.details=$("details").value.trim();
+      row.priority=$("priority").value;row.assignee=$("assignee").value;
+      row.status=$("status").value;
+      record("Tarefa editada: "+title);
+    }else{
+      records.push({id:++counter,store,date,title,details:$("details").value.trim(),
+        priority:$("priority").value,status:"pendente",assignee:$("assignee").value});
+      record("Tarefa cadastrada: "+title);
+    }
+    reset();render();
+  });
+  $("taskList").addEventListener("click",e=>{
+    const el=e.target.closest("[data-edit],[data-done],[data-delete]");
+    if(!el)return;
+    const id=Number(el.dataset.edit||el.dataset.done||el.dataset.delete);
+    const task=records.find(r=>r.id===id);
+    if(!task)return;
+    if(el.dataset.edit){
+      editing=id;$("title").value=task.title;$("details").value=task.details;
+      $("priority").value=task.priority;$("assignee").value=task.assignee;
+      $("status").value=task.status;$("formHeading").textContent="Editar tarefa";
+      $("submit").textContent="Salvar alterações";$("cancel").hidden=false;
+      $("statusGroup").hidden=false;
+      $("title").focus();return;
+    }
+    if(el.dataset.done){
+      task.status=task.status==="concluida"?"pendente":"concluida";
+      record((task.status==="concluida"?"Tarefa concluída: ":"Tarefa reaberta: ")+task.title);
+    }else if(el.dataset.delete){
+      if(!confirm("Excluir tarefa desta demonstração?"))return;
+      records=records.filter(r=>r.id!==id);
+      record("Tarefa excluída: "+task.title);
+      if(editing===id)reset();
+    }
+    render();
+  });
+  people();render();
+})();
+</script></body></html>

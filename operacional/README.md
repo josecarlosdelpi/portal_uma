@@ -132,3 +132,24 @@ O registro de avaliações Google é por conferência **manual**, não por leitu
 Módulos desenvolvidos não significam sistema já colocado no ar: não há conta real,
 servidor de aplicação nem banco operacional publicados em `portal.universodasmangueiras.com.br`.
 A escolha do provedor e do TLS permanecerá independente do código.
+
+
+## Incremento 10 — tarefas diárias e prévia SuperAdmin completa (26/10/2026)
+
+O módulo `daily_tasks` foi criado independentemente do checklist semanal.
+Permite registrar tarefa por data e loja, prioridade (baixa/normal/alta),
+responsável opcional vinculado à loja, status (pendente/em andamento/concluída),
+reabrir, editar e excluir logicamente. Todas as alterações relevantes são
+auditadas, com controle de revisões para evitar sobrescrita de trabalho de
+outro administrador. Administradores podem alterar; vendedores consultam
+somente a própria loja quando recebem `daily_tasks.view`.
+
+- Migração: `operacional/backend/migrations/versions/0010_daily_tasks.py`.
+- API: `GET/POST/PUT/DELETE /api/v1/daily-tasks/...`.
+- Frontend: `DailyTasksPage.tsx`, com filtro por loja e data e resumo de pendências.
+- Demonstração estática: `preview-operacional/superadmin.html`, unificando
+  todas as áreas operacionais, administrativas e o fechamento mensal de 7 slides.
+  Todas as interações da prévia usam dados fictícios, sem sincronização ou login.
+
+**A prévia não é a implantação do banco operacional.** A publicação do sistema
+real continuará condicionada a backend, PostgreSQL, HTTPS, DNS e backups.

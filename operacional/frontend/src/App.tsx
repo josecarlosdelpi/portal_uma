@@ -165,7 +165,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
         {canViewChecklist && <button className={"nav-item"+(area==="checklist"?" active":"")}
           onClick={()=>setArea("checklist")}><span className="nav-icon">☑</span><span>Checklist semanal</span></button>}
         {canViewDaily && <button className={"nav-item"+(area==="daily"?" active":"")}
-          onClick={()=>setArea("daily")}><span className="nav-icon">☷</span><span>Tarefas diárias</span></button>
+          onClick={()=>setArea("daily")}><span className="nav-icon">☷</span><span>Tarefas diárias</span></button>}
         {canViewTargets && <button className={"nav-item"+(area==="targets"?" active":"")}
           onClick={()=>setArea("targets")}><span className="nav-icon">$</span><span>Metas diárias</span></button>}
         {canViewWhatsApp && <button className={"nav-item"+(area==="whatsapp"?" active":"")}
