@@ -42,6 +42,20 @@ As rotas `/api/v1/me` e `/api/v1/stores` exigem um JWT verificável e um usuári
 
 Não exponha a porta do PostgreSQL em redes externas. Não inclua `.env`, credenciais, planilhas reais ou dados pessoais no GitHub.
 
+### Como subir a stack completa com Docker (desenvolvimento)
+
+Requer Docker Desktop (ou outro runtime compatível com Compose v2).
+
+1. Na pasta `operacional`, execute `docker compose up -d --build`.
+2. O backend roda as migrações Alembic automaticamente antes de iniciar o Uvicorn.
+3. Endereços locais:
+   - Frontend (nginx + build de produção): http://localhost:8080 — faz proxy de `/api` e `/health` para o backend;
+   - API: http://localhost:8000 (`/health` para liveness);
+   - PostgreSQL: `127.0.0.1:5439` (credenciais somente de desenvolvimento no compose).
+4. Para parar: `docker compose down` (adicione `-v` para apagar também o volume do banco).
+
+As portas publicadas ficam restritas a `127.0.0.1`. O usuário SuperAdmin e as contas locais seguem o provisionamento descrito em [Implantação e Acessos](./IMPLANTACAO-E-ACESSOS.md).
+
 ## Próximos incrementos
 
 1. Escolher/implementar o provedor de autenticação e o provisionamento inicial seguro.

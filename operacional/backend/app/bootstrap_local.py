@@ -64,9 +64,10 @@ def main() -> None:
     with Session(get_engine()) as db:
         try:
             user, secret = provision_initial_local_superadmin(db, username, name)
+            display_name = user.display_name
         except LocalAuthError as error:
             raise SystemExit(error.message) from error
-    print("SuperAdmin local criado:", user.display_name)
+    print("SuperAdmin local criado:", display_name)
     print("Login:", username_key(username))
     print("Senha TEMPORARIA (exibida apenas agora):", secret)
     print("Registre em meio seguro; validade 72 horas. Nao compartilhe esta saida.")
