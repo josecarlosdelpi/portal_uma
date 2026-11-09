@@ -1,5 +1,6 @@
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {EditorContent,useEditor} from "@tiptap/react";
+import type {EditorView} from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Image from "@tiptap/extension-image";
@@ -32,11 +33,70 @@ const ResizableImage=Image.extend({
       },
     };
   },
+  addNodeView(){
+    return({node,editor,getPos})=>{
+      const wrap=document.createElement("span");
+      wrap.className="img-wrap";
+      const img=document.createElement("img");
+      img.src=node.attrs.src;img.alt=node.attrs.alt||"";
+      if(node.attrs.width)img.style.width=String(node.attrs.width);
+      wrap.appendChild(img);
+      const handle=document.createElement("span");
+      handle.className="img-resize-handle";
+      handle.contentEditable="false";
+      wrap.appendChild(handle);
+      handle.addEventListener("mousedown",e=>{
+        e.preventDefault();e.stopPropagation();
+        const startX=e.clientX;const startW=img.getBoundingClientRect().width;
+        const limit=editor.view.dom.clientWidth||1;
+        const move=(ev:MouseEvent)=>{
+          const pct=Math.min(100,Math.max(5,Math.round((startW+ev.clientX-startX)/limit*100)));
+          img.style.width=pct+"%";
+        };
+        const up=(ev:MouseEvent)=>{
+          document.removeEventListener("mousemove",move);
+          document.removeEventListener("mouseup",up);
+          const pct=Math.min(100,Math.max(5,Math.round((startW+ev.clientX-startX)/limit*100)));
+          if(typeof getPos==="function"){
+            editor.chain().focus().command(({tr})=>{
+              tr.setNodeMarkup(getPos(),undefined,{...node.attrs,width:pct+"%"});return true;
+            }).run();
+          }
+        };
+        document.addEventListener("mousemove",move);
+        document.addEventListener("mouseup",up);
+      });
+      return{
+        dom:wrap,
+        update(updated){
+          if(updated.type.name!==node.type.name)return false;
+          if(updated.attrs.width)img.style.width=String(updated.attrs.width);
+          img.src=updated.attrs.src;return true;
+        },
+        selectNode(){wrap.classList.add("img-selected");},
+        deselectNode(){wrap.classList.remove("img-selected");},
+      };
+    };
+  },
 });
+
+/** Insere imagens enviadas para upload na posicao do cursor/soltura. */
+function insertUploaded(view:EditorView,files:File[],upload:(f:File)=>Promise<string>,
+                        onError:(m:string)=>void,pos?:number){
+  for(const file of files){
+    void upload(file).then(url=>{
+      const node=view.state.schema.nodes.image.create({src:url});
+      const tr=pos===undefined?view.state.tr.replaceSelectionWith(node)
+        :view.state.tr.insert(pos,node);
+      view.dispatch(tr);
+    }).catch(()=>onError("Não foi possível inserir a imagem. Tente novamente."));
+  }
+}
 
 type Props={token:string;procedure:Procedure;onClose:(changed:boolean)=>void};
 
 export function ProcedureEditor({token,procedure,onClose}:Props){
+  const [proc,setProc]=useState(procedure);
   const [title,setTitle]=useState(procedure.title);
   const [summary,setSummary]=useState(procedure.summary);
   const [allStores,setAllStores]=useState(procedure.applies_to_all);
@@ -46,56 +106,54 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
   const [working,setWorking]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
-  const draft=procedure.draft_version;
+  const draft=proc.draft_version;
   const [editingMode,setEditingMode]=useState(!!draft);
   const canEdit=editingMode;
+  const viewRef=useRef<HTMLDivElement>(null);
 
   const upload=useCallback(async(file:File)=>{
-    const result=await proceduresApi.uploadFile(token,procedure.id,file);
+    const result=await proceduresApi.uploadFile(token,proc.id,file);
     return result.url;
-  },[token,procedure.id]);
+  },[token,proc.id]);
+  const onUploadError=useCallback((m:string)=>setError(m),[]);
 
   const editor=useEditor({
     extensions:[StarterKit,Underline,TextStyle,FontSize,ResizableImage.configure({inline:false}),
       Table.configure({resizable:false}),TableRow,TableCell,TableHeader],
-    content:procedure.content_html||"",
+    content:proc.content_html||"",
     editable:editingMode,
     onUpdate:({editor:e})=>{void hydrateImages(e.view.dom,token);},
     editorProps:{
       attributes:{class:"doc-content",role:"textbox","aria-label":"Conteúdo do procedimento"},
-      handlePaste:(_view,event)=>{
+      handlePaste:(view,event)=>{
         const files=Array.from(event.clipboardData?.files??[]).filter(f=>f.type.startsWith("image/"));
         if(!files.length)return false;
         event.preventDefault();
-        void Promise.all(files.map(async f=>{
-          const url=await upload(f).catch(()=>null);
-          if(url)editor?.chain().focus().setImage({src:url}).run();
-        }));
+        insertUploaded(view,files,upload,onUploadError);
         return true;
       },
-      handleDrop:(_view,event)=>{
+      handleDrop:(view,event)=>{
         const files=Array.from(event.dataTransfer?.files??[]).filter(f=>f.type.startsWith("image/"));
         if(!files.length)return false;
         event.preventDefault();
-        void Promise.all(files.map(async f=>{
-          const url=await upload(f).catch(()=>null);
-          if(url)editor?.chain().focus().setImage({src:url}).run();
-        }));
+        const pos=view.posAtCoords({left:event.clientX,top:event.clientY})?.pos;
+        insertUploaded(view,files,upload,onUploadError,pos);
         return true;
       },
     },
   });
 
-  useEffect(()=>{void proceduresApi.versions(token,procedure.id).then(setVersions).catch(()=>{});},[token,procedure.id]);
+  useEffect(()=>{void proceduresApi.versions(token,proc.id).then(setVersions).catch(()=>{});},[token,proc.id]);
   useEffect(()=>{if(editor)void hydrateImages(editor.view.dom,token);},[editor,token]);
+  useEffect(()=>{void hydrateImages(viewRef.current,token);},[viewing,token]);
 
   async function pickImage(){
     const input=document.createElement("input");
     input.type="file";input.accept="image/png,image/jpeg,image/webp";
     input.onchange=async()=>{
-      const file=input.files?.[0];if(!file)return;
-      try{const url=await upload(file);editor?.chain().focus().setImage({src:url}).run();}
-      catch{setError("Não foi possível anexar a imagem.");}
+      const file=input.files?.[0];if(!file||!editor)return;
+      setError("");
+      insertUploaded(editor.view,[file],upload,onUploadError);
     };
     input.click();
   }
@@ -104,47 +162,58 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
     if(!editor)return;
     setWorking(true);setError("");setMessage("");
     try{
-      await proceduresApi.save(token,procedure.id,{
+      const saved=await proceduresApi.save(token,proc.id,{
         title,summary,applies_to_all:allStores,store_codes:allStores?[]:picked,
         content_html:editor.getHTML(),expected_revision:draft?.revision??1,
       });
+      setProc(saved);
       if(publish){
-        const rev=(draft?.revision??1)+1;
-        await proceduresApi.publish(token,procedure.id,rev);
-        setMessage("Procedimento publicado. Vendedores autorizados já podem visualizar.");
-      }else setMessage("Rascunho salvo.");
-      onClose(true);
+        const rev=saved.draft_version?.revision??((draft?.revision??0)+1);
+        const done=await proceduresApi.publish(token,proc.id,rev);
+        setProc(done);setMessage("Procedimento publicado.");
+        onClose(true);
+      }else{
+        setMessage("Rascunho salvo. Você pode continuar editando depois.");
+        void proceduresApi.versions(token,proc.id).then(setVersions).catch(()=>{});
+      }
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao salvar.");}
     finally{setWorking(false);}
   }
 
   async function openVersion(v:VersionInfo){
-    try{const full=await proceduresApi.getVersion(token,procedure.id,v.id);setViewing(full);}
+    try{const full=await proceduresApi.getVersion(token,proc.id,v.id);setViewing(full);}
     catch{setError("Não foi possível abrir a versão.");}
   }
 
   if(viewing)return <section>
     <div className="page-header"><div><div className="eyebrow">HISTÓRICO</div>
-      <h1>{procedure.code} — versão {viewing.version_label}</h1>
+      <h1>{proc.code} — versão {viewing.version_label}</h1>
       <p>{viewing.status==="publicado"?"Publicada":"Rascunho"} · {viewing.published_at?new Date(viewing.published_at).toLocaleString("pt-BR"):"sem publicação"}</p></div>
       <button className="btn-secondary" onClick={()=>setViewing(null)}>Voltar ao editor</button></div>
-    <article className="panel"><div className="doc-content doc-readonly"
+    <article className="panel"><div ref={viewRef} className="doc-content doc-readonly"
       dangerouslySetInnerHTML={{__html:viewing.content_html??""}}/></article>
   </section>;
 
   const t=(chain:string)=>()=>{editor?.chain().focus();
     (editor?.chain().focus() as any)[chain]().run();};
 
+  const subtitle=draft
+    ?(canEdit?`Rascunho v${draft.version_label} · revisão ${draft.revision} · salve quando quiser`
+      :`Rascunho v${draft.version_label} em andamento`)
+    :canEdit?"Nova versão em elaboração":"Publicado";
+
   return <section>
     <div className="page-header"><div><div className="eyebrow">EDITOR DE DOCUMENTO</div>
-      <h1>{procedure.code} · {title||"Sem título"}</h1>
-      <p>{draft?(editingMode?`Rascunho v${draft.version_label} · revisão ${draft.revision}`:`Rascunho v${draft.version_label} disponível`):
-        editingMode?"Nova versão em elaboração":"Publicado"}</p></div>
+      <h1>{proc.code} · {title||"Sem título"}</h1>
+      <p>{subtitle}</p></div>
       <div className="page-actions">
-        <button className="btn-secondary" onClick={()=>onClose(false)}>Voltar</button>
-        {!canEdit&&<button className="btn-primary" onClick={()=>{
+        <button className="btn-secondary" onClick={()=>onClose(true)}>Voltar</button>
+        {!canEdit&&proc.current_version&&!draft&&<button className="btn-primary" onClick={()=>{
           setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
         }}>Criar nova versão</button>}
+        {!canEdit&&draft&&<button className="btn-primary" onClick={()=>{
+          setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
+        }}>Continuar edição</button>}
         {canEdit&&<button className="btn-secondary" disabled={working} onClick={()=>void save(false)}>
           {working?"Salvando…":"Salvar rascunho"}</button>}
         {canEdit&&<button className="btn-primary" disabled={working} onClick={()=>void save(true)}>Publicar</button>}

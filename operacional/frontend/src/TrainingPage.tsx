@@ -177,17 +177,17 @@ export function TrainingPage({token,profile}:Props){
         </select></label>
       </div>
       <article className="panel"><div className="table-wrap"><table>
-        <thead><tr><th>Código</th><th>Título</th><th>Aplicável</th><th>Versão vigente</th>
-          {canWrite&&<th>Rascunho</th>}<th>Atualizado</th><th></th></tr></thead>
+        <thead><tr><th>Código</th><th>Título</th><th>Aplicável</th><th>Situação</th><th>Atualizado</th><th></th></tr></thead>
         <tbody>{procs.map(p=><tr key={p.id}>
           <td>{p.code}</td><td>{p.title}</td>
           <td>{p.applies_to_all?"Todas":p.stores.map(labelStore).join(", ")}</td>
-          <td>{p.current_version?`v${p.current_version.version_label}`:"—"}</td>
-          {canWrite&&<td>{p.draft_version?`v${p.draft_version.version_label}`:"—"}</td>}
+          <td>{p.draft_version?<span className="badge-draft">Rascunho v{p.draft_version.version_label}</span>
+            :p.current_version?<span className="badge-pub">Publicado v{p.current_version.version_label}</span>:"—"}</td>
           <td>{new Date(p.updated_at).toLocaleDateString("pt-BR")}</td>
           <td><div className="routine-file-actions">
             <button className="btn-secondary" onClick={()=>setViewing({id:p.id})}>Abrir</button>
-            {canWrite&&<button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>Editar</button>}
+            {canWrite&&<button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>
+              {p.draft_version?"Continuar edição":p.current_version?"Nova versão":"Editar"}</button>}
           </div></td></tr>)}</tbody></table></div>
         {procs.length===0&&<p className="empty">Nenhum procedimento encontrado.</p>}
       </article>
