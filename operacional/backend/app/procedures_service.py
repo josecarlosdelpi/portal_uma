@@ -3,6 +3,7 @@
 Permissoes: training.edit (admin/SuperAdmin) gerencia documentos nas tres
 lojas; training.view (vendedor) le apenas publicados aplicaveis a sua loja.
 """
+import re
 from datetime import datetime, timezone
 from hashlib import sha256
 from uuid import UUID, uuid4
@@ -45,12 +46,17 @@ def sanitize_html(raw: str) -> str:
         attributes=ALLOWED_ATTRS,
         link_rel=None,
         strip_comments=True,
+        url_schemes={"http", "https", "mailto"},
     )
-    return cleaned
+    # Imagem externa ou de origem desconhecida e descartada; apenas anexos internos.
+    return _EXTERNAL_IMG.sub("", cleaned)
 
 
-def _img_src_ok(src: str) -> bool:
-    return src.startswith("/api/v1/procedures/files/")
+INTERNAL_FILE_PREFIX = "/api/v1/procedures/files/"
+_EXTERNAL_IMG = re.compile(
+    r'<img\b(?:(?!src=)[^>])*?\bsrc="(?!' + re.escape(INTERNAL_FILE_PREFIX) + r')[^"]*"[^>]*>',
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 def _version_dict(row: ProcedureVersion, include_html: bool = True) -> dict:

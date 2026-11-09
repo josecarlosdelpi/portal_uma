@@ -14,6 +14,22 @@ export type ProcedurePayload={
   content_html:string;expected_revision?:number
 };
 
+/** Carrega imagens privadas com Bearer e troca o src por blob local. */
+export async function hydrateImages(root:HTMLElement|null,token:string){
+  if(!root)return;
+  const imgs=root.querySelectorAll<HTMLImageElement>('img[src^="/api/v1/procedures/files/"]');
+  await Promise.all(Array.from(imgs).map(async img=>{
+    const api=img.getAttribute("src")||"";
+    if(!api||img.dataset.authSrc===api)return;
+    try{
+      const res=await fetch(api,{headers:{Authorization:`Bearer ${token}`}});
+      if(!res.ok)return;
+      img.src=URL.createObjectURL(await res.blob());
+      img.dataset.authSrc=api;
+    }catch{/* imagem indisponível */}
+  }));
+}
+
 export const proceduresApi={
   list:(token:string,params:{status?:"rascunho"|"publicado";store?:string;q?:string}={})=>{
     const qs=new URLSearchParams();

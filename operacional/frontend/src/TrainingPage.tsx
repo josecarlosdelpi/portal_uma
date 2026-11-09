@@ -1,30 +1,40 @@
-import {useCallback,useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import type {MyProfile} from "./api";
 import {labelStore} from "./catalog";
 import {attachmentsApi} from "./attachmentsApi";
 import {operationsApi,type TeamMember} from "./operationsApi";
 import {routinesApi,type TrainingEntry} from "./routinesApi";
-import {proceduresApi,type Procedure} from "./proceduresApi";
+import {proceduresApi,hydrateImages,type Procedure,type VersionInfo} from "./proceduresApi";
 import {ProcedureEditor} from "./ProcedureEditor";
 
 type Props={token:string;profile:MyProfile};
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
 
-function DocView({token,proc,onBack}:{token:string;proc:Procedure;onBack:()=>void}){
+function DocView({token,procId,versionId,onBack}:{token:string;procId:string;versionId?:string;onBack:()=>void}){
   const [full,setFull]=useState<Procedure|null>(null);
+  const [ver,setVer]=useState<VersionInfo|null>(null);
   const [error,setError]=useState("");
-  useEffect(()=>{void proceduresApi.get(token,proc.id).then(setFull).catch(c=>setError(c.message));},[token,proc.id]);
+  const ref=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    void Promise.all([
+      proceduresApi.get(token,procId),
+      versionId?proceduresApi.getVersion(token,procId,versionId):Promise.resolve(null),
+    ]).then(([p,v])=>{setFull(p);setVer(v);}).catch(c=>setError(c.message));
+  },[token,procId,versionId]);
+  useEffect(()=>{void hydrateImages(ref.current,token);},[full,ver,token]);
   if(error)return <div className="notice notice-error">{error}</div>;
   if(!full)return <p>Carregando…</p>;
+  const html=ver?.content_html??full.content_html??"";
+  const label=ver?`Versão ${ver.version_label} ${ver.status==="publicado"?"publicada":"(rascunho)"}`:
+    full.version?.status==="publicado"?`Versão ${full.version.version_label} publicada`:"Rascunho";
   return <section>
     <div className="page-header"><div><div className="eyebrow">PROCEDIMENTO</div>
       <h1>{full.code} — {full.title}</h1>
-      <p>{full.version?.status==="publicado"?`Versão ${full.version.version_label} publicada`:"Rascunho"}
-        {" · "}{full.applies_to_all?"Todas as lojas":full.stores.map(labelStore).join(", ")}</p></div>
+      <p>{label}{" · "}{full.applies_to_all?"Todas as lojas":full.stores.map(labelStore).join(", ")}</p></div>
       <button className="btn-secondary" onClick={onBack}>Voltar</button></div>
     {full.summary&&<p className="small-note">{full.summary}</p>}
-    <article className="panel"><div className="doc-content doc-readonly"
-      dangerouslySetInnerHTML={{__html:full.content_html??""}}/></article>
+    <article className="panel"><div ref={ref} className="doc-content doc-readonly"
+      dangerouslySetInnerHTML={{__html:html}}/></article>
   </section>;
 }
 
@@ -35,7 +45,7 @@ export function TrainingPage({token,profile}:Props){
   const [q,setQ]=useState("");
   const [statusFilter,setStatusFilter]=useState<""|"rascunho"|"publicado">("");
   const [storeFilter,setStoreFilter]=useState("");
-  const [viewing,setViewing]=useState<Procedure|null>(null);
+  const [viewing,setViewing]=useState<{id:string;versionId?:string}|null>(null);
   const [editing,setEditing]=useState<Procedure|null>(null);
 
   const [store,setStore]=useState(profile.stores[0]??"");
@@ -137,7 +147,8 @@ export function TrainingPage({token,profile}:Props){
 
   if(editing)return <ProcedureEditor token={token} procedure={editing}
     onClose={changed=>{setEditing(null);if(changed)void refreshProcs();}}/>;
-  if(viewing)return <DocView token={token} proc={viewing} onBack={()=>setViewing(null)}/>;
+  if(viewing)return <DocView token={token} procId={viewing.id} versionId={viewing.versionId}
+    onBack={()=>setViewing(null)}/>;
 
   const hist=(canWrite?entries:mine);
   return <section>
@@ -175,7 +186,7 @@ export function TrainingPage({token,profile}:Props){
           {canWrite&&<td>{p.draft_version?`v${p.draft_version.version_label}`:"—"}</td>}
           <td>{new Date(p.updated_at).toLocaleDateString("pt-BR")}</td>
           <td><div className="routine-file-actions">
-            <button className="btn-secondary" onClick={()=>setViewing(p)}>Abrir</button>
+            <button className="btn-secondary" onClick={()=>setViewing({id:p.id})}>Abrir</button>
             {canWrite&&<button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>Editar</button>}
           </div></td></tr>)}</tbody></table></div>
         {procs.length===0&&<p className="empty">Nenhum procedimento encontrado.</p>}
@@ -186,11 +197,14 @@ export function TrainingPage({token,profile}:Props){
       <div className="panel-head"><div><h2>Meus treinamentos</h2>
         <p>Somente registros vinculados à sua conta.</p></div></div>
       <div className="table-wrap"><table><thead><tr><th>Data</th><th>Procedimento</th>
-        <th>Versão</th><th>Etapa</th><th>Instrutor</th></tr></thead>
+        <th>Versão</th><th>Etapa</th><th>Instrutor</th><th></th></tr></thead>
         <tbody>{hist.map(e=><tr key={e.id}>
           <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.procedure}</td>
           <td>{e.version}</td><td>{e.step==="pratica"?"Prática verificada":"Apresentado"}</td>
-          <td>{e.instructor}</td></tr>)}</tbody></table></div>
+          <td>{e.instructor}</td>
+          <td>{e.procedure_id&&<button className="btn-secondary"
+            onClick={()=>setViewing({id:e.procedure_id!,versionId:e.procedure_version_id??undefined})}>
+            Abrir procedimento</button>}</td></tr>)}</tbody></table></div>
       {hist.length===0&&<p className="empty">Nenhum treinamento registrado.</p>}
     </article>}
 

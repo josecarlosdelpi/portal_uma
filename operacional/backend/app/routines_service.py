@@ -13,7 +13,7 @@ from app.models import (
 from app.operations_service import (
     OperationError, OperationsService, date_time, day_iso, normalize,
 )
-from app.policy import STORE_CODES
+from app.policy import STORE_CODES, can_access
 
 DEFAULT_CALL_GOALS={"JOINVILLE":20,"TUBARAO":12,"ITAJAI":10}
 SAO_PAULO=ZoneInfo("America/Sao_Paulo")
@@ -334,11 +334,15 @@ class RoutinesService(OperationsService):
                  procedure_id:UUID|None=None,start:date|None=None,
                  end:date|None=None)->list[dict]:
         self.require(store,"training.view")
+        # Vendedor so consulta os proprios registros; gestao ve a loja inteira.
+        manager=can_access(self.principal,"training.edit",store)
         query=(select(TrainingRecord,User.display_name)
             .join(User,User.id==TrainingRecord.participant_id)
             .where(TrainingRecord.store_code==store,
                    TrainingRecord.deleted_at.is_(None)))
-        if participant_id:
+        if not manager:
+            query=query.where(TrainingRecord.participant_id==self.actor.id)
+        elif participant_id:
             query=query.where(TrainingRecord.participant_id==participant_id)
         if procedure_id:
             query=query.where(TrainingRecord.procedure_id==procedure_id)
@@ -432,12 +436,16 @@ class RoutinesService(OperationsService):
             raise OperationError(422,"Colaborador não cadastrado na loja selecionada")
         before={"participant_id":str(row.participant_id),"procedure":row.procedure,
                 "version":row.version,"step":row.step,"happened_on":row.happened_on.isoformat()}
-        proc_id,ver_id,p_code,p_label=self._procedure_snapshot(procedure_id)
-        if proc_id is not None:
-            procedure,version=p_code,p_label
+        # Mesma procedure mantida: preserva o vinculo historico com a versao usada.
+        if procedure_id is not None and procedure_id==row.procedure_id:
+            procedure,version=row.procedure,row.version
+        else:
+            proc_id,ver_id,p_code,p_label=self._procedure_snapshot(procedure_id)
+            if proc_id is not None:
+                procedure,version=p_code,p_label
+            row.procedure_id=proc_id;row.procedure_version_id=ver_id
         row.participant_id=participant_id
         row.procedure=procedure.strip();row.version=version.strip()
-        row.procedure_id=proc_id;row.procedure_version_id=ver_id
         row.title=title;row.instructor=instructor.strip()
         row.happened_on=happened_on;row.step=step;row.note=note
         row.revision+=1;row.updated_by=self.actor.id

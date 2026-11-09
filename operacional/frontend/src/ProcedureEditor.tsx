@@ -10,7 +10,7 @@ import TableHeader from "@tiptap/extension-table-header";
 import {TextStyle} from "@tiptap/extension-text-style";
 import {Extension} from "@tiptap/core";
 import type {Procedure,VersionInfo} from "./proceduresApi";
-import {proceduresApi} from "./proceduresApi";
+import {proceduresApi,hydrateImages} from "./proceduresApi";
 import {stores,labelStore} from "./catalog";
 
 const FontSize=Extension.create({
@@ -47,7 +47,8 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const draft=procedure.draft_version;
-  const canEdit=!!draft;
+  const [editingMode,setEditingMode]=useState(!!draft);
+  const canEdit=editingMode;
 
   const upload=useCallback(async(file:File)=>{
     const result=await proceduresApi.uploadFile(token,procedure.id,file);
@@ -58,7 +59,8 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
     extensions:[StarterKit,Underline,TextStyle,FontSize,ResizableImage.configure({inline:false}),
       Table.configure({resizable:false}),TableRow,TableCell,TableHeader],
     content:procedure.content_html||"",
-    editable:canEdit,
+    editable:editingMode,
+    onUpdate:({editor:e})=>{void hydrateImages(e.view.dom,token);},
     editorProps:{
       attributes:{class:"doc-content",role:"textbox","aria-label":"Conteúdo do procedimento"},
       handlePaste:(_view,event)=>{
@@ -85,6 +87,7 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
   });
 
   useEffect(()=>{void proceduresApi.versions(token,procedure.id).then(setVersions).catch(()=>{});},[token,procedure.id]);
+  useEffect(()=>{if(editor)void hydrateImages(editor.view.dom,token);},[editor,token]);
 
   async function pickImage(){
     const input=document.createElement("input");
@@ -135,10 +138,13 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
   return <section>
     <div className="page-header"><div><div className="eyebrow">EDITOR DE DOCUMENTO</div>
       <h1>{procedure.code} · {title||"Sem título"}</h1>
-      <p>{draft?`Rascunho v${draft.version_label} · revisão ${draft.revision}`:
-        "Publicado — edite para criar nova versão"}</p></div>
+      <p>{draft?(editingMode?`Rascunho v${draft.version_label} · revisão ${draft.revision}`:`Rascunho v${draft.version_label} disponível`):
+        editingMode?"Nova versão em elaboração":"Publicado"}</p></div>
       <div className="page-actions">
         <button className="btn-secondary" onClick={()=>onClose(false)}>Voltar</button>
+        {!canEdit&&<button className="btn-primary" onClick={()=>{
+          setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
+        }}>Criar nova versão</button>}
         {canEdit&&<button className="btn-secondary" disabled={working} onClick={()=>void save(false)}>
           {working?"Salvando…":"Salvar rascunho"}</button>}
         {canEdit&&<button className="btn-primary" disabled={working} onClick={()=>void save(true)}>Publicar</button>}
