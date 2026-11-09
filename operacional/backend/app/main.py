@@ -12,6 +12,7 @@ from app.attachments_routes import router as attachments_router
 from app.overview_routes import router as overview_router
 from app.closing_routes import router as closing_router
 from app.targets_routes import router as targets_router
+from app.procedures_routes import router as procedures_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
@@ -29,6 +30,7 @@ app.include_router(routines_router)
 app.include_router(daily_tasks_router)
 app.include_router(local_router)
 app.include_router(attachments_router)
+app.include_router(procedures_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),

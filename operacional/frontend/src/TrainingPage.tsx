@@ -4,197 +4,272 @@ import {labelStore} from "./catalog";
 import {attachmentsApi} from "./attachmentsApi";
 import {operationsApi,type TeamMember} from "./operationsApi";
 import {routinesApi,type TrainingEntry} from "./routinesApi";
+import {proceduresApi,type Procedure} from "./proceduresApi";
+import {ProcedureEditor} from "./ProcedureEditor";
 
 type Props={token:string;profile:MyProfile};
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
-const popTitles=[
-  ["POP-COM-01","Atendimento e cotação"],
-  ["POP-COM-02","Prospecção e reativação"],
-  ["POP-COM-03","Demanda não atendida"]
-];
+
+function DocView({token,proc,onBack}:{token:string;proc:Procedure;onBack:()=>void}){
+  const [full,setFull]=useState<Procedure|null>(null);
+  const [error,setError]=useState("");
+  useEffect(()=>{void proceduresApi.get(token,proc.id).then(setFull).catch(c=>setError(c.message));},[token,proc.id]);
+  if(error)return <div className="notice notice-error">{error}</div>;
+  if(!full)return <p>Carregando…</p>;
+  return <section>
+    <div className="page-header"><div><div className="eyebrow">PROCEDIMENTO</div>
+      <h1>{full.code} — {full.title}</h1>
+      <p>{full.version?.status==="publicado"?`Versão ${full.version.version_label} publicada`:"Rascunho"}
+        {" · "}{full.applies_to_all?"Todas as lojas":full.stores.map(labelStore).join(", ")}</p></div>
+      <button className="btn-secondary" onClick={onBack}>Voltar</button></div>
+    {full.summary&&<p className="small-note">{full.summary}</p>}
+    <article className="panel"><div className="doc-content doc-readonly"
+      dangerouslySetInnerHTML={{__html:full.content_html??""}}/></article>
+  </section>;
+}
 
 export function TrainingPage({token,profile}:Props){
+  const canWrite=profile.profile!=="seller";
+  const [tab,setTab]=useState<"procedimentos"|"treinamentos"|"meus">("procedimentos");
+  const [procs,setProcs]=useState<Procedure[]>([]);
+  const [q,setQ]=useState("");
+  const [statusFilter,setStatusFilter]=useState<""|"rascunho"|"publicado">("");
+  const [storeFilter,setStoreFilter]=useState("");
+  const [viewing,setViewing]=useState<Procedure|null>(null);
+  const [editing,setEditing]=useState<Procedure|null>(null);
+
   const [store,setStore]=useState(profile.stores[0]??"");
   const [entries,setEntries]=useState<TrainingEntry[]>([]);
   const [people,setPeople]=useState<TeamMember[]>([]);
+  const [mine,setMine]=useState<TrainingEntry[]>([]);
+  const [editRec,setEditRec]=useState<TrainingEntry|null>(null);
   const [participant,setParticipant]=useState("");
-  const [procedure,setProcedure]=useState("POP-COM-01");
-  const [version,setVersion]=useState("Rascunho 0.1");
+  const [procedureId,setProcedureId]=useState("");
   const [title,setTitle]=useState("");
   const [instructor,setInstructor]=useState("");
   const [day,setDay]=useState(today);
   const [hour,setHour]=useState("09:00");
   const [step,setStep]=useState<"participou"|"pratica">("participou");
   const [note,setNote]=useState("");
-  const [documentId,setDocumentId]=useState("");
-  const [documentFile,setDocumentFile]=useState<File|null>(null);
+  const [fPerson,setFPerson]=useState("");
+  const [fProc,setFProc]=useState("");
+  const [fStart,setFStart]=useState("");
+  const [fEnd,setFEnd]=useState("");
+  const [docFile,setDocFile]=useState<File|null>(null);
+  const [docId,setDocId]=useState("");
   const [loading,setLoading]=useState(false);
   const [working,setWorking]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
-  const canWrite=profile.profile!=="seller";
 
-  const refresh=useCallback(async()=>{
-    if(!store)return;
-    setLoading(true);setError("");
+  const refreshProcs=useCallback(async()=>{
+    try{setProcs(await proceduresApi.list(token,{status:statusFilter||undefined,
+      store:storeFilter||undefined,q:q||undefined}));}
+    catch(cause){setError(cause instanceof Error?cause.message:"Erro ao listar procedimentos.");}
+  },[token,q,statusFilter,storeFilter]);
+  useEffect(()=>{void refreshProcs();},[refreshProcs]);
+
+  const refreshTrainings=useCallback(async()=>{
+    if(!store)return;setLoading(true);setError("");
     try{
       const [rows,team]=await Promise.all([
-        routinesApi.trainings(token,store),canWrite?operationsApi.team(token,store):Promise.resolve([] as TeamMember[])
-      ]);
+        routinesApi.trainings(token,store,{participant_id:fPerson||undefined,
+          procedure_id:fProc||undefined,start:fStart||undefined,end:fEnd||undefined}),
+        canWrite?operationsApi.team(token,store):Promise.resolve([] as TeamMember[])]);
       setEntries(rows);setPeople(team);
-    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível carregar treinamentos.");}
+    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível carregar.");}
     finally{setLoading(false);}
-  },[token,store,canWrite]);
-  useEffect(()=>{void refresh();},[refresh]);
+  },[token,store,canWrite,fPerson,fProc,fStart,fEnd]);
+  useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
   useEffect(()=>{setParticipant(current=>people.some(p=>p.id===current)?current:people[0]?.id??"");},[people]);
-  useEffect(()=>{
-    setDocumentId(current=>entries.some(p=>p.id===current)?current:entries[0]?.id??"");
-    setDocumentFile(null);
-  },[entries]);
+  useEffect(()=>{if(!canWrite)void routinesApi.myTrainings(token).then(setMine).catch(()=>{});},[token,canWrite]);
+
+  async function newProcedure(){
+    setWorking(true);setError("");
+    try{const created=await proceduresApi.create(token,{title:"Novo procedimento",
+      summary:"",applies_to_all:true,store_codes:[],content_html:""});
+      const full=await proceduresApi.get(token,created.id);setEditing(full);}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao criar.");}
+    finally{setWorking(false);}
+  }
+
+  function startEdit(entry:TrainingEntry){
+    setEditRec(entry);setParticipant(entry.participant_id);
+    setProcedureId(entry.procedure_id??"");setTitle(entry.title);
+    setInstructor(entry.instructor);setDay(entry.happened_on.slice(0,10));
+    setHour(entry.happened_on.slice(11,16));setStep(entry.step);setNote(entry.note);
+  }
 
   async function save(){
     setWorking(true);setError("");setMessage("");
     try{
-      await routinesApi.addTraining(token,store,{
-        participant_id:participant,procedure,version,title,instructor,
-        happened_on:day+"T"+hour+":00",step,note
-      });
-      await refresh();setMessage("Participação registrada sem assinatura eletrônica.");
-      setNote("");setTitle("");
+      const body={participant_id:participant,procedure_id:procedureId||null,
+        title,instructor,happened_on:day+"T"+hour+":00",step,note};
+      if(editRec)await routinesApi.updateTraining(token,store,editRec.id,{...body,expected_revision:editRec.revision});
+      else await routinesApi.addTraining(token,store,body);
+      await refreshTrainings();setMessage(editRec?"Registro atualizado.":"Participação registrada. Não representa assinatura eletrônica.");
+      setEditRec(null);setNote("");setTitle("");
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao registrar.");}
     finally{setWorking(false);}
   }
 
-  const selectedDocument=entries.find(x=>x.id===documentId);
-
-  async function uploadDocument(){
-    if(!documentFile||!selectedDocument)return;
+  async function removeRec(entry:TrainingEntry){
+    if(!window.confirm(`Excluir o treinamento de ${entry.participant} (${entry.happened_on.slice(0,10)})? A exclusão é lógica e auditada.`))return;
     setWorking(true);setError("");setMessage("");
-    try{
-      await attachmentsApi.uploadTraining(
-        token,store,documentId,documentFile,selectedDocument.document?.revision??0
-      );
-      setDocumentFile(null);
-      await refresh();
-      setMessage("PDF vinculado ao treinamento. Isso não representa assinatura eletrônica.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível anexar PDF.");}
+    try{await routinesApi.deleteTraining(token,store,entry.id,entry.revision);
+      await refreshTrainings();setMessage("Registro excluído. Histórico preservado na auditoria.");}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");}
     finally{setWorking(false);}
   }
 
-  async function downloadDocument(record:TrainingEntry){
-    if(!record.document)return;
-    setError("");
-    try{await attachmentsApi.downloadTraining(token,store,record.id,record.document.name);}
-    catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível baixar PDF.");}
-  }
-
-  async function deleteDocument(record:TrainingEntry){
-    if(!record.document||!window.confirm("Excluir o PDF anexado? A ação será auditada."))return;
-    setWorking(true);setError("");setMessage("");
-    try{
-      await attachmentsApi.deleteTraining(token,store,record.id,record.document.revision);
-      await refresh();setMessage("PDF removido. Histórico da ação preservado.");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível excluir o PDF.");}
+  const selectedDoc=entries.find(x=>x.id===docId);
+  async function uploadDoc(){
+    if(!docFile||!selectedDoc)return;setWorking(true);setError("");
+    try{await attachmentsApi.uploadTraining(token,store,docId,docFile,selectedDoc.document?.revision??0);
+      setDocFile(null);await refreshTrainings();setMessage("PDF anexado (não é assinatura eletrônica).");}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha no anexo.");}
     finally{setWorking(false);}
   }
+  async function downloadDoc(e:TrainingEntry){if(e.document)await attachmentsApi.downloadTraining(token,store,e.id,e.document.name).catch(c=>setError(c.message));}
+  async function deleteDoc(e:TrainingEntry){if(!e.document||!window.confirm("Excluir o PDF anexado?"))return;
+    setWorking(true);try{await attachmentsApi.deleteTraining(token,store,e.id,e.document.revision);await refreshTrainings();}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");}finally{setWorking(false);}}
+
+  if(editing)return <ProcedureEditor token={token} procedure={editing}
+    onClose={changed=>{setEditing(null);if(changed)void refreshProcs();}}/>;
+  if(viewing)return <DocView token={token} proc={viewing} onBack={()=>setViewing(null)}/>;
+
+  const hist=(canWrite?entries:mine);
   return <section>
     <div className="page-header"><div><div className="eyebrow">CLAREZA E CAPACITAÇÃO</div>
       <h1>Padrões e treinamento</h1>
-      <p>Registre procedimentos, versões, participantes e verificação prática por loja.</p></div></div>
-    <div className="notice notice-amber">Os procedimentos abaixo ainda são rascunhos.
-      PDFs de apoio podem ser anexados em armazenamento privado. O registro de participação
-      e o anexo não representam assinatura eletrônica ou ciência formal do colaborador.</div>
+      <p>Procedimentos internos com editor completo e histórico de treinamentos por versão.</p></div>
+      {canWrite&&<button className="btn-primary" disabled={working} onClick={()=>void newProcedure()}>
+        + Novo Procedimento</button>}</div>
+    <div className="tab-bar">
+      <button role="tab" aria-selected={tab==="procedimentos"} className={tab==="procedimentos"?"tab active":"tab"}
+        onClick={()=>setTab("procedimentos")}>Procedimentos</button>
+      <button role="tab" aria-selected={tab==="treinamentos"} className={tab==="treinamentos"?"tab active":"tab"}
+        onClick={()=>setTab("treinamentos")}>{canWrite?"Treinamentos":"Meus treinamentos"}</button>
+    </div>
     {error&&<div className="notice notice-error" role="alert">{error}</div>}
     {message&&<div className="notice notice-success" role="status">{message}</div>}
-    <div className="routine-procedures">
-      {popTitles.map(([code,name])=><article className="panel" key={code}>
-        <span className="routine-procedure-code">{code} · RASCUNHO 0.1</span>
-        <h2>{name}</h2>
-        <p>{code==="POP-COM-01"?
-          "Padrão esperado para atendimento, cotação e acompanhamento.":
-          code==="POP-COM-02"?
-          "Organização de contatos e reativação de clientes.":
-          "Registro de pedidos não atendidos e oportunidades de melhoria."}</p>
-        <span className="routine-alert">Não aprovado</span>
-      </article>)}
-    </div>
-    <div className="routine-filters"><label>Unidade<select value={store} onChange={e=>setStore(e.target.value)}>
-      {profile.stores.map(code=><option value={code} key={code}>{labelStore(code)}</option>)}
-    </select></label></div>
-    {loading&&<p role="status">Consultando registros…</p>}
-    {canWrite&&<article className="panel routine-form-panel">
-      <div className="panel-head"><div><h2>Registrar treinamento</h2>
-        <p>Registre presença e verificação prática separadamente.</p></div></div>
-      <div className="routine-form-grid">
-        <label>Colaborador<select value={participant} onChange={e=>setParticipant(e.target.value)}>
-          {people.map(person=><option value={person.id} key={person.id}>{person.name}</option>)}</select></label>
-        <label>Procedimento<select value={procedure} onChange={e=>setProcedure(e.target.value)}>
-          {popTitles.map(([code,name])=><option value={code} key={code}>{code} — {name}</option>)}
-          <option value="Outro">Outro procedimento</option>
+
+    {tab==="procedimentos"&&<>
+      <div className="routine-filters">
+        <label>Busca<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Título ou código"/></label>
+        {canWrite&&<label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value as typeof statusFilter)}>
+          <option value="">Todas</option><option value="publicado">Publicado</option><option value="rascunho">Rascunho</option>
+        </select></label>}
+        <label>Loja<select value={storeFilter} onChange={e=>setStoreFilter(e.target.value)}>
+          <option value="">Todas</option>{profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}
         </select></label>
-        <label>Versão<input maxLength={45} value={version} onChange={e=>setVersion(e.target.value)}/></label>
-        <label>Instrutor / responsável<input maxLength={90} value={instructor}
-          onChange={e=>setInstructor(e.target.value)}/></label>
-        <label>Data<input type="date" value={day} onChange={e=>setDay(e.target.value)}/></label>
-        <label>Horário<input type="time" value={hour} onChange={e=>setHour(e.target.value)}/></label>
-        <label>Etapa<select value={step} onChange={e=>setStep(e.target.value as typeof step)}>
-          <option value="participou">Treinamento apresentado</option>
-          <option value="pratica">Execução prática verificada</option>
-        </select></label>
-        <label className="routine-wide">Referência complementar<input maxLength={140}
-          value={title} onChange={e=>setTitle(e.target.value)}/></label>
-        <label className="routine-wide">Observações<input maxLength={350}
-          value={note} onChange={e=>setNote(e.target.value)}/></label>
       </div>
-      {people.length===0&&<div className="notice notice-amber">Cadastre os vendedores vinculados à loja
-        antes de registrar um treinamento.</div>}
-      <button className="btn-primary" disabled={working||!participant||!procedure.trim()||
-        !version.trim()||!instructor.trim()||!day||!hour}
-        onClick={()=>void save()}>Registrar participação</button>
+      <article className="panel"><div className="table-wrap"><table>
+        <thead><tr><th>Código</th><th>Título</th><th>Aplicável</th><th>Versão vigente</th>
+          {canWrite&&<th>Rascunho</th>}<th>Atualizado</th><th></th></tr></thead>
+        <tbody>{procs.map(p=><tr key={p.id}>
+          <td>{p.code}</td><td>{p.title}</td>
+          <td>{p.applies_to_all?"Todas":p.stores.map(labelStore).join(", ")}</td>
+          <td>{p.current_version?`v${p.current_version.version_label}`:"—"}</td>
+          {canWrite&&<td>{p.draft_version?`v${p.draft_version.version_label}`:"—"}</td>}
+          <td>{new Date(p.updated_at).toLocaleDateString("pt-BR")}</td>
+          <td><div className="routine-file-actions">
+            <button className="btn-secondary" onClick={()=>setViewing(p)}>Abrir</button>
+            {canWrite&&<button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>Editar</button>}
+          </div></td></tr>)}</tbody></table></div>
+        {procs.length===0&&<p className="empty">Nenhum procedimento encontrado.</p>}
+      </article>
+    </>}
+
+    {tab==="treinamentos"&&!canWrite&&<article className="panel">
+      <div className="panel-head"><div><h2>Meus treinamentos</h2>
+        <p>Somente registros vinculados à sua conta.</p></div></div>
+      <div className="table-wrap"><table><thead><tr><th>Data</th><th>Procedimento</th>
+        <th>Versão</th><th>Etapa</th><th>Instrutor</th></tr></thead>
+        <tbody>{hist.map(e=><tr key={e.id}>
+          <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.procedure}</td>
+          <td>{e.version}</td><td>{e.step==="pratica"?"Prática verificada":"Apresentado"}</td>
+          <td>{e.instructor}</td></tr>)}</tbody></table></div>
+      {hist.length===0&&<p className="empty">Nenhum treinamento registrado.</p>}
     </article>}
 
-    {canWrite&&entries.length>0&&<article className="panel routine-form-panel">
-      <div className="panel-head"><div><h2>Anexar documento ao treinamento</h2>
-        <p>PDF privado de até 5 MB, sem assinatura eletrônica automática.</p></div></div>
-      <div className="routine-form-grid">
-        <label className="routine-wide">Registro de treinamento
-          <select value={documentId} onChange={e=>setDocumentId(e.target.value)}>
-            {entries.map(row=><option key={row.id} value={row.id}>
-              {row.participant} — {row.procedure} ({row.happened_on.slice(0,10)})
-            </option>)}
-          </select>
-        </label>
-        <label className="routine-wide">Documento PDF
-          <input type="file" accept=".pdf,application/pdf"
-            key={documentId+"-"+(selectedDocument?.document?.revision??0)}
-            disabled={working} onChange={e=>setDocumentFile(e.target.files?.[0]??null)}/>
-        </label>
+    {tab==="treinamentos"&&canWrite&&<>
+      <div className="routine-filters">
+        <label>Loja<select value={store} onChange={e=>setStore(e.target.value)}>
+          {profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}
+        </select></label>
+        <label>Colaborador<select value={fPerson} onChange={e=>setFPerson(e.target.value)}>
+          <option value="">Todos</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+        </select></label>
+        <label>Procedimento<select value={fProc} onChange={e=>setFProc(e.target.value)}>
+          <option value="">Todos</option>{procs.filter(p=>p.current_version).map(p=><option key={p.id} value={p.id}>{p.code} — {p.title}</option>)}
+        </select></label>
+        <label>De<input type="date" value={fStart} onChange={e=>setFStart(e.target.value)}/></label>
+        <label>Até<input type="date" value={fEnd} onChange={e=>setFEnd(e.target.value)}/></label>
       </div>
-      {selectedDocument?.document&&<p className="small-note">
-        Atual: {selectedDocument.document.name} · revisão {selectedDocument.document.revision}.
-        Anexar outro PDF substitui o arquivo atual e registra a operação.
-      </p>}
-      <button className="btn-primary" disabled={!documentFile||!selectedDocument||working}
-        onClick={()=>void uploadDocument()}>{working?"Salvando…":"Anexar PDF"}</button>
-    </article>}
-    <article className="panel routine-form-panel">
-      <div className="panel-head"><div><h2>Histórico de treinamentos</h2>
-        <p>Registros administrativos por colaborador e procedimento.</p></div></div>
-      <div className="table-wrap"><table><thead><tr><th>Data</th><th>Colaborador</th>
-        <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>PDF</th><th>Assinatura</th></tr></thead>
-        <tbody>{entries.map(entry=><tr key={entry.id}>
-          <td>{new Date(entry.happened_on).toLocaleString("pt-BR")}</td>
-          <td>{entry.participant}</td><td>{entry.procedure}</td><td>{entry.version}</td>
-          <td>{entry.step==="pratica"?"Prática verificada":"Participação registrada"}</td>
-          <td>{entry.document?
-            <div className="routine-file-actions">
-              <button className="btn-secondary" onClick={()=>void downloadDocument(entry)}>Baixar PDF</button>
-              {canWrite&&<button className="btn-secondary" disabled={working}
-                onClick={()=>void deleteDocument(entry)}>Excluir PDF</button>}
-            </div>:"Não anexado"}</td>
-          <td><span className="routine-alert">Pendente</span></td>
-        </tr>)}</tbody></table></div>
-      {entries.length===0&&<p className="empty">Nenhum treinamento cadastrado nesta loja.</p>}
-    </article>
+      <article className="panel routine-form-panel">
+        <div className="panel-head"><div><h2>{editRec?"Editar treinamento":"Registrar treinamento"}</h2>
+          <p>{editRec?`Revisão ${editRec.revision} · edição auditada`:"A versão publicada vigente é registrada automaticamente."}</p></div>
+          {editRec&&<button className="btn-secondary" onClick={()=>setEditRec(null)}>Cancelar edição</button>}</div>
+        <div className="routine-form-grid">
+          <label>Colaborador<select value={participant} onChange={e=>setParticipant(e.target.value)}>
+            {people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+          <label>Procedimento<select value={procedureId} onChange={e=>setProcedureId(e.target.value)}>
+            <option value="">Selecione…</option>
+            {procs.filter(p=>p.current_version).map(p=><option key={p.id} value={p.id}>
+              {p.code} — {p.title} (v{p.current_version!.version_label})</option>)}
+          </select></label>
+          <label>Instrutor / responsável<input maxLength={90} value={instructor}
+            onChange={e=>setInstructor(e.target.value)}/></label>
+          <label>Data<input type="date" value={day} onChange={e=>setDay(e.target.value)}/></label>
+          <label>Horário<input type="time" value={hour} onChange={e=>setHour(e.target.value)}/></label>
+          <label>Etapa<select value={step} onChange={e=>setStep(e.target.value as typeof step)}>
+            <option value="participou">Treinamento apresentado</option>
+            <option value="pratica">Execução prática verificada</option></select></label>
+          <label className="routine-wide">Referência complementar<input maxLength={140}
+            value={title} onChange={e=>setTitle(e.target.value)}/></label>
+          <label className="routine-wide">Observações<input maxLength={350}
+            value={note} onChange={e=>setNote(e.target.value)}/></label>
+        </div>
+        <button className="btn-primary" disabled={working||!participant||!procedureId||!instructor.trim()}
+          onClick={()=>void save()}>{working?"Salvando…":editRec?"Salvar alterações":"Registrar participação"}</button>
+      </article>
+      {entries.length>0&&<article className="panel routine-form-panel">
+        <div className="panel-head"><div><h2>Anexar PDF complementar</h2>
+          <p>PDF privado de até 5 MB. Não é assinatura eletrônica.</p></div></div>
+        <div className="routine-form-grid">
+          <label className="routine-wide">Registro<select value={docId} onChange={e=>setDocId(e.target.value)}>
+            <option value="">Selecione…</option>
+            {entries.map(r=><option key={r.id} value={r.id}>{r.participant} — {r.procedure} ({r.happened_on.slice(0,10)})</option>)}
+          </select></label>
+          <label className="routine-wide">PDF<input type="file" accept=".pdf,application/pdf"
+            key={docId+"-"+(selectedDoc?.document?.revision??0)} disabled={working}
+            onChange={e=>setDocFile(e.target.files?.[0]??null)}/></label>
+        </div>
+        <button className="btn-primary" disabled={!docFile||!selectedDoc||working}
+          onClick={()=>void uploadDoc()}>Anexar PDF</button>
+      </article>}
+      <article className="panel routine-form-panel">
+        <div className="panel-head"><div><h2>Histórico de treinamentos</h2>
+          <p>Registros administrativos com edição e exclusão lógica auditadas.</p></div></div>
+        {loading&&<p role="status">Consultando registros…</p>}
+        <div className="table-wrap"><table><thead><tr><th>Data</th><th>Colaborador</th>
+          <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>PDF</th><th>Ações</th></tr></thead>
+          <tbody>{entries.map(e=><tr key={e.id}>
+            <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.participant}</td>
+            <td>{e.procedure}</td><td>{e.version}</td>
+            <td>{e.step==="pratica"?"Prática verificada":"Apresentado"}</td>
+            <td>{e.document?<div className="routine-file-actions">
+              <button className="btn-secondary" onClick={()=>void downloadDoc(e)}>Baixar</button>
+              <button className="btn-secondary" disabled={working} onClick={()=>void deleteDoc(e)}>Excluir</button>
+            </div>:"—"}</td>
+            <td><div className="routine-file-actions">
+              <button className="btn-secondary" onClick={()=>startEdit(e)}>Editar</button>
+              <button className="btn-secondary" disabled={working} onClick={()=>void removeRec(e)}>Excluir</button>
+            </div></td></tr>)}</tbody></table></div>
+        {entries.length===0&&!loading&&<p className="empty">Nenhum treinamento nesta loja.</p>}
+      </article>
+    </>}
   </section>;
 }

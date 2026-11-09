@@ -368,8 +368,14 @@ class TrainingRecord(Base):
     happened_on: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
     step: Mapped[str] = mapped_column(String(15), nullable=False)
     note: Mapped[str] = mapped_column(String(350), nullable=False, default="")
+    procedure_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedures.id", ondelete="RESTRICT"))
+    procedure_version_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedure_versions.id", ondelete="RESTRICT"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     recorded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AccessInvitation(Base):
@@ -515,3 +521,62 @@ class DailyTask(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Procedure(Base):
+    """Documento interno da UMA, editado no portal e publicado por versao."""
+    __tablename__ = "procedures"
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(140), nullable=False)
+    summary: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    applies_to_all: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProcedureStore(Base):
+    """Lojas as quais o procedimento se aplica (quando nao e global)."""
+    __tablename__ = "procedure_stores"
+    procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+
+
+class ProcedureVersion(Base):
+    """Versao de conteudo do procedimento; rascunho editavel, publicado imutavel."""
+    __tablename__ = "procedure_versions"
+    __table_args__ = (
+        UniqueConstraint("procedure_id", "version_label", name="uq_procedure_version_label"),
+        CheckConstraint("status IN ('rascunho','publicado')", name="ck_procedure_version_status"),
+        CheckConstraint("revision >= 1", name="ck_procedure_version_revision"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_label: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="rascunho")
+    content_html: Mapped[str] = mapped_column(String(), nullable=False, default="")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    published_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProcedureFile(Base):
+    """Imagem privada embutida no documento; nunca URL publica."""
+    __tablename__ = "procedure_files"
+    __table_args__ = (
+        CheckConstraint("byte_length BETWEEN 1 AND 3145728", name="ck_procedure_file_size"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True)
+    original_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

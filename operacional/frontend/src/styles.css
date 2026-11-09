@@ -123,3 +123,21 @@
   .closing-slide-canvas{width:100%;height:auto;min-height:0;border:0;box-shadow:none;border-radius:0;margin:0;page-break-inside:avoid}
   .closing-slide-header{print-color-adjust:exact;-webkit-print-color-adjust:exact}
 }
+
+/* Editor de procedimentos */
+.tab-bar{display:flex;gap:8px;margin-bottom:14px}
+.editor-toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0;padding:8px;background:#f4f1e6;border:1px solid #e0d9bd;border-radius:8px}
+.editor-toolbar button,.editor-toolbar select{padding:5px 10px;border:1px solid #cfc7a5;background:#fff;border-radius:6px;cursor:pointer;font-size:13px}
+.editor-toolbar button:hover{background:#fff8d6}
+.toolbar-hint{margin-left:auto;font-size:12px;color:#8a7d3a}
+.editor-panel{min-height:60vh}
+.doc-content{min-height:50vh;outline:none;padding:8px;line-height:1.6}
+.doc-content h1{font-size:1.6em}.doc-content h2{font-size:1.35em}.doc-content h3{font-size:1.15em}
+.doc-content img{max-width:100%;height:auto;display:block;margin:8px 0;border-radius:6px}
+.doc-content table{border-collapse:collapse;width:100%;margin:10px 0}
+.doc-content th,.doc-content td{border:1px solid #c9c2a6;padding:6px 8px}
+.doc-content th{background:#f4f1e6}
+.doc-readonly{min-height:0}
+.check-line{display:inline-flex;align-items:center;gap:6px;margin-right:16px}
+.page-actions{display:flex;gap:8px}
+.ProseMirror p.is-editor-empty:first-child::before{color:#999;float:left;height:0;pointer-events:none}
