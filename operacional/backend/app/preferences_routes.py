@@ -83,11 +83,11 @@ def save_preferences(body: PreferencesBody, user: User = Depends(current_user),
     row = _get_row(db, user)
     # deduplicado, na ordem enviada, somente modulos autorizados
     favorites = [key for key in dict.fromkeys(body.favorites) if key in allowed]
-    # Favoritos temporariamente sem permissao sao preservados no fim da lista:
-    # se o acesso voltar, o atalho reaparece para o usuario.
-    hidden = [key for key in row.favorites
-              if key in MODULE_PERMISSION and key not in allowed]
-    favorites += [key for key in hidden if key not in favorites]
+    # Favoritos sem permissao no momento: preservados na posicao original,
+    # para reaparecerem no lugar certo se o acesso voltar.
+    for index, key in enumerate(row.favorites):
+        if key in MODULE_PERMISSION and key not in allowed and key not in favorites:
+            favorites.insert(min(index, len(favorites)), key)
     row.sidebar_pinned = body.sidebar_pinned
     row.favorites = favorites
     db.commit()

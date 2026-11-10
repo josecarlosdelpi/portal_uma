@@ -238,3 +238,53 @@
   .sidebar .brand .brand-logo-image{width:34px;height:34px}
   .sidebar .brand{padding:0 4px 12px}
 }
+
+/* Refino visual final (PR7): larguras, logo, favs leves, sem scroll horizontal */
+.sb-pinned{grid-template-columns:262px minmax(0,1fr)}
+.sb-unpinned .sidebar{width:242px}
+.sidebar{overflow-x:hidden}
+.sidebar .brand{gap:10px;padding:0 6px 12px}
+.sidebar .brand .brand-logo-image{width:64px;height:44px}
+.sidebar .brand strong{font-size:13.5px}
+.sidebar .nav-item{min-width:0}
+.nav-item,.nav-link{min-width:0}
+.nav-link span{flex:1;min-width:0}
+.nav-link .nav-icon{opacity:.8}
+/* ativo: indicador lateral dourado + fundo suave, sem cartao pesado */
+.nav-link.active{background:rgba(210,179,0,.14);color:#fff;font-weight:600;box-shadow:inset 3px 0 0 #d2b300}
+.fav-item{background:rgba(255,255,255,.035);border-radius:6px;margin:1px 0}
+.fav-item .nav-link.active{background:rgba(210,179,0,.12);box-shadow:inset 3px 0 0 #d2b300;font-weight:600}
+.fav-item.drop-target{outline:1px dashed #d2b300;outline-offset:-1px}
+/* controles de ordem: so aparecem no hover/foco; sempre visiveis em toque */
+.fav-reorder{opacity:0;transition:opacity .12s;flex-shrink:0}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{opacity:1}
+@media(hover:none){.fav-reorder{opacity:.9}}
+.star-btn{opacity:.4}
+.star-btn:hover{opacity:.9}
+.star-btn.starred{opacity:.95;color:#d2b300}
+@media(max-width:940px){
+  .sidebar .brand .brand-logo-image{width:64px;height:44px}
+  .sb-pinned .sidebar,.sb-unpinned .sidebar{width:min(280px,85vw)}
+}
+
+/* setas de ordem nao ocupam largura quando ocultas */
+.fav-reorder{width:0;overflow:hidden}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{width:auto;opacity:1}
+@media(hover:none){.fav-reorder{width:auto}}
+
+/* controles de ordem compactos tambem em dispositivos de toque */
+.fav-reorder button{padding:0 2px;width:16px;height:16px;line-height:0}
+@media(hover:none){.fav-reorder{width:34px;opacity:.85}}
+
+/* fecho definitivo dos controles de ordem */
+.fav-item .fav-reorder{width:0!important;opacity:0;overflow:hidden}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{width:36px!important;opacity:1}
+@media(hover:none){.fav-item .fav-reorder{width:36px!important;opacity:.85}}
+
+/* controles de ordem fora do fluxo - nunca comprimem o nome */
+.fav-item{position:relative}
+.fav-item .fav-reorder{position:absolute!important;right:4px;top:50%;transform:translateY(-50%);
+  width:auto!important;flex-direction:column;opacity:0;pointer-events:none;background:#1c1c1c;border-radius:5px;z-index:2}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{opacity:1;pointer-events:auto;width:auto!important}
+@media(hover:none){.fav-item .fav-reorder{position:static!important;transform:none;opacity:.85;
+  pointer-events:auto;flex-direction:row;width:auto!important;background:transparent}}
