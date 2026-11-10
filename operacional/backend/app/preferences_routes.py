@@ -91,4 +91,7 @@ def save_preferences(body: PreferencesBody, user: User = Depends(current_user),
     row.sidebar_pinned = body.sidebar_pinned
     row.favorites = favorites
     db.commit()
-    return {"sidebar_pinned": row.sidebar_pinned, "favorites": favorites}
+    # resposta alinhada ao GET: somente modulos autorizados agora;
+    # os ocultos ficam preservados apenas no banco.
+    return {"sidebar_pinned": row.sidebar_pinned,
+            "favorites": [k for k in favorites if k in allowed]}
