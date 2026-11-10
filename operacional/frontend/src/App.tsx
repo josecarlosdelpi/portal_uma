@@ -33,7 +33,7 @@ const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> 
   { key: "daily", label: "Tarefas diárias", icon: CalendarCheck },
   { key: "targets", label: "Metas diárias", icon: Target },
   { key: "whatsapp", label: "Canais digitais", icon: MessageCircle },
-  { key: "training", label: "Padrões e treinamento", icon: GraduationCap },
+  { key: "training", label: "Padrões e treinamentos", icon: GraduationCap },
   { key: "closing", label: "Fechamento Mensal", icon: ClipboardCheck },
   { key: "access", label: "Configurações", icon: Settings },
 ];

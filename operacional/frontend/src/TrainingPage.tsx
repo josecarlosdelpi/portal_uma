@@ -422,7 +422,7 @@ export function TrainingPage({token,profile}:Props){
   const hist=(canWrite?entries:mine);
   return <section>
     <div className="page-header"><div><div className="eyebrow">CLAREZA E CAPACITAÇÃO</div>
-      <h1>Padrões e treinamento</h1>
+      <h1>Padrões e treinamentos</h1>
       <p>Procedimentos internos com editor completo e histórico de treinamentos por versão.</p></div>
     </div>
     <div className="tab-bar">
