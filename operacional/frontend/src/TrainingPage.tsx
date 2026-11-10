@@ -6,6 +6,7 @@ import {operationsApi,type TeamMember} from "./operationsApi";
 import {routinesApi,type TrainingEntry} from "./routinesApi";
 import {proceduresApi,hydrateImages,type Procedure,type VersionInfo} from "./proceduresApi";
 import {ProcedureEditor} from "./ProcedureEditor";
+import {ConfirmDialog} from "./ConfirmDialog";
 
 type Props={token:string;profile:MyProfile};
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
@@ -46,6 +47,9 @@ export function TrainingPage({token,profile}:Props){
   const [q,setQ]=useState("");
   const [statusFilter,setStatusFilter]=useState<""|"rascunho"|"publicado"|"obsoleto">("");
   const [deleting,setDeleting]=useState<Procedure|null>(null);
+  const [obsoleting,setObsoleting]=useState<Procedure|null>(null);
+  const [removingRec,setRemovingRec]=useState<TrainingEntry|null>(null);
+  const [deletingDoc,setDeletingDoc]=useState<TrainingEntry|null>(null);
   const [storeFilter,setStoreFilter]=useState("");
   const [viewing,setViewing]=useState<{id:string;versionId?:string}|null>(null);
   const [editing,setEditing]=useState<Procedure|null>(null);
@@ -105,12 +109,12 @@ export function TrainingPage({token,profile}:Props){
     finally{setWorking(false);}
   }
 
-  async function markObsolete(p:Procedure){
-    if(!window.confirm(`Marcar o procedimento ${p.code} — ${p.title} como OBSOLETO?\nEle deixará de ser exibido aos vendedores.`))return;
+  async function confirmObsolete(){
+    if(!obsoleting)return;const p=obsoleting;
     setWorking(true);setError("");setMessage("");
-    try{await proceduresApi.obsolete(token,p.id);await refreshProcs();
+    try{await proceduresApi.obsolete(token,p.id);setObsoleting(null);await refreshProcs();
       setMessage(`${p.code} marcado como obsoleto.`);}
-    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao marcar obsoleto.");}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao marcar obsoleto.");setObsoleting(null);}
     finally{setWorking(false);}
   }
 
@@ -142,12 +146,13 @@ export function TrainingPage({token,profile}:Props){
     finally{setWorking(false);}
   }
 
-  async function removeRec(entry:TrainingEntry){
-    if(!window.confirm(`Excluir o treinamento de ${entry.participant} (${entry.happened_on.slice(0,10)})? A exclusão é lógica e auditada.`))return;
+  async function confirmRemoveRec(){
+    if(!removingRec)return;const entry=removingRec;
     setWorking(true);setError("");setMessage("");
     try{await routinesApi.deleteTraining(token,store,entry.id,entry.revision);
-      await refreshTrainings();setMessage("Registro excluído. Histórico preservado na auditoria.");}
-    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");}
+      setRemovingRec(null);await refreshTrainings();
+      setMessage("Registro excluído. Histórico preservado na auditoria.");}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");setRemovingRec(null);}
     finally{setWorking(false);}
   }
 
@@ -160,9 +165,13 @@ export function TrainingPage({token,profile}:Props){
     finally{setWorking(false);}
   }
   async function downloadDoc(e:TrainingEntry){if(e.document)await attachmentsApi.downloadTraining(token,store,e.id,e.document.name).catch(c=>setError(c.message));}
-  async function deleteDoc(e:TrainingEntry){if(!e.document||!window.confirm("Excluir o PDF anexado?"))return;
-    setWorking(true);try{await attachmentsApi.deleteTraining(token,store,e.id,e.document.revision);await refreshTrainings();}
-    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");}finally{setWorking(false);}}
+  async function confirmDeleteDoc(){
+    if(!deletingDoc?.document)return;const e=deletingDoc;
+    setWorking(true);setError("");
+    try{await attachmentsApi.deleteTraining(token,store,e.id,e.document!.revision);
+      setDeletingDoc(null);await refreshTrainings();setMessage("PDF anexado excluído.");}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");setDeletingDoc(null);}
+    finally{setWorking(false);}}
 
   if(editing)return <ProcedureEditor token={token} procedure={editing}
     onClose={changed=>{setEditing(null);if(changed)void refreshProcs();}}/>;
@@ -184,14 +193,29 @@ export function TrainingPage({token,profile}:Props){
     </div>
     {error&&<div className="notice notice-error" role="alert">{error}</div>}
     {message&&<div className="notice notice-success" role="status">{message}</div>}
-    {deleting&&<div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal-card"><h3>Excluir procedimento</h3>
-        <p>Tem certeza de que deseja excluir o procedimento {deleting.code} — {deleting.title}?
-        O procedimento será removido da listagem e não poderá mais ser utilizado.</p>
-        <div className="modal-actions">
-          <button className="btn-secondary" onClick={()=>setDeleting(null)}>Cancelar</button>
-          <button className="btn-danger" disabled={working} onClick={()=>void confirmDelete()}>Sim, excluir</button>
-        </div></div></div>}
+    {deleting&&<ConfirmDialog title="Excluir procedimento" confirmLabel="Sim, excluir"
+      busy={working} onCancel={()=>setDeleting(null)} onConfirm={()=>void confirmDelete()}>
+      <p>Tem certeza de que deseja excluir o procedimento {deleting.code} — {deleting.title}?
+      O documento deixará de aparecer nas consultas do Portal UMA. Suas versões e os registros
+      históricos de treinamentos serão preservados para fins de auditoria.</p>
+    </ConfirmDialog>}
+    {obsoleting&&<ConfirmDialog title="Marcar procedimento como obsoleto"
+      confirmLabel="Sim, marcar como obsoleto" danger={false}
+      busy={working} onCancel={()=>setObsoleting(null)} onConfirm={()=>void confirmObsolete()}>
+      <p>Tem certeza de que deseja marcar o procedimento {obsoleting.code} — {obsoleting.title} como
+      obsoleto? O procedimento deixará de aparecer para os vendedores, mas suas versões e o histórico
+      de treinamentos continuarão preservados para consulta administrativa.</p>
+    </ConfirmDialog>}
+    {removingRec&&<ConfirmDialog title="Excluir treinamento" confirmLabel="Confirmar exclusão"
+      busy={working} onCancel={()=>setRemovingRec(null)} onConfirm={()=>void confirmRemoveRec()}>
+      <p>Tem certeza de que deseja excluir o treinamento de {removingRec.participant}
+      {" "}({removingRec.happened_on.slice(0,10)})? A exclusão é lógica e auditada.</p>
+    </ConfirmDialog>}
+    {deletingDoc&&<ConfirmDialog title="Excluir PDF anexado" confirmLabel="Confirmar exclusão"
+      busy={working} onCancel={()=>setDeletingDoc(null)} onConfirm={()=>void confirmDeleteDoc()}>
+      <p>Tem certeza de que deseja excluir o PDF {deletingDoc.document?.name} anexado ao treinamento
+      de {deletingDoc.participant}?</p>
+    </ConfirmDialog>}
 
     {tab==="procedimentos"&&<>
       <div className="routine-filters">
@@ -221,8 +245,8 @@ export function TrainingPage({token,profile}:Props){
             {canWrite&&p.status==="rascunho"&&!p.draft_version&&
               <button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>Editar</button>}
             {canWrite&&p.status==="publicado"&&
-              <button className="btn-secondary" disabled={working} onClick={()=>void markObsolete(p)}>Obsoleto</button>}
-            {canWrite&&!p.current_version&&
+              <button className="btn-secondary" disabled={working} onClick={()=>setObsoleting(p)}>Obsoleto</button>}
+            {canWrite&&(isSuperAdmin||!p.current_version)&&
               <button className="btn-secondary" disabled={working} onClick={()=>setDeleting(p)}>Excluir</button>}
           </div></td></tr>)}</tbody></table></div>
         {procs.length===0&&<p className="empty">Nenhum procedimento encontrado.</p>}
@@ -312,11 +336,11 @@ export function TrainingPage({token,profile}:Props){
             <td>{e.step==="pratica"?"Prática verificada":"Apresentado"}</td>
             <td>{e.document?<div className="routine-file-actions">
               <button className="btn-secondary" onClick={()=>void downloadDoc(e)}>Baixar</button>
-              <button className="btn-secondary" disabled={working} onClick={()=>void deleteDoc(e)}>Excluir</button>
+              <button className="btn-secondary" disabled={working} onClick={()=>setDeletingDoc(e)}>Excluir</button>
             </div>:"—"}</td>
             <td><div className="routine-file-actions">
               <button className="btn-secondary" onClick={()=>startEdit(e)}>Editar</button>
-              {isSuperAdmin&&<button className="btn-secondary" disabled={working} onClick={()=>void removeRec(e)}>Excluir</button>}
+              {isSuperAdmin&&<button className="btn-secondary" disabled={working} onClick={()=>setRemovingRec(e)}>Excluir</button>}
             </div></td></tr>)}</tbody></table></div>
         {entries.length===0&&!loading&&<p className="empty">Nenhum treinamento nesta loja.</p>}
       </article>

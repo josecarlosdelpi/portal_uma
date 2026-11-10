@@ -323,12 +323,17 @@ class ProceduresService(OperationsService):
         published = self.db.scalar(select(ProcedureVersion.id).where(
             ProcedureVersion.procedure_id == row.id,
             ProcedureVersion.status == "publicado"))
-        if published is not None:
-            raise OperationError(409, "Procedimento já publicado não pode ser excluído. "
-                                      "Use 'Marcar como obsoleto'.")
+        # Rascunho nunca publicado: qualquer editor exclui. Ja publicado ou
+        # obsoleto: somente o SuperAdmin. A exclusao e sempre logica.
+        if published is not None and not self.principal.is_superadmin:
+            raise OperationError(403, "Somente o SuperAdmin pode excluir "
+                                      "procedimentos já publicados ou obsoletos")
+        status_before = ("obsoleto" if row.obsolete_at is not None
+                         else "publicado" if published is not None else "rascunho")
         row.deleted_at = datetime.now(timezone.utc)
         self.audit("procedure.deleted", "procedure", str(row.id),
-                   {"code": row.code, "title": row.title})
+                   {"code": row.code, "title": row.title,
+                    "previous_status": status_before})
         self.commit()
         return {"id": str(row.id), "deleted": True}
 
