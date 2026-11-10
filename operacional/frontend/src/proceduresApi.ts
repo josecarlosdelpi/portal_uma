@@ -6,7 +6,8 @@ export type VersionInfo={
 };
 export type Procedure={
   id:string;code:string;title:string;summary:string;applies_to_all:boolean;
-  stores:string[];current_version:VersionInfo|null;draft_version:VersionInfo|null;
+  stores:string[];status:"rascunho"|"publicado"|"obsoleto";obsolete_at:string|null;
+  current_version:VersionInfo|null;draft_version:VersionInfo|null;
   updated_at:string;content_html?:string;version?:VersionInfo|null
 };
 export type ProcedurePayload={
@@ -31,7 +32,7 @@ export async function hydrateImages(root:HTMLElement|null,token:string){
 }
 
 export const proceduresApi={
-  list:(token:string,params:{status?:"rascunho"|"publicado";store?:string;q?:string}={})=>{
+  list:(token:string,params:{status?:"rascunho"|"publicado"|"obsoleto";store?:string;q?:string}={})=>{
     const qs=new URLSearchParams();
     if(params.status)qs.set("status",params.status);
     if(params.store)qs.set("store",params.store);
@@ -47,6 +48,10 @@ export const proceduresApi={
   publish:(token:string,id:string,expectedRevision:number)=>
     request<Procedure>(token,`/api/v1/procedures/${id}/publish`,"POST",
       {expected_revision:expectedRevision}),
+  obsolete:(token:string,id:string)=>
+    request<Procedure>(token,`/api/v1/procedures/${id}/obsolete`,"POST"),
+  deleteProcedure:(token:string,id:string)=>
+    request<{deleted:boolean}>(token,`/api/v1/procedures/${id}`,"DELETE"),
   versions:(token:string,id:string)=>
     request<VersionInfo[]>(token,`/api/v1/procedures/${id}/versions`),
   getVersion:(token:string,id:string,versionId:string)=>

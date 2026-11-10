@@ -92,15 +92,20 @@ class ProceduresService(OperationsService):
             "id": str(row.id), "code": row.code, "title": row.title,
             "summary": row.summary, "applies_to_all": row.applies_to_all,
             "stores": stores,
+            "status": ("obsoleto" if row.obsolete_at else
+                       "publicado" if published else "rascunho"),
+            "obsolete_at": row.obsolete_at.isoformat() if row.obsolete_at else None,
             "current_version": _version_dict(published, include_html=False) if published else None,
             "draft_version": _version_dict(draft, include_html=False) if draft else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else row.created_at.isoformat(),
         }
 
     def _seller_can_see(self, row: Procedure, stores: list[str]) -> bool:
-        """Vendedor ve apenas publicados aplicaveis a sua unica loja."""
+        """Vendedor ve apenas publicados vigentes aplicaveis a sua unica loja."""
         if self.is_editor():
             return True
+        if row.obsolete_at is not None:
+            return False
         viewable = self.allowed("training.view")
         if not viewable:
             return False
@@ -122,9 +127,7 @@ class ProceduresService(OperationsService):
             if not editor:
                 if not self._seller_can_see(row, stores) or info["current_version"] is None:
                     continue
-            if status == "rascunho" and info["draft_version"] is None:
-                continue
-            if status == "publicado" and info["current_version"] is None:
+            if status and info["status"] != status:
                 continue
             if store and not (row.applies_to_all or store in stores):
                 continue
@@ -163,7 +166,7 @@ class ProceduresService(OperationsService):
         row = self._load(procedure_id)
         stores = self._applicable_stores(row.id)
         if not self._seller_can_see(row, stores):
-            raise OperationError(403, "Acesso negado")
+            raise OperationError(404, "Documento não está mais disponível para consulta")
         info = self._proc_dict(row, stores)
         if self.is_editor():
             version = self._draft(row.id) or self._current(row.id)
@@ -284,7 +287,7 @@ class ProceduresService(OperationsService):
         row = self._load(procedure_id)
         stores = self._applicable_stores(row.id)
         if not self._seller_can_see(row, stores):
-            raise OperationError(403, "Acesso negado")
+            raise OperationError(404, "Documento não está mais disponível para consulta")
         version = self.db.scalar(select(ProcedureVersion).where(
             ProcedureVersion.id == version_id,
             ProcedureVersion.procedure_id == row.id))
@@ -293,6 +296,37 @@ class ProceduresService(OperationsService):
         if version.status != "publicado" and not self.is_editor():
             raise OperationError(403, "Acesso negado")
         return _version_dict(version)
+
+    def mark_obsolete(self, procedure_id: UUID) -> dict:
+        if not self.is_editor():
+            raise OperationError(403, "Acesso negado")
+        row = self._load(procedure_id)
+        if self._current(row.id) is None:
+            raise OperationError(422, "Somente procedimentos publicados podem ser obsoletos")
+        if row.obsolete_at is not None:
+            raise OperationError(409, "Procedimento já está obsoleto")
+        row.obsolete_at = datetime.now(timezone.utc)
+        row.obsolete_by = self.actor.id
+        self.audit("procedure.obsoleted", "procedure", str(row.id),
+                   {"code": row.code, "title": row.title})
+        self.commit()
+        return self.get(row.id)
+
+    def delete(self, procedure_id: UUID) -> dict:
+        if not self.is_editor():
+            raise OperationError(403, "Acesso negado")
+        row = self._load(procedure_id)
+        published = self.db.scalar(select(ProcedureVersion.id).where(
+            ProcedureVersion.procedure_id == row.id,
+            ProcedureVersion.status == "publicado"))
+        if published is not None:
+            raise OperationError(409, "Procedimento já publicado não pode ser excluído. "
+                                      "Use 'Marcar como obsoleto'.")
+        row.deleted_at = datetime.now(timezone.utc)
+        self.audit("procedure.deleted", "procedure", str(row.id),
+                   {"code": row.code, "title": row.title})
+        self.commit()
+        return {"id": str(row.id), "deleted": True}
 
     # ---------- imagens ----------
 
@@ -323,7 +357,7 @@ class ProceduresService(OperationsService):
         row = self._load(record.procedure_id)
         stores = self._applicable_stores(row.id)
         if not self._seller_can_see(row, stores):
-            raise OperationError(403, "Acesso negado")
+            raise OperationError(404, "Imagem não disponível")
         if not self.is_editor() and self._current(row.id) is None:
             raise OperationError(404, "Procedimento ainda não publicado")
         return {"name": record.original_name, "media_type": record.media_type,

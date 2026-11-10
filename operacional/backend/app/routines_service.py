@@ -387,6 +387,8 @@ class RoutinesService(OperationsService):
             Procedure.id == procedure_id, Procedure.deleted_at.is_(None)))
         if proc is None:
             raise OperationError(422, "Procedimento não encontrado")
+        if proc.obsolete_at is not None:
+            raise OperationError(422, "Procedimento obsoleto não pode receber novos treinamentos")
         version = self.db.scalars(select(ProcedureVersion).where(
             ProcedureVersion.procedure_id == proc.id,
             ProcedureVersion.status == "publicado",

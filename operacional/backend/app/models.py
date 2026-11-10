@@ -535,6 +535,8 @@ class Procedure(Base):
     updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    obsolete_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    obsolete_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

@@ -47,7 +47,7 @@ def checked(fn):
 
 
 @router.get("")
-def list_procedures(status: str | None = Query(None, pattern=r"^(rascunho|publicado)$"),
+def list_procedures(status: str | None = Query(None, pattern=r"^(rascunho|publicado|obsoleto)$"),
                     store: str | None = None, q: str | None = Query(None, max_length=80),
                     svc: ProceduresService = Depends(service)) -> list[dict]:
     return checked(lambda: svc.list_procedures(status, store, q))
@@ -76,6 +76,18 @@ def save_procedure(procedure_id: UUID, body: ProcedureSave,
 def publish_procedure(procedure_id: UUID, body: PublishBody,
                       svc: ProceduresService = Depends(service)) -> dict:
     return checked(lambda: svc.publish(procedure_id, body.expected_revision))
+
+
+@router.post("/{procedure_id}/obsolete")
+def obsolete_procedure(procedure_id: UUID,
+                       svc: ProceduresService = Depends(service)) -> dict:
+    return checked(lambda: svc.mark_obsolete(procedure_id))
+
+
+@router.delete("/{procedure_id}")
+def delete_procedure(procedure_id: UUID,
+                     svc: ProceduresService = Depends(service)) -> dict:
+    return checked(lambda: svc.delete(procedure_id))
 
 
 @router.get("/{procedure_id}/versions")

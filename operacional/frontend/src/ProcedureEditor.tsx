@@ -37,9 +37,10 @@ const ResizableImage=Image.extend({
     return({node,editor,getPos})=>{
       const wrap=document.createElement("span");
       wrap.className="img-wrap";
+      wrap.style.width=node.attrs.width?String(node.attrs.width):"auto";
       const img=document.createElement("img");
+      img.dataset.apiSrc=node.attrs.src;
       img.src=node.attrs.src;img.alt=node.attrs.alt||"";
-      if(node.attrs.width)img.style.width=String(node.attrs.width);
       wrap.appendChild(img);
       const handle=document.createElement("span");
       handle.className="img-resize-handle";
@@ -47,19 +48,20 @@ const ResizableImage=Image.extend({
       wrap.appendChild(handle);
       handle.addEventListener("mousedown",e=>{
         e.preventDefault();e.stopPropagation();
-        const startX=e.clientX;const startW=img.getBoundingClientRect().width;
+        const startX=e.clientX;const startW=wrap.getBoundingClientRect().width;
         const limit=editor.view.dom.clientWidth||1;
         const move=(ev:MouseEvent)=>{
           const pct=Math.min(100,Math.max(5,Math.round((startW+ev.clientX-startX)/limit*100)));
-          img.style.width=pct+"%";
+          wrap.style.width=pct+"%";
         };
         const up=(ev:MouseEvent)=>{
           document.removeEventListener("mousemove",move);
           document.removeEventListener("mouseup",up);
           const pct=Math.min(100,Math.max(5,Math.round((startW+ev.clientX-startX)/limit*100)));
-          if(typeof getPos==="function"){
-            editor.chain().focus().command(({tr})=>{
-              tr.setNodeMarkup(getPos(),undefined,{...node.attrs,width:pct+"%"});return true;
+          const pos=typeof getPos==="function"?getPos():undefined;
+          if(pos!==undefined){
+            editor.chain().command(({tr})=>{
+              tr.setNodeMarkup(pos,undefined,{...node.attrs,width:pct+"%"});return true;
             }).run();
           }
         };
@@ -70,8 +72,12 @@ const ResizableImage=Image.extend({
         dom:wrap,
         update(updated){
           if(updated.type.name!==node.type.name)return false;
-          if(updated.attrs.width)img.style.width=String(updated.attrs.width);
-          img.src=updated.attrs.src;return true;
+          wrap.style.width=updated.attrs.width?String(updated.attrs.width):"auto";
+          // Preserva o blob autenticado quando o src nao mudou.
+          if(updated.attrs.src!==img.dataset.apiSrc){
+            img.dataset.apiSrc=updated.attrs.src;img.src=updated.attrs.src;
+          }
+          return true;
         },
         selectNode(){wrap.classList.add("img-selected");},
         deselectNode(){wrap.classList.remove("img-selected");},
@@ -211,6 +217,14 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
         {!canEdit&&proc.current_version&&!draft&&<button className="btn-primary" onClick={()=>{
           setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
         }}>Criar nova versão</button>}
+        {proc.current_version&&proc.status!=="obsoleto"&&<button className="btn-secondary" disabled={working}
+          onClick={async()=>{
+            if(!window.confirm(`Marcar ${proc.code} — ${proc.title} como OBSOLETO?\nVendedores deixarão de vê-lo.`))return;
+            setWorking(true);setError("");
+            try{setProc(await proceduresApi.obsolete(token,proc.id));setMessage("Procedimento marcado como obsoleto.");}
+            catch(c){setError(c instanceof Error?c.message:"Falha ao marcar obsoleto.");}
+            finally{setWorking(false);}
+          }}>Obsoleto</button>}
         {!canEdit&&draft&&<button className="btn-primary" onClick={()=>{
           setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
         }}>Continuar edição</button>}

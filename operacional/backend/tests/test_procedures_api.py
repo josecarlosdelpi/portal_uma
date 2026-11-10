@@ -188,6 +188,59 @@ def test_sanitization_drops_external_images(env):
     assert "/api/v1/procedures/files/abc" in html
 
 
+def test_obsolete_hides_from_seller_keeps_history(env):
+    c, actor, _, admin, joi, colega, tub = env
+    p = _proc(c, "POP obsoleto"); pid = p["id"]
+    c.post(f"/api/v1/procedures/{pid}/publish", json={"expected_revision": 1})
+    t = c.post("/api/v1/routines/trainings/JOINVILLE", json={
+        "participant_id": str(joi.id), "procedure_id": pid, "title": "",
+        "instructor": "X", "happened_on": "2026-11-01T10:00:00",
+        "step": "participou", "note": ""}).json()
+    actor["user"] = joi
+    assert pid in {x["id"] for x in c.get("/api/v1/procedures").json()}
+    actor["user"] = admin
+    obs = c.post(f"/api/v1/procedures/{pid}/obsolete")
+    assert obs.status_code == 200, obs.text
+    assert obs.json()["status"] == "obsoleto" and obs.json()["obsolete_at"]
+    # sellers: hidden, blocked on get/version/file
+    actor["user"] = joi
+    assert pid not in {x["id"] for x in c.get("/api/v1/procedures").json()}
+    assert c.get(f"/api/v1/procedures/{pid}").status_code == 404
+    vers = c.get("/api/v1/routines/my-trainings").json()
+    old = next(r for r in vers if r["id"] == t["id"])
+    assert old["procedure"] and old["version"]  # training record kept
+    assert c.get(f"/api/v1/procedures/{pid}/versions/{old['procedure_version_id']}").status_code == 404
+    actor["user"] = admin
+    # admin keeps all versions + audit trail
+    assert len(c.get(f"/api/v1/procedures/{pid}/versions").json()) >= 1
+    # no new training with obsolete procedure
+    r = c.post("/api/v1/routines/trainings/JOINVILLE", json={
+        "participant_id": str(joi.id), "procedure_id": pid, "title": "",
+        "instructor": "X", "happened_on": "2026-11-05T10:00:00",
+        "step": "participou", "note": ""})
+    assert r.status_code == 422, r.text
+    # never-published cannot be marked obsolete
+    draft = _proc(c, "So rascunho obs")
+    assert c.post(f"/api/v1/procedures/{draft['id']}/obsolete").status_code == 422
+
+
+def test_delete_only_never_published(env):
+    c, actor, _, admin, joi, *_ = env
+    draft = _proc(c, "Rascunho descartado")
+    pub = _proc(c, "Publicado firme")
+    c.post(f"/api/v1/procedures/{pub['id']}/publish", json={"expected_revision": 1})
+    # published cannot be deleted
+    assert c.delete(f"/api/v1/procedures/{pub['id']}").status_code == 409
+    # seller cannot delete
+    actor["user"] = joi
+    assert c.delete(f"/api/v1/procedures/{draft['id']}").status_code == 403
+    actor["user"] = admin
+    # draft deleted logically: disappears from list and get
+    assert c.delete(f"/api/v1/procedures/{draft['id']}").status_code == 200
+    assert draft["id"] not in {x["id"] for x in c.get("/api/v1/procedures").json()}
+    assert c.get(f"/api/v1/procedures/{draft['id']}").status_code == 404
+
+
 def test_seller_sees_only_published_applicable(env):
     c, actor, _, admin, joi, colega, tub = env
     pub = _proc(c, "Global publicado")

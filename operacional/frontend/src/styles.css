@@ -151,3 +151,13 @@
 .img-wrap.img-selected .img-resize-handle{display:block}
 .badge-draft{background:#fff3cd;color:#856404;padding:2px 8px;border-radius:10px;font-size:12px}
 .badge-pub{background:#d4edda;color:#155724;padding:2px 8px;border-radius:10px;font-size:12px}
+
+/* wrap de imagem redimensionavel - largura definida pelo NodeView */
+.img-wrap{display:inline-block;position:relative;max-width:100%;line-height:0;vertical-align:bottom}
+.img-wrap img{display:block;width:100%;height:auto;border-radius:6px}
+.badge-obs{background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:10px;font-size:12px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:60}
+.modal-card{background:#fff;border-radius:10px;padding:24px;max-width:460px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.modal-card h3{margin:0 0 10px}.modal-card p{color:#555;line-height:1.5}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.btn-danger{background:#b3261e;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer}

@@ -43,7 +43,8 @@ export function TrainingPage({token,profile}:Props){
   const [tab,setTab]=useState<"procedimentos"|"treinamentos"|"meus">("procedimentos");
   const [procs,setProcs]=useState<Procedure[]>([]);
   const [q,setQ]=useState("");
-  const [statusFilter,setStatusFilter]=useState<""|"rascunho"|"publicado">("");
+  const [statusFilter,setStatusFilter]=useState<""|"rascunho"|"publicado"|"obsoleto">("");
+  const [deleting,setDeleting]=useState<Procedure|null>(null);
   const [storeFilter,setStoreFilter]=useState("");
   const [viewing,setViewing]=useState<{id:string;versionId?:string}|null>(null);
   const [editing,setEditing]=useState<Procedure|null>(null);
@@ -100,6 +101,23 @@ export function TrainingPage({token,profile}:Props){
       summary:"",applies_to_all:true,store_codes:[],content_html:""});
       const full=await proceduresApi.get(token,created.id);setEditing(full);}
     catch(cause){setError(cause instanceof Error?cause.message:"Falha ao criar.");}
+    finally{setWorking(false);}
+  }
+
+  async function markObsolete(p:Procedure){
+    if(!window.confirm(`Marcar o procedimento ${p.code} — ${p.title} como OBSOLETO?\nEle deixará de ser exibido aos vendedores.`))return;
+    setWorking(true);setError("");setMessage("");
+    try{await proceduresApi.obsolete(token,p.id);await refreshProcs();
+      setMessage(`${p.code} marcado como obsoleto.`);}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao marcar obsoleto.");}
+    finally{setWorking(false);}
+  }
+
+  async function confirmDelete(){
+    if(!deleting)return;setWorking(true);setError("");setMessage("");
+    try{await proceduresApi.deleteProcedure(token,deleting.id);
+      setDeleting(null);await refreshProcs();setMessage("Procedimento excluído.");}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");setDeleting(null);}
     finally{setWorking(false);}
   }
 
@@ -165,12 +183,21 @@ export function TrainingPage({token,profile}:Props){
     </div>
     {error&&<div className="notice notice-error" role="alert">{error}</div>}
     {message&&<div className="notice notice-success" role="status">{message}</div>}
+    {deleting&&<div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className="modal-card"><h3>Excluir procedimento</h3>
+        <p>Tem certeza de que deseja excluir o procedimento {deleting.code} — {deleting.title}?
+        O procedimento será removido da listagem e não poderá mais ser utilizado.</p>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={()=>setDeleting(null)}>Cancelar</button>
+          <button className="btn-danger" disabled={working} onClick={()=>void confirmDelete()}>Sim, excluir</button>
+        </div></div></div>}
 
     {tab==="procedimentos"&&<>
       <div className="routine-filters">
         <label>Busca<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Título ou código"/></label>
         {canWrite&&<label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value as typeof statusFilter)}>
-          <option value="">Todas</option><option value="publicado">Publicado</option><option value="rascunho">Rascunho</option>
+          <option value="">Todas</option><option value="publicado">Publicado</option>
+          <option value="rascunho">Rascunho</option><option value="obsoleto">Obsoleto</option>
         </select></label>}
         <label>Loja<select value={storeFilter} onChange={e=>setStoreFilter(e.target.value)}>
           <option value="">Todas</option>{profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}
@@ -181,13 +208,21 @@ export function TrainingPage({token,profile}:Props){
         <tbody>{procs.map(p=><tr key={p.id}>
           <td>{p.code}</td><td>{p.title}</td>
           <td>{p.applies_to_all?"Todas":p.stores.map(labelStore).join(", ")}</td>
-          <td>{p.draft_version?<span className="badge-draft">Rascunho v{p.draft_version.version_label}</span>
-            :p.current_version?<span className="badge-pub">Publicado v{p.current_version.version_label}</span>:"—"}</td>
+          <td>{p.status==="obsoleto"?<span className="badge-obs">Obsoleto</span>
+            :p.draft_version?<span className="badge-draft">Rascunho v{p.draft_version.version_label}</span>
+            :<span className="badge-pub">Publicado v{p.current_version!.version_label}</span>}</td>
           <td>{new Date(p.updated_at).toLocaleDateString("pt-BR")}</td>
           <td><div className="routine-file-actions">
             <button className="btn-secondary" onClick={()=>setViewing({id:p.id})}>Abrir</button>
-            {canWrite&&<button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>
-              {p.draft_version?"Continuar edição":p.current_version?"Nova versão":"Editar"}</button>}
+            {canWrite&&p.status!=="obsoleto"&&(p.draft_version||p.current_version)&&
+              <button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>
+                {p.draft_version?"Continuar edição":"Nova versão"}</button>}
+            {canWrite&&p.status==="rascunho"&&!p.draft_version&&
+              <button className="btn-secondary" onClick={async()=>setEditing(await proceduresApi.get(token,p.id))}>Editar</button>}
+            {canWrite&&p.status==="publicado"&&
+              <button className="btn-secondary" disabled={working} onClick={()=>void markObsolete(p)}>Obsoleto</button>}
+            {canWrite&&!p.current_version&&
+              <button className="btn-secondary" disabled={working} onClick={()=>setDeleting(p)}>Excluir</button>}
           </div></td></tr>)}</tbody></table></div>
         {procs.length===0&&<p className="empty">Nenhum procedimento encontrado.</p>}
       </article>
