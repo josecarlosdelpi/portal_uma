@@ -288,3 +288,15 @@
 .fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{opacity:1;pointer-events:auto;width:auto!important}
 @media(hover:none){.fav-item .fav-reorder{position:static!important;transform:none;opacity:.85;
   pointer-events:auto;flex-direction:row;width:auto!important;background:transparent}}
+
+/* logomarca com mais destaque (100-125px visuais) + scrollbar discreta */
+.sidebar .brand{padding:4px 6px 14px;gap:12px}
+.sidebar .brand .brand-logo-image{width:112px;height:56px;object-fit:contain;object-position:left center}
+.sidebar .brand strong{font-size:14px;letter-spacing:.5px}
+.sidebar .brand small{font-size:10px}
+.sidebar::-webkit-scrollbar{width:8px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:4px}
+.sidebar::-webkit-scrollbar-thumb:hover{background:#4a4a4a}
+.sidebar{scrollbar-width:thin;scrollbar-color:#3a3a3a transparent}
+@media(max-width:940px){.sidebar .brand .brand-logo-image{width:112px;height:56px}}

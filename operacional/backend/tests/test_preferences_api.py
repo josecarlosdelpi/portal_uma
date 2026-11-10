@@ -108,6 +108,37 @@ def test_hidden_favorites_survive_later_saves(env):
     assert again["sidebar_pinned"] is False
 
 
+def test_middle_favorite_keeps_position(env):
+    """Favorito no meio da lista perde permissao, volta a posicao original."""
+    c, actor, engine, admin, joi = env
+    actor["user"] = joi
+    with Session(engine) as db:
+        gid = db.scalars(select(StoreGroup.id).where(StoreGroup.store_code == "JOINVILLE")).first()
+        for code in ("targets.view", "reviews.view"):
+            db.add(GroupPermission(group_id=gid, code=code, granted=True))
+        db.commit()
+    c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": ["targets", "training", "reviews"]})
+    assert c.get("/api/v1/me/preferences").json()["favorites"] == [
+        "targets", "training", "reviews"]
+    # perde acesso ao item do meio
+    with Session(engine) as db:
+        db.query(GroupPermission).filter(GroupPermission.code == "training.view").delete()
+        db.commit()
+    assert c.get("/api/v1/me/preferences").json()["favorites"] == ["targets", "reviews"]
+    # continua usando: muda pin e reordena os visiveis
+    c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": False, "favorites": ["reviews", "targets"]})
+    assert c.get("/api/v1/me/preferences").json()["favorites"] == ["reviews", "targets"]
+    # permissao volta: training reaparece na posicao original (meio)
+    with Session(engine) as db:
+        db.add(GroupPermission(group_id=gid, code="training.view", granted=True))
+        db.commit()
+    got = c.get("/api/v1/me/preferences").json()
+    assert got["favorites"] == ["reviews", "training", "targets"]
+    assert got["sidebar_pinned"] is False
+
+
 def test_order_moves_and_pruning(env):
     c, actor, _, admin, joi = env
     c.put("/api/v1/me/preferences", json={

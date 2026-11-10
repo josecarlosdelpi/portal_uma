@@ -182,22 +182,33 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   useEffect(() => {
     if (!token || !profile || prefsLoaded) return;
     void api.preferences(token).then(p => {
-      setPinned(p.sidebar_pinned); setFavorites(p.favorites); setPrefsLoaded(true);
+      setPinned(p.sidebar_pinned); setFavorites(p.favorites);
+      lastSaved.current = { p: p.sidebar_pinned, f: p.favorites };
+      setPrefsLoaded(true);
     }).catch(() => setPrefsLoaded(true));
   }, [token, profile, prefsLoaded]);
 
-  const persistQueue = useRef(Promise.resolve());
+  // Fila serializada + numero de gravacao: respostas intermediarias nunca
+  // sobrescrevem alteracoes mais recentes do usuario; falha restaura o
+  // ultimo estado confirmado pelo servidor.
+  const persistQueue = useRef<Promise<void>>(Promise.resolve());
   const lastSaved = useRef<{ p: boolean; f: string[] } | null>(null);
+  const writeSeq = useRef(0);
   const persist = useCallback((nextPinned: boolean, nextFavs: string[]) => {
-    persistQueue.current = persistQueue.current.then(
-      () => api.savePreferences(token, { sidebar_pinned: nextPinned, favorites: nextFavs })
-    ).then(saved => {
-      lastSaved.current = { p: saved.sidebar_pinned, f: saved.favorites };
-      setPinned(saved.sidebar_pinned); setFavorites(saved.favorites);
-    }).catch(problem => {
-      setError(errorText(problem));
-      if (lastSaved.current) {
-        setPinned(lastSaved.current.p); setFavorites(lastSaved.current.f);
+    const seq = ++writeSeq.current;
+    persistQueue.current = persistQueue.current.then(async () => {
+      try {
+        const saved = await api.savePreferences(
+          token, { sidebar_pinned: nextPinned, favorites: nextFavs });
+        lastSaved.current = { p: saved.sidebar_pinned, f: saved.favorites };
+        if (seq === writeSeq.current) {
+          setPinned(saved.sidebar_pinned); setFavorites(saved.favorites);
+        }
+      } catch (problem) {
+        setError(errorText(problem));
+        if (seq === writeSeq.current && lastSaved.current) {
+          setPinned(lastSaved.current.p); setFavorites(lastSaved.current.f);
+        }
       }
     });
   }, [token]);
