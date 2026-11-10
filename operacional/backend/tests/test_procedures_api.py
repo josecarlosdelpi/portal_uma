@@ -339,3 +339,20 @@ def test_seller_sees_only_published_applicable(env):
     ids = {p["id"] for p in c.get("/api/v1/procedures").json()}
     assert tub_only["id"] in ids
 
+
+
+def test_obsolete_blocks_writes(env):
+    """Procedimento obsoleto: sem edicao, publicacao ou novos anexos."""
+    c, _, _, admin, joi, *_ = env
+    p = _proc(c, "POP obsoleto bloqueado"); pid = p["id"]
+    c.post(f"/api/v1/procedures/{pid}/publish", json={"expected_revision": 1})
+    c.post(f"/api/v1/procedures/{pid}/obsolete")
+    assert c.put(f"/api/v1/procedures/{pid}", json={
+        "title": "Nova tentativa", "summary": "", "applies_to_all": True,
+        "store_codes": [], "content_html": "<p>x</p>",
+        "expected_revision": 1}).status_code == 409
+    assert c.post(f"/api/v1/procedures/{pid}/publish",
+                  json={"expected_revision": 1}).status_code == 409
+    assert c.put(f"/api/v1/procedures/{pid}/files",
+                 files={"file": ("i.png", b"\x89PNG\r\n\x1a\n" + b"0" * 60, "image/png")}
+                 ).status_code == 409
