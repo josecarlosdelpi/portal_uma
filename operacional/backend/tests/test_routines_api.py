@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import Base,Store,User,GroupMembership,GroupPermission,StoreGroup,AuditEvent
+from app.models import Base,Store,User,GroupMembership,GroupPermission,StoreGroup,AuditEvent,Procedure,TrainingRecord
 
 
 @pytest.fixture
@@ -479,3 +479,36 @@ def test_trainings_multi_store_and_filters(env):
     assert len(page1) == 2 and len(page2) == 1
     ids = {r["id"] for r in page1 + page2}
     assert len(ids) == 3
+
+
+def test_trainings_procedures_include_deleted_metadata(env):
+    """Procedimento obsoleto ou excluido continua localizavel no filtro
+    via metadados do historico, sem liberar seu conteudo."""
+    from datetime import datetime
+    c, actor, engine, admin, seller, other = env
+    actor["user"] = admin
+    with Session(engine) as db:
+        deleted = Procedure(id=uuid4(), code="POP-DEL", title="Antigo excluído",
+                            created_by=admin.id, deleted_at=datetime.now())
+        db.add(deleted); db.flush()
+        db.add(TrainingRecord(
+            id=uuid4(), store_code="JOINVILLE", participant_id=seller.id,
+            procedure="POP-DEL — Antigo excluído", version="1", title="",
+            instructor="Gestão", happened_on=datetime(2026, 10, 10, 9, 0),
+            step="participou", note="", procedure_id=deleted.id,
+            procedure_version_id=None, recorded_by=admin.id))
+        db.commit()
+        deleted_id = str(deleted.id)
+    rows = c.get("/api/v1/routines/trainings/procedures?stores=JOINVILLE").json()
+    labels = {r["procedure_id"]: r["procedure"] for r in rows}
+    assert deleted_id in labels
+    assert "POP-DEL" in labels[deleted_id]
+    # o documento continua inacessivel mesmo assim
+    assert c.get(f"/api/v1/procedures/{deleted_id}").status_code == 404
+    # seller enxerga somente metadados dos proprios treinamentos
+    actor["user"] = seller
+    own = c.get("/api/v1/routines/trainings/procedures?stores=JOINVILLE").json()
+    assert deleted_id in {r["procedure_id"] for r in own}
+    actor["user"] = other
+    denied = c.get("/api/v1/routines/trainings/procedures?stores=JOINVILLE")
+    assert denied.status_code == 403

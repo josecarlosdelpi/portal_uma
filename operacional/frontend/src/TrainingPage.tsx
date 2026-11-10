@@ -190,6 +190,8 @@ export function TrainingPage({token,profile}:Props){
   const [store,setStore]=useState(profile.stores[0]??"");
   const [entries,setEntries]=useState<TrainingEntry[]>([]);
   const [people,setPeople]=useState<TeamMember[]>([]);
+  const [team,setTeam]=useState<TeamMember[]>([]);
+  const [histProcs,setHistProcs]=useState<{procedure_id:string;procedure:string}[]>([]);
   const [mine,setMine]=useState<TrainingEntry[]>([]);
   const [editRec,setEditRec]=useState<TrainingEntry|null>(null);
   const [participant,setParticipant]=useState("");
@@ -207,6 +209,7 @@ export function TrainingPage({token,profile}:Props){
   const [fEnd,setFEnd]=useState("");
   const [hasMore,setHasMore]=useState(false);
   const PAGE_SIZE=200;
+  const reqSeq=useRef(0);
   const [loading,setLoading]=useState(false);
   const [working,setWorking]=useState(false);
   const [error,setError]=useState("");
@@ -222,22 +225,30 @@ export function TrainingPage({token,profile}:Props){
   const activeStores=filterStores.length?filterStores:profile.stores;
   const refreshTrainings=useCallback(async()=>{
     const stores=filterStores.length?filterStores:profile.stores;
-    if(!stores.length)return;setLoading(true);setError("");
+    if(!stores.length)return;
+    const seq=++reqSeq.current;
+    setLoading(true);setError("");
     try{
-      const [rows,...teams]=await Promise.all([
+      const [rows,hprocs,formTeam,...teams]=await Promise.all([
         routinesApi.trainingsMulti(token,stores,{participant_ids:fPersons,
           procedure_ids:fProcs,start:fStart||undefined,end:fEnd||undefined,
           limit:PAGE_SIZE}),
+        routinesApi.trainingProcedures(token,stores),
+        canWrite&&store?operationsApi.team(token,store).catch(()=>[] as TeamMember[])
+          :Promise.resolve([] as TeamMember[]),
         ...(canWrite?stores.map(s=>operationsApi.team(token,s).catch(()=>[] as TeamMember[]))
           :[Promise.resolve([] as TeamMember[])])]);
-      setEntries(rows);setHasMore(rows.length===PAGE_SIZE);
+      if(seq!==reqSeq.current)return rows;
+      setEntries(rows);setHasMore(rows.length===PAGE_SIZE);setHistProcs(hprocs);
+      setTeam(formTeam);
       const seen=new Map<string,TeamMember>();
-      for(const team of teams)for(const m of team)seen.set(m.id,m);
+      for(const t of teams)for(const m of t)seen.set(m.id,m);
       setPeople([...seen.values()]);
       return rows;
-    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível carregar.");}
-    finally{setLoading(false);}
-  },[token,filterStores,canWrite,fPersons,fProcs,fStart,fEnd,profile.stores]);
+    }catch(cause){if(seq===reqSeq.current)
+      setError(cause instanceof Error?cause.message:"Não foi possível carregar.");}
+    finally{if(seq===reqSeq.current)setLoading(false);}
+  },[token,store,filterStores,canWrite,fPersons,fProcs,fStart,fEnd,profile.stores]);
   useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
 
   async function loadMore(){
@@ -511,12 +522,11 @@ export function TrainingPage({token,profile}:Props){
         <MultiSelect label="Colaborador" empty="Todos" value={fPersons} onChange={setFPersons}
           options={people.map(p=>({value:p.id,label:p.name}))}/>
         <MultiSelect label="Procedimento" empty="Todos" value={fProcs} onChange={setFProcs}
-          options={[...procs.filter(p=>p.current_version)
-            .map(p=>({value:p.id,label:`${p.code} — ${p.title}`})),
-            ...[...new Map(entries
-              .filter(e=>e.procedure_id&&!procs.some(p=>p.id===e.procedure_id))
-              .map(e=>[e.procedure_id as string,e.procedure])).entries()]
-            .map(([value,label])=>({value,label}))]}/>
+          options={[...new Map([
+            ...procs.filter(p=>p.current_version)
+              .map(p=>[p.id,`${p.code} — ${p.title}`] as [string,string]),
+            ...histProcs.map(h=>[h.procedure_id,h.procedure] as [string,string]),
+          ]).entries()].map(([value,label])=>({value,label}))}/>
         <label>De<input type="date" value={fStart} onChange={e=>setFStart(e.target.value)}/></label>
         <label>Até<input type="date" value={fEnd} onChange={e=>setFEnd(e.target.value)}/></label>
       </div>
@@ -530,7 +540,9 @@ export function TrainingPage({token,profile}:Props){
             {profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}</select></label>
           <label>Colaborador<select ref={participantRef} value={participant} onChange={e=>setParticipant(e.target.value)}>
             <option value="">Selecione…</option>
-            {people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+            {editRec&&participant&&!team.some(p=>p.id===participant)&&
+              <option value={participant}>{editRec.participant}</option>}
+            {team.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label>Procedimento<select value={procedureId} onChange={e=>setProcedureId(e.target.value)}>
             <option value="">Selecione…</option>
             {procs.filter(p=>p.current_version).map(p=><option key={p.id} value={p.id}>

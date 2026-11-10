@@ -84,6 +84,9 @@ export const routinesApi={
     if(filters.offset)qs.set("offset",String(filters.offset));
     return request<TrainingEntry[]>(token,`/api/v1/routines/trainings?${qs}`);
   },
+  trainingProcedures:(token:string,stores:string[])=>
+    request<{procedure_id:string;procedure:string}[]>(token,
+      `/api/v1/routines/trainings/procedures?stores=${stores.join(",")}`),
   trainings:(token:string,store:string,filters:{
     participant_id?:string;procedure_id?:string;start?:string;end?:string}={})=>{
     const qs=new URLSearchParams();

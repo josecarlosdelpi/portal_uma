@@ -185,6 +185,13 @@ def trainings_multi(stores:str="",participant_ids:str|None=None,
         limit=limit,offset=offset))
 
 
+@router.get("/trainings/procedures")
+def trainings_procedures(stores:str="",
+                         svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.trainings_procedures(
+        [s.strip() for s in stores.split(",") if s.strip()]))
+
+
 @router.get("/trainings/{store_code}")
 def trainings(store_code:str,limit:int=Query(100,ge=1,le=500),
               participant_id:UUID|None=None,procedure_id:UUID|None=None,

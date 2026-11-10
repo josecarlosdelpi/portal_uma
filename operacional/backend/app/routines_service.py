@@ -380,6 +380,28 @@ class RoutinesService(OperationsService):
                    for uid,name,media,size,revision in document_data}
         return [self._training(row,name,documents.get(row.id)) for row,name in rows]
 
+    def trainings_procedures(self,stores:list[str])->list[dict]:
+        """Procedimentos distintos presentes no historico de treinamentos.
+
+        Inclui procedimentos obsoletos e excluidos logicamente (somente
+        metadados id+rotulo), independentemente da paginacao.
+        """
+        allowed=[s for s in stores if s in STORE_CODES
+                 and can_access(self.principal,"training.view",s)]
+        if not allowed:
+            raise OperationError(403,"Acesso negado")
+        query=(select(TrainingRecord.procedure_id,TrainingRecord.procedure)
+            .where(TrainingRecord.store_code.in_(allowed),
+                   TrainingRecord.deleted_at.is_(None),
+                   TrainingRecord.procedure_id.is_not(None))
+            .distinct())
+        for s in allowed:
+            if not can_access(self.principal,"training.edit",s):
+                query=query.where(TrainingRecord.participant_id==self.actor.id)
+                break
+        rows=self.db.execute(query).all()
+        return [{"procedure_id":str(pid),"procedure":name} for pid,name in rows]
+
     def training(self,store:str,limit:int=100,participant_id:UUID|None=None,
                  procedure_id:UUID|None=None,start:date|None=None,
                  end:date|None=None)->list[dict]:
