@@ -327,3 +327,31 @@
 .fav-org-actions button:disabled{opacity:.3;cursor:default}
 .fav-org-actions .fav-org-remove{color:#8a2a20;border-color:#e6c0bc}
 @media(max-width:940px){.sidebar .brand .brand-logo-image{width:118px;height:60px}}
+
+/* Cabecalho premium da sidebar (referencia UMA): card escuro + detalhes dourados */
+.sidebar .brand{
+  position:relative;display:flex;flex-direction:column;align-items:center;
+  gap:0;padding:20px 12px 16px;margin:0 4px 12px;
+  background:linear-gradient(165deg,#0a0a0a 0%,#141414 55%,#171204 100%);
+  border:1px solid #ffd90033;border-radius:14px;overflow:hidden}
+.sidebar .brand::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(130px 70px at -5% -10%,rgba(255,217,0,.30),transparent 70%),
+    radial-gradient(150px 80px at 105% 110%,rgba(255,217,0,.22),transparent 70%)}
+.sidebar .brand .brand-logo-image{width:150px;max-height:72px;height:auto;object-fit:contain;
+  position:relative;z-index:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
+.brand-title{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
+  gap:16px;width:100%;margin-top:10px}
+.brand-title::before,.brand-title::after{content:"";height:1px;flex:1;max-width:56px;
+  background:linear-gradient(90deg,transparent,#d2b300)}
+.brand-title::after{background:linear-gradient(90deg,#d2b300,transparent)}
+.brand-title strong{color:#fff;font-size:16.5px;font-weight:800;letter-spacing:2.4px;white-space:nowrap}
+.brand-sub{position:relative;z-index:1;color:#b9b9b9;font-size:11.5px;margin-top:4px;letter-spacing:.3px}
+.pin-btn{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border:1px solid #ffd90066;border-radius:8px;
+  background:rgba(0,0,0,.35);color:#d2b300;cursor:pointer;transition:all .15s}
+.pin-btn:hover{background:rgba(210,179,0,.18);color:#ffe252}
+@media(max-width:940px){
+  .sidebar .brand{padding:16px 12px 13px;margin-bottom:10px}
+  .sidebar .brand .brand-logo-image{width:130px;max-height:60px}
+}

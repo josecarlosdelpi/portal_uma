@@ -312,10 +312,11 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       </div></div>}
     <aside className={"sidebar" + (tempOpen ? " open" : "")} aria-label="Barra lateral">
       <div className="brand">
-        <div className="brand-top"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/></div>
-        <div className="brand-name"><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div>
         <button type="button" className="pin-btn" aria-label={pinned ? "Desafixar barra lateral" : "Fixar barra lateral"}
-          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? <Pin size={14}/> : <PinOff size={14}/>}</button></div>
+          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? <Pin size={13}/> : <PinOff size={13}/>}</button>
+        <img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/>
+        <div className="brand-title"><strong>PORTAL UMA</strong></div>
+        <small className="brand-sub">Gestão operacional</small>
       </div>
       <div className="side-heading side-heading-fav"><span>FAVORITOS</span>
         <button type="button" className="fav-org-btn" aria-label="Organizar favoritos"
