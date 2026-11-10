@@ -208,3 +208,33 @@
   .sidebar .nav-link{display:flex!important;flex-direction:row!important}
   .sb-open .sidebar .sidebar-note,.sb-open .sidebar .sidebar-bottom{display:block}
 }
+
+/* Revisao visual da sidebar (PR7): compacta, elegante, icones Lucide */
+.sidebar{padding:14px 10px 16px;overflow-y:auto}
+.sidebar .brand{flex-direction:row;align-items:center;gap:9px;padding:0 4px 12px;border-bottom:1px solid #ffffff1f}
+.sidebar .brand .brand-logo-image{width:34px;height:34px;object-fit:contain;background:transparent;flex-shrink:0}
+.sidebar .brand>div{text-align:left;min-width:0;flex:1}
+.sidebar .brand strong{font-size:13px;letter-spacing:.6px}
+.sidebar .brand small{font-size:10px;display:block}
+.side-heading{font-size:9px;letter-spacing:1.6px;margin:16px 8px 6px;font-weight:800}
+.sidebar .nav-item{padding:0;margin:1px 0}
+.nav-link{gap:9px;padding:7px 9px;font-size:12.5px;border-radius:7px}
+.nav-link span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-link .nav-icon{flex-shrink:0;opacity:.85}
+.star-btn{padding:4px;opacity:.55}
+.star-btn:hover{opacity:1}
+.star-btn.starred{opacity:1;color:#d2b300}
+.fav-item{background:rgba(255,255,255,.05);border-radius:7px;margin:2px 0;padding:0 2px}
+.fav-item .nav-link{padding:6px 6px;font-size:12.5px}
+.fav-item .nav-link.active{background:rgba(210,179,0,.18);color:#fff;font-weight:600}
+.drag-grip{display:flex;align-items:center;color:#6b6b6b;padding:0 2px;flex-shrink:0}
+.fav-reorder{display:flex;flex-direction:row;gap:1px}
+.fav-reorder button{padding:2px;display:flex;align-items:center}
+.sidebar-note{font-size:10px;padding:9px;margin-top:12px}
+.sidebar-bottom{font-size:9px;padding:12px 8px 0}
+.pin-btn{color:#9a9378;padding:3px;display:flex;align-items:center}
+.pin-btn:hover{color:#d2b300}
+@media(max-width:940px){
+  .sidebar .brand .brand-logo-image{width:34px;height:34px}
+  .sidebar .brand{padding:0 4px 12px}
+}

@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  LayoutDashboard, Phone, Star, Package, ListChecks, CalendarCheck,
+  Target, MessageCircle, GraduationCap, ClipboardCheck, Settings,
+  Pin, PinOff, GripVertical, ChevronUp, ChevronDown, Menu, ChevronsRight,
+} from "lucide-react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent, type LocalResetPassword, ApiError } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
 import { TargetsPage } from "./TargetsPage";
@@ -18,18 +23,18 @@ type Tab = "usuarios" | "grupos" | "auditoria";
 type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training";
 
 /** Identificadores estaveis dos modulos (mesmos chaves do backend /preferences). */
-const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: string }> = [
-  { key: "overview", label: "Visão geral", icon: "▦" },
-  { key: "contacts", label: "Telemarketing", icon: "☎" },
-  { key: "reviews", label: "Avaliações Google", icon: "★" },
-  { key: "supplies", label: "Materiais e insumos", icon: "▣" },
-  { key: "checklist", label: "Checklist semanal", icon: "☑" },
-  { key: "daily", label: "Tarefas diárias", icon: "☷" },
-  { key: "targets", label: "Metas diárias", icon: "$" },
-  { key: "whatsapp", label: "Status WhatsApp / Instagram", icon: "▤" },
-  { key: "training", label: "Padrões e treinamento", icon: "☰" },
-  { key: "closing", label: "Fechamento Mensal", icon: "◎" },
-  { key: "access", label: "Configurações", icon: "⚙" },
+const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> = [
+  { key: "overview", label: "Visão geral", icon: LayoutDashboard },
+  { key: "contacts", label: "Telemarketing", icon: Phone },
+  { key: "reviews", label: "Avaliações Google", icon: Star },
+  { key: "supplies", label: "Materiais e insumos", icon: Package },
+  { key: "checklist", label: "Checklist semanal", icon: ListChecks },
+  { key: "daily", label: "Tarefas diárias", icon: CalendarCheck },
+  { key: "targets", label: "Metas diárias", icon: Target },
+  { key: "whatsapp", label: "Status WhatsApp / Instagram", icon: MessageCircle },
+  { key: "training", label: "Padrões e treinamento", icon: GraduationCap },
+  { key: "closing", label: "Fechamento Mensal", icon: ClipboardCheck },
+  { key: "access", label: "Configurações", icon: Settings },
 ];
 const navLabel = (key: string) => NAV_ITEMS.find(i => i.key === key)?.label ?? key;
 
@@ -237,12 +242,12 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   return <div className={"shell" + (pinned ? " sb-pinned" : " sb-unpinned") + (tempOpen ? " sb-open" : "")}>
     {!pinned && <button type="button" className="edge-strip" aria-label="Abrir menu lateral"
       onMouseEnter={() => setTempOpen(true)} onClick={() => setTempOpen(true)}>
-      <span aria-hidden="true">»</span></button>}
+      <ChevronsRight size={13} aria-hidden="true"/></button>}
     {tempOpen && <div className="side-backdrop" onClick={() => setTempOpen(false)} aria-hidden="true"/>}
     <aside className={"sidebar" + (tempOpen ? " open" : "")} aria-label="Barra lateral">
       <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div>
         <button type="button" className="pin-btn" aria-label={pinned ? "Desafixar barra lateral" : "Fixar barra lateral"}
-          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? "📌" : "📍"}</button>
+          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? <Pin size={14}/> : <PinOff size={14}/>}</button>
       </div>
       <div className="side-heading">FAVORITOS</div>
       <nav aria-label="Favoritos" className="fav-list">
@@ -254,13 +259,14 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
           onDragOver={e => { e.preventDefault(); setDropTarget(item.key); }}
           onDragLeave={() => setDropTarget(prev => prev === item.key ? null : prev)}
           onDrop={() => onFavDrop(item.key)} onDragEnd={() => { setDragKey(null); setDropTarget(null); }}>
+          <span className="drag-grip" aria-hidden="true"><GripVertical size={13}/></span>
           <button className={"nav-link" + (area === item.key ? " active" : "")}
-            onClick={() => selectArea(item.key)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span></button>
+            onClick={() => selectArea(item.key)}><item.icon size={15} className="nav-icon" strokeWidth={1.9}/><span>{item.label}</span></button>
           <span className="fav-reorder">
             <button type="button" aria-label={"Subir " + item.label} disabled={i === 0}
-              onClick={() => moveFav(i, -1)}>↑</button>
+              onClick={() => moveFav(i, -1)}><ChevronUp size={12}/></button>
             <button type="button" aria-label={"Descer " + item.label} disabled={i === favItems.length - 1}
-              onClick={() => moveFav(i, 1)}>↓</button>
+              onClick={() => moveFav(i, 1)}><ChevronDown size={12}/></button>
           </span>
         </div>)}
       </nav>
@@ -268,13 +274,13 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       <nav aria-label="Menu principal">
         {visibleItems.map(item => <div className="nav-item" key={item.key}>
           <button className={"nav-link" + (area === item.key ? " active" : "")}
-            onClick={() => selectArea(item.key)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span></button>
+            onClick={() => selectArea(item.key)}><item.icon size={15} className="nav-icon" strokeWidth={1.9}/><span>{item.label}</span></button>
           <button type="button" className={"star-btn" + (favorites.includes(item.key) ? " starred" : "")}
             aria-label={(favorites.includes(item.key) ? "Remover " : "Favoritar ") + item.label}
             aria-pressed={favorites.includes(item.key)}
-            onClick={() => toggleFav(item.key)}>{favorites.includes(item.key) ? "★" : "☆"}</button>
+            onClick={() => toggleFav(item.key)}><Star size={14} fill={favorites.includes(item.key) ? "currentColor" : "none"}/></button>
         </div>)}
-        <div className="nav-item disabled"><span className="nav-icon">↗</span><span>Vendas</span><span className="soon">ERP pendente</span></div>
+        <div className="nav-item disabled"><span>Vendas</span><span className="soon">ERP pendente</span></div>
       </nav>
       <div className="side-spacer"/>
       <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>
@@ -282,7 +288,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
     </aside>
     <main className="main">
       <header className="topbar"><button type="button" className="menu-btn" aria-label="Abrir menu"
-        onClick={() => setTempOpen(true)}>☰</button><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{navLabel(area)}</strong></div>
+        onClick={() => setTempOpen(true)}><Menu size={20}/></button><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{navLabel(area)}</strong></div>
         <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={onLogout}>Sair</button></div>
       </header>
       <div className="workspace">
