@@ -218,6 +218,8 @@ class ProceduresService(OperationsService):
         if not self.is_editor():
             raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if row.obsolete_at is not None:
+            raise OperationError(409, "Procedimento obsoleto não pode ser editado")
         title = title.strip()
         if not 3 <= len(title) <= 140:
             raise OperationError(422, "Título inválido")
@@ -254,6 +256,8 @@ class ProceduresService(OperationsService):
         if not self.is_editor():
             raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if row.obsolete_at is not None:
+            raise OperationError(409, "Procedimento obsoleto não pode ser publicado")
         draft = self.db.scalar(select(ProcedureVersion).where(
             ProcedureVersion.procedure_id == row.id,
             ProcedureVersion.status == "rascunho").with_for_update())
@@ -335,6 +339,8 @@ class ProceduresService(OperationsService):
         if not self.is_editor():
             raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if row.obsolete_at is not None:
+            raise OperationError(409, "Procedimento obsoleto não recebe novos arquivos")
         name, mime = validated_file(
             raw, filename, media_type, set(IMAGE_EXTENSIONS), MAX_IMAGE_BYTES
         )
