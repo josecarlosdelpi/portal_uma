@@ -72,13 +72,16 @@ export const routinesApi={
     request<InstagramRow>(token,`/api/v1/routines/instagram/${store}/${year}/${month}`,
       "PUT",{planned,completed,expected_revision}),
   trainingsMulti:(token:string,stores:string[],filters:{
-    participant_ids?:string[];procedure_ids?:string[];start?:string;end?:string}={})=>{
+    participant_ids?:string[];procedure_ids?:string[];start?:string;end?:string;
+    limit?:number;offset?:number}={})=>{
     const qs=new URLSearchParams();
     qs.set("stores",stores.join(","));
     if(filters.participant_ids?.length)qs.set("participant_ids",filters.participant_ids.join(","));
     if(filters.procedure_ids?.length)qs.set("procedure_ids",filters.procedure_ids.join(","));
     if(filters.start)qs.set("start",filters.start);
     if(filters.end)qs.set("end",filters.end);
+    if(filters.limit)qs.set("limit",String(filters.limit));
+    if(filters.offset)qs.set("offset",String(filters.offset));
     return request<TrainingEntry[]>(token,`/api/v1/routines/trainings?${qs}`);
   },
   trainings:(token:string,store:string,filters:{

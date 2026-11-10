@@ -343,7 +343,7 @@ class RoutinesService(OperationsService):
 
     def trainings_multi(self,stores:list[str],participant_ids:list[UUID]|None=None,
                         procedure_ids:list[UUID]|None=None,start:date|None=None,
-                        end:date|None=None,limit:int=500)->list[dict]:
+                        end:date|None=None,limit:int=200,offset:int=0)->list[dict]:
         """Historico consolidado por lojas autorizadas, com filtros multiplos."""
         allowed=[s for s in stores if s in STORE_CODES
                  and can_access(self.principal,"training.view",s)]
@@ -368,7 +368,7 @@ class RoutinesService(OperationsService):
             query=query.where(TrainingRecord.happened_on<start_of(end)+timedelta(days=1))
         rows=self.db.execute(
             query.order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
-            .limit(limit)
+            .offset(offset).limit(limit)
         ).all()
         document_data=self.db.execute(
             select(TrainingDocument.training_id, TrainingDocument.original_name,

@@ -471,3 +471,11 @@ def test_trainings_multi_store_and_filters(env):
     unknown = c.get("/api/v1/routines/trainings?stores=JOINVILLE"
                     f"&participant_ids={uuid4()}").json()
     assert unknown == []
+    # paginacao progressiva: primeira pagina + offset
+    page1 = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI"
+                  "&limit=2").json()
+    page2 = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI"
+                  "&limit=2&offset=2").json()
+    assert len(page1) == 2 and len(page2) == 1
+    ids = {r["id"] for r in page1 + page2}
+    assert len(ids) == 3

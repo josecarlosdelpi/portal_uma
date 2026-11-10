@@ -47,13 +47,28 @@ TRAINING_MEDIA = {
 
 
 def _office_media(data: bytes) -> str | None:
-    """DOCX/XLSX/PPTX sao conteineres ZIP; o tipo real esta no [Content_Types].xml."""
+    """DOCX/XLSX/PPTX sao conteineres ZIP; o tipo real esta no [Content_Types].xml.
+
+    Leitura limitada do membro (evita descompactacao excessiva) e rejeita
+    pacotes com macros (vbaProject.bin).
+    """
     if not data.startswith(b"PK\x03\x04"):
         return None
     try:
         import io, zipfile
         with zipfile.ZipFile(io.BytesIO(data)) as pack:
-            head = pack.read("[Content_Types].xml")[:4096].decode("utf-8", "ignore")
+            names = {n.casefold() for n in pack.namelist()}
+            if any(n.endswith("vbaproject.bin") for n in names):
+                return None
+            member = next((n for n in pack.namelist()
+                           if n.casefold() == "[content_types].xml"), None)
+            if member is None:
+                return None
+            info = pack.getinfo(member)
+            if info.file_size > 4 * 1024 * 1024 or info.compress_size > 1024 * 1024:
+                return None
+            with pack.open(info) as fh:
+                head = fh.read(64 * 1024).decode("utf-8", "ignore")
     except Exception:
         return None
     for marker, (mime, _ext) in OFFICE_MIMES.items():

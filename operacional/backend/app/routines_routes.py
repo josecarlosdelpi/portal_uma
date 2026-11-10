@@ -176,11 +176,13 @@ def _csv_uuids(raw:str|None)->list[UUID]|None:
 @router.get("/trainings")
 def trainings_multi(stores:str="",participant_ids:str|None=None,
                     procedure_ids:str|None=None,start:date|None=None,
-                    end:date|None=None,
+                    end:date|None=None,limit:int=Query(200,ge=1,le=500),
+                    offset:int=Query(0,ge=0),
                     svc:RoutinesService=Depends(service))->list[dict]:
     return checked(lambda:svc.trainings_multi(
         [s.strip() for s in stores.split(",") if s.strip()],
-        _csv_uuids(participant_ids),_csv_uuids(procedure_ids),start,end))
+        _csv_uuids(participant_ids),_csv_uuids(procedure_ids),start,end,
+        limit=limit,offset=offset))
 
 
 @router.get("/trainings/{store_code}")

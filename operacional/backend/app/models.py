@@ -481,7 +481,7 @@ class TrainingDocument(Base):
     """Small private PDF attached to training record; does NOT constitute e-signature."""
     __tablename__ = "training_documents"
     __table_args__ = (
-        CheckConstraint("byte_length BETWEEN 1 AND 5242880", name="ck_training_pdf_size"),
+        CheckConstraint("byte_length BETWEEN 1 AND 10485760", name="ck_training_pdf_size"),
         CheckConstraint("revision >= 1", name="ck_training_pdf_revision"),
     )
     training_id: Mapped[UUID] = mapped_column(

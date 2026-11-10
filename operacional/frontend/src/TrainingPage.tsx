@@ -112,10 +112,12 @@ function MultiSelect({label,options,value,onChange,empty}:{
       <div className="step-multi-tools">
         <button type="button" onClick={()=>onChange(options.map(o=>o.value))}>Selecionar todos</button>
         <button type="button" onClick={()=>onChange([])}>Limpar seleção</button></div>
+      <div className="step-multi-options">
       {options.map(o=><label key={o.value} className="check-line" role="option"
         aria-selected={value.includes(o.value)}>
         <input type="checkbox" checked={value.includes(o.value)} onChange={()=>toggle(o.value)}/>
         {o.label}</label>)}
+      </div>
     </div>}
   </div>;
 }
@@ -203,6 +205,8 @@ export function TrainingPage({token,profile}:Props){
   const [fProcs,setFProcs]=useState<string[]>([]);
   const [fStart,setFStart]=useState("");
   const [fEnd,setFEnd]=useState("");
+  const [hasMore,setHasMore]=useState(false);
+  const PAGE_SIZE=200;
   const [loading,setLoading]=useState(false);
   const [working,setWorking]=useState(false);
   const [error,setError]=useState("");
@@ -222,10 +226,11 @@ export function TrainingPage({token,profile}:Props){
     try{
       const [rows,...teams]=await Promise.all([
         routinesApi.trainingsMulti(token,stores,{participant_ids:fPersons,
-          procedure_ids:fProcs,start:fStart||undefined,end:fEnd||undefined}),
+          procedure_ids:fProcs,start:fStart||undefined,end:fEnd||undefined,
+          limit:PAGE_SIZE}),
         ...(canWrite?stores.map(s=>operationsApi.team(token,s).catch(()=>[] as TeamMember[]))
           :[Promise.resolve([] as TeamMember[])])]);
-      setEntries(rows);
+      setEntries(rows);setHasMore(rows.length===PAGE_SIZE);
       const seen=new Map<string,TeamMember>();
       for(const team of teams)for(const m of team)seen.set(m.id,m);
       setPeople([...seen.values()]);
@@ -234,6 +239,19 @@ export function TrainingPage({token,profile}:Props){
     finally{setLoading(false);}
   },[token,filterStores,canWrite,fPersons,fProcs,fStart,fEnd,profile.stores]);
   useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
+
+  async function loadMore(){
+    if(loading)return;setLoading(true);setError("");
+    try{const rows=await routinesApi.trainingsMulti(token,activeStores,
+      {participant_ids:fPersons,procedure_ids:fProcs,
+        start:fStart||undefined,end:fEnd||undefined,
+        limit:PAGE_SIZE,offset:entries.length});
+      setEntries(prev=>{const ids=new Set(prev.map(e=>e.id));
+        return [...prev,...rows.filter(r=>!ids.has(r.id))];});
+      setHasMore(rows.length===PAGE_SIZE);
+    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível carregar.");}
+    finally{setLoading(false);}
+  }
   useEffect(()=>{if(!recentId)return;
     const t=setTimeout(()=>setRecentId(""),12000);return()=>clearTimeout(t);},[recentId]);
   useEffect(()=>{if(!canWrite)void routinesApi.myTrainings(token).then(setMine).catch(()=>{});},[token,canWrite]);
@@ -281,7 +299,7 @@ export function TrainingPage({token,profile}:Props){
   function startEdit(entry:TrainingEntry){setConfirmingEdit(entry);}
 
   function applyEdit(){const entry=confirmingEdit;if(!entry)return;
-    setConfirmingEdit(null);setEditRec(entry);
+    setConfirmingEdit(null);setEditRec(entry);setStore(entry.store_code);
     setParticipant(entry.participant_id);setProcedureId(entry.procedure_id??"");
     setInstructor(entry.instructor);setDay(entry.happened_on.slice(0,10));
     setHour(entry.happened_on.slice(11,16));setSteps(entry.step.split(","));
@@ -335,7 +353,7 @@ export function TrainingPage({token,profile}:Props){
   async function confirmRemoveRec(){
     if(!removingRec)return;const entry=removingRec;
     setWorking(true);setError("");setMessage("");
-    try{await routinesApi.deleteTraining(token,store,entry.id,entry.revision);
+    try{await routinesApi.deleteTraining(token,entry.store_code,entry.id,entry.revision);
       setRemovingRec(null);await refreshTrainings();
       setMessage("Registro excluído. Histórico preservado na auditoria.");}
     catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");setRemovingRec(null);}
@@ -493,8 +511,12 @@ export function TrainingPage({token,profile}:Props){
         <MultiSelect label="Colaborador" empty="Todos" value={fPersons} onChange={setFPersons}
           options={people.map(p=>({value:p.id,label:p.name}))}/>
         <MultiSelect label="Procedimento" empty="Todos" value={fProcs} onChange={setFProcs}
-          options={procs.filter(p=>p.current_version)
-            .map(p=>({value:p.id,label:`${p.code} — ${p.title}`}))}/>
+          options={[...procs.filter(p=>p.current_version)
+            .map(p=>({value:p.id,label:`${p.code} — ${p.title}`})),
+            ...[...new Map(entries
+              .filter(e=>e.procedure_id&&!procs.some(p=>p.id===e.procedure_id))
+              .map(e=>[e.procedure_id as string,e.procedure])).entries()]
+            .map(([value,label])=>({value,label}))]}/>
         <label>De<input type="date" value={fStart} onChange={e=>setFStart(e.target.value)}/></label>
         <label>Até<input type="date" value={fEnd} onChange={e=>setFEnd(e.target.value)}/></label>
       </div>
@@ -503,7 +525,8 @@ export function TrainingPage({token,profile}:Props){
           <p>{editRec?`Revisão ${editRec.revision} · edição auditada`:"A versão publicada vigente é registrada automaticamente."}</p></div>
           {editRec&&<button className="btn-secondary" onClick={()=>{setEditRec(null);clearForm();}}>Cancelar edição</button>}</div>
         <div className="routine-form-grid">
-          <label>Loja<select value={store} onChange={e=>setStore(e.target.value)}>
+          <label>Loja<select value={editRec?editRec.store_code:store} disabled={!!editRec}
+            onChange={e=>setStore(e.target.value)}>
             {profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}</select></label>
           <label>Colaborador<select ref={participantRef} value={participant} onChange={e=>setParticipant(e.target.value)}>
             <option value="">Selecione…</option>
@@ -567,7 +590,9 @@ export function TrainingPage({token,profile}:Props){
               <button className="btn-secondary" onClick={()=>startEdit(e)}>Editar</button>
               {isSuperAdmin&&<button className="btn-secondary" disabled={working} onClick={()=>setRemovingRec(e)}>Excluir</button>}
             </div></td></tr>)}</tbody></table></div>
-        {entries.length===0&&!loading&&<p className="empty">Nenhum treinamento nesta loja.</p>}
+        {entries.length===0&&!loading&&<p className="empty">Nenhum treinamento encontrado.</p>}
+        {hasMore&&<button className="btn-secondary" disabled={loading}
+          onClick={()=>void loadMore()}>Carregar mais registros</button>}
       </article>
     </>}
   </section>;
