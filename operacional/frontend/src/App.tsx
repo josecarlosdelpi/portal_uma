@@ -3,6 +3,7 @@ import {
   LayoutDashboard, Phone, Star, Package, ListChecks, CalendarCheck,
   Target, MessageCircle, GraduationCap, ClipboardCheck, Settings,
   Pin, PinOff, GripVertical, ChevronUp, ChevronDown, Menu, ChevronsRight,
+  Settings2, X,
 } from "lucide-react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent, type LocalResetPassword, ApiError } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
@@ -31,7 +32,7 @@ const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> 
   { key: "checklist", label: "Checklist semanal", icon: ListChecks },
   { key: "daily", label: "Tarefas diárias", icon: CalendarCheck },
   { key: "targets", label: "Metas diárias", icon: Target },
-  { key: "whatsapp", label: "Status WhatsApp / Instagram", icon: MessageCircle },
+  { key: "whatsapp", label: "Canais digitais", icon: MessageCircle },
   { key: "training", label: "Padrões e treinamento", icon: GraduationCap },
   { key: "closing", label: "Fechamento Mensal", icon: ClipboardCheck },
   { key: "access", label: "Configurações", icon: Settings },
@@ -191,12 +192,12 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   // Fila serializada + numero de gravacao: respostas intermediarias nunca
   // sobrescrevem alteracoes mais recentes do usuario; falha restaura o
   // ultimo estado confirmado pelo servidor.
-  const persistQueue = useRef<Promise<void>>(Promise.resolve());
+  const persistQueue = useRef<Promise<boolean>>(Promise.resolve(true));
   const lastSaved = useRef<{ p: boolean; f: string[] } | null>(null);
   const writeSeq = useRef(0);
-  const persist = useCallback((nextPinned: boolean, nextFavs: string[]) => {
+  const persist = useCallback((nextPinned: boolean, nextFavs: string[]): Promise<boolean> => {
     const seq = ++writeSeq.current;
-    persistQueue.current = persistQueue.current.then(async () => {
+    persistQueue.current = persistQueue.current.then(async (): Promise<boolean> => {
       try {
         const saved = await api.savePreferences(
           token, { sidebar_pinned: nextPinned, favorites: nextFavs });
@@ -204,30 +205,49 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
         if (seq === writeSeq.current) {
           setPinned(saved.sidebar_pinned); setFavorites(saved.favorites);
         }
+        return true;
       } catch (problem) {
         setError(errorText(problem));
         if (seq === writeSeq.current && lastSaved.current) {
           setPinned(lastSaved.current.p); setFavorites(lastSaved.current.f);
         }
+        return false;
       }
     });
+    return persistQueue.current;
   }, [token]);
 
-  const togglePin = () => { const next = !pinned; setPinned(next); if (next) setTempOpen(false); persist(next, favorites); };
+  // ---- modal "Organizar favoritos" ----
+  const [organizing, setOrganizing] = useState<string[] | null>(null);
+  const [orgSaving, setOrgSaving] = useState(false);
+  const [orgError, setOrgError] = useState("");
+  const moveOrg = (index: number, dir: -1 | 1) => {
+    setOrganizing(prev => {
+      if (!prev) return prev;
+      const target = index + dir; if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev]; const [item] = next.splice(index, 1); next.splice(target, 0, item);
+      return next;
+    });
+  };
+  const onOrgDrop = (targetKey: string) => {
+    if (!dragKey || dragKey === targetKey || !organizing) { setDragKey(null); setDropTarget(null); return; }
+    const next = organizing.filter(k => k !== dragKey);
+    next.splice(next.indexOf(targetKey), 0, dragKey);
+    setOrganizing(next); setDragKey(null); setDropTarget(null);
+  };
+  const saveOrganize = async () => {
+    if (!organizing) return;
+    setOrgSaving(true); setOrgError("");
+    const ok = await persist(pinned, organizing);
+    setOrgSaving(false);
+    if (ok) setOrganizing(null);
+    else setOrgError("Não foi possível salvar a organização. Tente novamente.");
+  };
+
+  const togglePin = () => { const next = !pinned; setPinned(next); if (next) setTempOpen(false); void persist(next, favorites); };
   const toggleFav = (key: string) => {
     const next = favorites.includes(key) ? favorites.filter(k => k !== key) : [...favorites, key];
-    setFavorites(next); persist(pinned, next);
-  };
-  const moveFav = (index: number, dir: -1 | 1) => {
-    const target = index + dir; if (target < 0 || target >= favorites.length) return;
-    const next = [...favorites]; const [item] = next.splice(index, 1); next.splice(target, 0, item);
-    setFavorites(next); persist(pinned, next);
-  };
-  const onFavDrop = (targetKey: string) => {
-    if (!dragKey || dragKey === targetKey) { setDragKey(null); setDropTarget(null); return; }
-    const next = favorites.filter(k => k !== dragKey);
-    next.splice(next.indexOf(targetKey), 0, dragKey);
-    setFavorites(next); persist(pinned, next); setDragKey(null); setDropTarget(null);
+    setFavorites(next); void persist(pinned, next);
   };
 
   const allowedAreas = new Set<Area>();
@@ -255,30 +275,57 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       onMouseEnter={() => setTempOpen(true)} onClick={() => setTempOpen(true)}>
       <ChevronsRight size={13} aria-hidden="true"/></button>}
     {tempOpen && <div className="side-backdrop" onClick={() => setTempOpen(false)} aria-hidden="true"/>}
+    {organizing && <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="fav-org-title">
+      <div className="modal-card fav-org-card">
+        <div className="fav-org-head"><h3 id="fav-org-title">Organizar favoritos</h3>
+          <button type="button" className="fav-org-close" aria-label="Fechar" onClick={() => setOrganizing(null)}><X size={16}/></button></div>
+        <div className="fav-org-list" role="list">
+          {organizing.length === 0 && <p className="fav-empty">Nenhum favorito. Adicione pela ★ no menu.</p>}
+          {organizing.map((key, i) => {
+            const item = NAV_ITEMS.find(n => n.key === key); if (!item) return null;
+            return <div key={key} role="listitem"
+              className={"fav-org-item" + (dropTarget === key ? " drop-target" : "")}
+              draggable onDragStart={() => setDragKey(key)}
+              onDragOver={e => { e.preventDefault(); setDropTarget(key); }}
+              onDragLeave={() => setDropTarget(p => p === key ? null : p)}
+              onDrop={() => onOrgDrop(key)} onDragEnd={() => { setDragKey(null); setDropTarget(null); }}>
+              <span className="drag-grip" aria-hidden="true"><GripVertical size={14}/></span>
+              <item.icon size={15} className="nav-icon" strokeWidth={1.9}/>
+              <span className="fav-org-name">{item.label}</span>
+              <span className="fav-org-actions">
+                <button type="button" aria-label={"Subir " + item.label} disabled={i === 0}
+                  onClick={() => moveOrg(i, -1)}><ChevronUp size={14}/></button>
+                <button type="button" aria-label={"Descer " + item.label} disabled={i === organizing.length - 1}
+                  onClick={() => moveOrg(i, 1)}><ChevronDown size={14}/></button>
+                <button type="button" aria-label={"Remover " + item.label} className="fav-org-remove"
+                  onClick={() => setOrganizing(prev => prev ? prev.filter(k => k !== key) : prev)}><X size={14}/></button>
+              </span>
+            </div>;
+          })}
+        </div>
+        {orgError && <p className="notice notice-error" role="alert">{orgError}</p>}
+        <div className="modal-actions">
+          <button className="btn-secondary" disabled={orgSaving} onClick={() => setOrganizing(null)}>Cancelar</button>
+          <button className="btn-primary" disabled={orgSaving} onClick={() => void saveOrganize()}>
+            {orgSaving ? "Salvando…" : "Salvar alterações"}</button>
+        </div>
+      </div></div>}
     <aside className={"sidebar" + (tempOpen ? " open" : "")} aria-label="Barra lateral">
-      <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div>
+      <div className="brand">
+        <div className="brand-top"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/></div>
+        <div className="brand-name"><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div>
         <button type="button" className="pin-btn" aria-label={pinned ? "Desafixar barra lateral" : "Fixar barra lateral"}
-          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? <Pin size={14}/> : <PinOff size={14}/>}</button>
+          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? <Pin size={14}/> : <PinOff size={14}/>}</button></div>
       </div>
-      <div className="side-heading">FAVORITOS</div>
+      <div className="side-heading side-heading-fav"><span>FAVORITOS</span>
+        <button type="button" className="fav-org-btn" aria-label="Organizar favoritos"
+          title="Organizar favoritos" onClick={() => { setOrganizing([...favorites]); setOrgError(""); }}>
+          <Settings2 size={13}/></button></div>
       <nav aria-label="Favoritos" className="fav-list">
-
         {favItems.length === 0 && <p className="fav-empty">Toque na ★ de um módulo para fixá-lo aqui.</p>}
-        {favItems.map((item, i) => <div key={item.key}
-          className={"nav-item fav-item" + (dropTarget === item.key ? " drop-target" : "")}
-          draggable onDragStart={() => setDragKey(item.key)}
-          onDragOver={e => { e.preventDefault(); setDropTarget(item.key); }}
-          onDragLeave={() => setDropTarget(prev => prev === item.key ? null : prev)}
-          onDrop={() => onFavDrop(item.key)} onDragEnd={() => { setDragKey(null); setDropTarget(null); }}>
-          <span className="drag-grip" aria-hidden="true"><GripVertical size={13}/></span>
+        {favItems.map(item => <div key={item.key} className="nav-item fav-item">
           <button className={"nav-link" + (area === item.key ? " active" : "")}
             onClick={() => selectArea(item.key)}><item.icon size={15} className="nav-icon" strokeWidth={1.9}/><span>{item.label}</span></button>
-          <span className="fav-reorder">
-            <button type="button" aria-label={"Subir " + item.label} disabled={i === 0}
-              onClick={() => moveFav(i, -1)}><ChevronUp size={12}/></button>
-            <button type="button" aria-label={"Descer " + item.label} disabled={i === favItems.length - 1}
-              onClick={() => moveFav(i, 1)}><ChevronDown size={12}/></button>
-          </span>
         </div>)}
       </nav>
       <div className="side-heading">PAINEL DE CONTROLE</div>

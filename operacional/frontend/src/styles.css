@@ -300,3 +300,30 @@
 .sidebar::-webkit-scrollbar-thumb:hover{background:#4a4a4a}
 .sidebar{scrollbar-width:thin;scrollbar-color:#3a3a3a transparent}
 @media(max-width:940px){.sidebar .brand .brand-logo-image{width:112px;height:56px}}
+
+/* Cabecalho em duas linhas (alternativa A recomendada) + modal de favoritos */
+.sidebar .brand{flex-direction:column;align-items:stretch;gap:8px;padding:4px 6px 14px}
+.sidebar .brand-top{display:flex;justify-content:center}
+.sidebar .brand .brand-logo-image{width:118px;height:60px;object-fit:contain}
+.sidebar .brand-name{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sidebar .brand-name strong{font-size:14px;letter-spacing:.5px;white-space:nowrap}
+.sidebar .brand-name small{display:block;font-size:10px;color:#c8c8c8}
+.side-heading-fav{display:flex;align-items:center;justify-content:space-between}
+.fav-org-btn{background:none;border:none;color:#9a9378;padding:3px;display:flex;cursor:pointer}
+.fav-org-btn:hover{color:#d2b300}
+.fav-item .nav-link{padding:7px 9px}
+.fav-org-card{max-width:420px;width:92%;max-height:80vh;display:flex;flex-direction:column}
+.fav-org-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.fav-org-head h3{margin:0}
+.fav-org-close{background:none;border:none;color:#666;cursor:pointer;display:flex;padding:4px}
+.fav-org-list{overflow-y:auto;min-height:60px;display:flex;flex-direction:column;gap:4px}
+.fav-org-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e7e2d0;
+  border-radius:8px;background:#fffdf4;cursor:grab}
+.fav-org-item.drop-target{outline:2px dashed #d2b300;outline-offset:-2px}
+.fav-org-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.fav-org-actions{display:flex;gap:2px}
+.fav-org-actions button{background:none;border:1px solid #e0dac0;border-radius:5px;padding:3px;
+  display:flex;cursor:pointer;color:#554b00}
+.fav-org-actions button:disabled{opacity:.3;cursor:default}
+.fav-org-actions .fav-org-remove{color:#8a2a20;border-color:#e6c0bc}
+@media(max-width:940px){.sidebar .brand .brand-logo-image{width:118px;height:60px}}
