@@ -181,10 +181,20 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
     }).catch(() => setPrefsLoaded(true));
   }, [token, profile, prefsLoaded]);
 
+  const persistQueue = useRef(Promise.resolve());
+  const lastSaved = useRef<{ p: boolean; f: string[] } | null>(null);
   const persist = useCallback((nextPinned: boolean, nextFavs: string[]) => {
-    api.savePreferences(token, { sidebar_pinned: nextPinned, favorites: nextFavs })
-      .then(saved => { setPinned(saved.sidebar_pinned); setFavorites(saved.favorites); })
-      .catch(problem => setError(errorText(problem)));
+    persistQueue.current = persistQueue.current.then(
+      () => api.savePreferences(token, { sidebar_pinned: nextPinned, favorites: nextFavs })
+    ).then(saved => {
+      lastSaved.current = { p: saved.sidebar_pinned, f: saved.favorites };
+      setPinned(saved.sidebar_pinned); setFavorites(saved.favorites);
+    }).catch(problem => {
+      setError(errorText(problem));
+      if (lastSaved.current) {
+        setPinned(lastSaved.current.p); setFavorites(lastSaved.current.f);
+      }
+    });
   }, [token]);
 
   const togglePin = () => { const next = !pinned; setPinned(next); if (next) setTempOpen(false); persist(next, favorites); };
@@ -265,38 +275,6 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
             onClick={() => toggleFav(item.key)}>{favorites.includes(item.key) ? "★" : "☆"}</button>
         </div>)}
         <div className="nav-item disabled"><span className="nav-icon">↗</span><span>Vendas</span><span className="soon">ERP pendente</span></div>
-      </nav>
-      <div className="side-spacer"/>
-      <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>
-      <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
-    </aside>
-    <aside className="sidebar">
-      <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
-      <div className="side-heading">PAINEL DE CONTROLE</div>
-      <nav aria-label="Menu principal">
-        {canViewOverview && <button className={"nav-item"+(area==="overview"?" active":"")}
-          onClick={()=>setArea("overview")}><span className="nav-icon">▦</span><span>Visão geral</span></button>}
-        <div className="nav-item disabled"><span className="nav-icon">↗</span><span>Vendas</span><span className="soon">ERP pendente</span></div>
-        {canViewContacts && <button className={"nav-item"+(area==="contacts"?" active":"")}
-          onClick={()=>setArea("contacts")}><span className="nav-icon">☎</span><span>Telemarketing</span></button>}
-        {canViewReviews && <button className={"nav-item"+(area==="reviews"?" active":"")}
-          onClick={()=>setArea("reviews")}><span className="nav-icon">★</span><span>Avaliações Google</span></button>}
-        {canViewSupplies && <button className={"nav-item"+(area==="supplies"?" active":"")}
-          onClick={()=>setArea("supplies")}><span className="nav-icon">▣</span><span>Materiais e insumos</span></button>}
-        {canViewChecklist && <button className={"nav-item"+(area==="checklist"?" active":"")}
-          onClick={()=>setArea("checklist")}><span className="nav-icon">☑</span><span>Checklist semanal</span></button>}
-        {canViewDaily && <button className={"nav-item"+(area==="daily"?" active":"")}
-          onClick={()=>setArea("daily")}><span className="nav-icon">☷</span><span>Tarefas diárias</span></button>}
-        {canViewTargets && <button className={"nav-item"+(area==="targets"?" active":"")}
-          onClick={()=>setArea("targets")}><span className="nav-icon">$</span><span>Metas diárias</span></button>}
-        {canViewWhatsApp && <button className={"nav-item"+(area==="whatsapp"?" active":"")}
-          onClick={()=>setArea("whatsapp")}><span className="nav-icon">▤</span><span>Status WhatsApp / Instagram</span></button>}
-        {canViewTraining && <button className={"nav-item"+(area==="training"?" active":"")}
-          onClick={()=>setArea("training")}><span className="nav-icon">☰</span><span>Padrões e treinamento</span></button>}
-        {canViewClosing && <button className={"nav-item"+(area==="closing"?" active":"")}
-          onClick={()=>setArea("closing")}><span className="nav-icon">◎</span><span>Fechamento Mensal</span></button>}
-        {isSuperAdmin && <button className={"nav-item"+(area==="access"?" active":"")}
-          onClick={()=>{setArea("access");setTab("usuarios");}}><span className="nav-icon">⚙</span><span>Configurações</span></button>}
       </nav>
       <div className="side-spacer"/>
       <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>

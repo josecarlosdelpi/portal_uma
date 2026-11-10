@@ -21,7 +21,7 @@ MODULE_PERMISSION = {
     "checklist": "checklist.view",
     "daily": "daily_tasks.view",
     "targets": "targets.view",
-    "whatsapp": "whatsapp_status.view",
+    "whatsapp": None,  # regra especial: whatsapp_status OU instagram
     "training": "training.view",
     "closing": "monthly_closing.view",
     "access": None,  # somente SuperAdmin
@@ -41,6 +41,9 @@ def _allowed_modules(db: Session, user: User) -> set[str]:
         key for key, permission in MODULE_PERMISSION.items()
         if permission and any(can_access(principal, permission, store) for store in stores)
     }
+    if any(can_access(principal, "whatsapp_status.view", store)
+           or can_access(principal, "instagram.view", store) for store in stores):
+        allowed.add("whatsapp")
     if principal.is_superadmin:
         allowed.add("access")
     if can_access(principal, "monthly_closing.view") and (
@@ -77,9 +80,14 @@ def save_preferences(body: PreferencesBody, user: User = Depends(current_user),
     if unknown:
         raise HTTPException(422, f"Módulo desconhecido: {unknown[0]}")
     allowed = _allowed_modules(db, user)
+    row = _get_row(db, user)
     # deduplicado, na ordem enviada, somente modulos autorizados
     favorites = [key for key in dict.fromkeys(body.favorites) if key in allowed]
-    row = _get_row(db, user)
+    # Favoritos temporariamente sem permissao sao preservados no fim da lista:
+    # se o acesso voltar, o atalho reaparece para o usuario.
+    hidden = [key for key in row.favorites
+              if key in MODULE_PERMISSION and key not in allowed]
+    favorites += [key for key in hidden if key not in favorites]
     row.sidebar_pinned = body.sidebar_pinned
     row.favorites = favorites
     db.commit()

@@ -197,3 +197,14 @@
   .sb-pinned .side-backdrop{display:none}
   .sb-unpinned .side-backdrop,.sb-pinned.sb-open .side-backdrop{display:block}
 }
+
+/* Correcoes PR7: grid expande + nav visivel no mobile */
+.sb-unpinned{grid-template-columns:minmax(0,1fr)!important}
+@media(max-width:940px){
+  .sidebar .side-heading{display:block;margin:14px 13px 6px}
+  .sidebar nav{display:block!important}
+  .sidebar .nav-item{flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;
+    min-height:0!important;font-size:13px!important;text-align:left!important;padding:6px 4px!important;gap:0!important}
+  .sidebar .nav-link{display:flex!important;flex-direction:row!important}
+  .sb-open .sidebar .sidebar-note,.sb-open .sidebar .sidebar-bottom{display:block}
+}

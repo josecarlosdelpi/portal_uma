@@ -2,7 +2,7 @@
 from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -85,6 +85,27 @@ def test_dedupe_and_per_user_isolation(env):
     own = c.get("/api/v1/me/preferences").json()
     assert own["favorites"] == ["overview", "targets"]
     assert own["sidebar_pinned"] is True  # unaffected by seller's save
+
+
+def test_hidden_favorites_survive_later_saves(env):
+    """Revogar permissao nao apaga o favorito: ele retorna quando o acesso volta."""
+    c, actor, engine, admin, joi = env
+    actor["user"] = joi
+    c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": ["training"]})
+    # simula perda de permissao: limpa grants do grupo
+    with Session(engine) as db:
+        db.query(GroupPermission).delete(); db.commit()
+    # usuario nao ve mais o favorito, mas o save de pin NAO pode apaga-lo
+    assert c.get("/api/v1/me/preferences").json()["favorites"] == []
+    c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": False, "favorites": []})
+    with Session(engine) as db:
+        gid = db.scalars(select(StoreGroup.id).where(StoreGroup.store_code == "JOINVILLE")).first()
+        db.add(GroupPermission(group_id=gid, code="training.view", granted=True)); db.commit()
+    again = c.get("/api/v1/me/preferences").json()
+    assert again["favorites"] == ["training"]  # restaurado
+    assert again["sidebar_pinned"] is False
 
 
 def test_order_moves_and_pruning(env):
