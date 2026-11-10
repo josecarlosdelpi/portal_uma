@@ -385,3 +385,6 @@
   .routine-filters .step-multi{flex:1 1 100%;min-width:0;max-width:none}
   .step-multi-panel{max-width:calc(100vw - 32px)}
 }
+
+/* Spacer que empurra os filtros para a direita da linha (aba Procedimentos). */
+.filters-spacer{flex:1}

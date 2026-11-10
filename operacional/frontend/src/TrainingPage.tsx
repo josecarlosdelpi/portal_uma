@@ -424,8 +424,7 @@ export function TrainingPage({token,profile}:Props){
     <div className="page-header"><div><div className="eyebrow">CLAREZA E CAPACITAÇÃO</div>
       <h1>Padrões e treinamento</h1>
       <p>Procedimentos internos com editor completo e histórico de treinamentos por versão.</p></div>
-      {canWrite&&<button className="btn-primary" disabled={working} onClick={()=>void newProcedure()}>
-        + Novo Procedimento</button>}</div>
+    </div>
     <div className="tab-bar">
       <button role="tab" aria-selected={tab==="procedimentos"} className={tab==="procedimentos"?"tab active":"tab"}
         onClick={()=>setTab("procedimentos")}>Procedimentos</button>
@@ -476,6 +475,9 @@ export function TrainingPage({token,profile}:Props){
 
     {tab==="procedimentos"&&<>
       <div className="routine-filters">
+        {canWrite&&<button className="btn-primary" disabled={working}
+          onClick={()=>void newProcedure()}>+ Novo Procedimento</button>}
+        <div className="filters-spacer"/>
         <label>Busca<input value={q} onChange={e=>setQ(e.target.value)} placeholder="Título ou código"/></label>
         {canWrite&&<label>Situação<select value={statusFilter} onChange={e=>setStatusFilter(e.target.value as typeof statusFilter)}>
           <option value="">Todas</option><option value="publicado">Publicado</option>
