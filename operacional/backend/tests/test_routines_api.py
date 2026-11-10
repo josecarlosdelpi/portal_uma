@@ -192,6 +192,34 @@ def test_training_metadata_never_fabricates_signature(env):
     assert c.post("/api/v1/routines/trainings/JOINVILLE",json=body).status_code==403
 
 
+def test_training_step_accepts_multiple_values(env):
+    """Etapa aceita uma ou ambas as opcoes; ordem canonica; registros antigos intactos."""
+    c,actor,_,_,seller,other=env
+    body={"participant_id":str(seller.id),"procedure":"POP-MULTI",
+          "version":"1.0","instructor":"Gestão","happened_on":"2026-11-10T09:00:00"}
+    # ambas as etapas em um unico registro
+    r=c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":"participou,pratica"})
+    assert r.status_code==201,r.text
+    rec=r.json()
+    assert rec["step"]=="participou,pratica"
+    # ordem canonica independente da ordem enviada
+    r2=c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":"pratica,participou"})
+    assert r2.status_code==201 and r2.json()["step"]=="participou,pratica"
+    # edicao troca para etapa unica e volta para combinada
+    upd=c.put(f"/api/v1/routines/trainings/JOINVILLE/{rec['id']}",json={
+        **body,"step":"pratica","expected_revision":rec["revision"]})
+    assert upd.status_code==200 and upd.json()["step"]=="pratica"
+    upd2=c.put(f"/api/v1/routines/trainings/JOINVILLE/{rec['id']}",json={
+        **body,"step":"participou,pratica","expected_revision":upd.json()["revision"]})
+    assert upd2.status_code==200 and upd2.json()["step"]=="participou,pratica"
+    # valores invalidos seguem rejeitados
+    assert c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":"outra"}).status_code==422
+    assert c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":""}).status_code==422
+    # listagem devolve o valor combinado
+    rows=c.get("/api/v1/routines/trainings/JOINVILLE").json()
+    assert any(x["step"]=="participou,pratica" for x in rows)
+
+
 def test_all_routes_reject_unauthenticated():
     with TestClient(app) as c:
         for route in [

@@ -31,6 +31,17 @@ def can_verify(week:date)->bool:
     return monday(week)<=monday(datetime.now(SAO_PAULO).date())
 
 
+STEP_VALUES=("participou","pratica")
+
+
+def canon_step(step:str)->str:
+    """Normaliza a(s) etapa(s): deduplica e ordena de forma canonica."""
+    parts=sorted({p for p in step.split(",") if p in STEP_VALUES},key=STEP_VALUES.index)
+    if not parts:
+        raise OperationError(422,"Etapa inválida")
+    return ",".join(parts)
+
+
 class RoutinesService(OperationsService):
     def week(self, store:str, reference:date)->dict:
         self.require(store,"checklist.view")
@@ -406,6 +417,7 @@ class RoutinesService(OperationsService):
         proc_id,ver_id,p_code,p_label=self._procedure_snapshot(procedure_id)
         if proc_id is not None:
             procedure,version=p_code,p_label
+        step=canon_step(step)
         entry=TrainingRecord(
             id=uuid4(),store_code=store,participant_id=participant_id,
             procedure=procedure.strip(),version=version.strip(),
@@ -449,7 +461,7 @@ class RoutinesService(OperationsService):
         row.participant_id=participant_id
         row.procedure=procedure.strip();row.version=version.strip()
         row.title=title;row.instructor=instructor.strip()
-        row.happened_on=happened_on;row.step=step;row.note=note
+        row.happened_on=happened_on;row.step=canon_step(step);row.note=note
         row.revision+=1;row.updated_by=self.actor.id
         row.updated_at=datetime.now(timezone.utc)
         self.audit("training.updated","training_record",str(row.id),

@@ -3,13 +3,20 @@ import type {MyProfile} from "./api";
 import {labelStore} from "./catalog";
 import {attachmentsApi} from "./attachmentsApi";
 import {operationsApi,type TeamMember} from "./operationsApi";
-import {routinesApi,type TrainingEntry} from "./routinesApi";
+import {routinesApi,type TrainingEntry,type TrainingStep} from "./routinesApi";
 import {proceduresApi,hydrateImages,type Procedure,type VersionInfo} from "./proceduresApi";
 import {ProcedureEditor} from "./ProcedureEditor";
 import {ConfirmDialog} from "./ConfirmDialog";
+import {ChevronDown} from "lucide-react";
 
 type Props={token:string;profile:MyProfile};
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
+const STEP_OPTIONS=[
+  {value:"participou",label:"Treinamento apresentado"},
+  {value:"pratica",label:"Execução prática verificada"},
+] as const;
+const stepLabel=(step:string)=>step.split(",")
+  .map(s=>s==="pratica"?"Prática verificada":"Apresentado").join(" + ");
 
 function DocView({token,procId,versionId,onBack}:{token:string;procId:string;versionId?:string;onBack:()=>void}){
   const [full,setFull]=useState<Procedure|null>(null);
@@ -61,11 +68,12 @@ export function TrainingPage({token,profile}:Props){
   const [editRec,setEditRec]=useState<TrainingEntry|null>(null);
   const [participant,setParticipant]=useState("");
   const [procedureId,setProcedureId]=useState("");
-  const [title,setTitle]=useState("");
   const [instructor,setInstructor]=useState("");
   const [day,setDay]=useState(today);
   const [hour,setHour]=useState("09:00");
-  const [step,setStep]=useState<"participou"|"pratica">("participou");
+  const [steps,setSteps]=useState<string[]>(["participou"]);
+  const [stepOpen,setStepOpen]=useState(false);
+  const stepRef=useRef<HTMLDivElement>(null);
   const [note,setNote]=useState("");
   const [fPerson,setFPerson]=useState("");
   const [fProc,setFProc]=useState("");
@@ -99,6 +107,16 @@ export function TrainingPage({token,profile}:Props){
   useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
   useEffect(()=>{setParticipant(current=>people.some(p=>p.id===current)?current:people[0]?.id??"");},[people]);
   useEffect(()=>{if(!canWrite)void routinesApi.myTrainings(token).then(setMine).catch(()=>{});},[token,canWrite]);
+  useEffect(()=>{
+    if(!stepOpen)return;
+    const onDown=(e:MouseEvent)=>{
+      if(stepRef.current&&!stepRef.current.contains(e.target as Node))setStepOpen(false);};
+    const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setStepOpen(false);};
+    document.addEventListener("mousedown",onDown);
+    document.addEventListener("keydown",onKey);
+    return ()=>{document.removeEventListener("mousedown",onDown);
+      document.removeEventListener("keydown",onKey);};
+  },[stepOpen]);
 
   async function newProcedure(){
     setWorking(true);setError("");
@@ -128,20 +146,21 @@ export function TrainingPage({token,profile}:Props){
 
   function startEdit(entry:TrainingEntry){
     setEditRec(entry);setParticipant(entry.participant_id);
-    setProcedureId(entry.procedure_id??"");setTitle(entry.title);
+    setProcedureId(entry.procedure_id??"");
     setInstructor(entry.instructor);setDay(entry.happened_on.slice(0,10));
-    setHour(entry.happened_on.slice(11,16));setStep(entry.step);setNote(entry.note);
+    setHour(entry.happened_on.slice(11,16));setSteps(entry.step.split(","));setNote(entry.note);
   }
 
   async function save(){
     setWorking(true);setError("");setMessage("");
     try{
+      const step=STEP_OPTIONS.map(o=>o.value).filter(v=>steps.includes(v)).join(",") as TrainingStep;
       const body={participant_id:participant,procedure_id:procedureId||null,
-        title,instructor,happened_on:day+"T"+hour+":00",step,note};
+        title:editRec?editRec.title:"",instructor,happened_on:day+"T"+hour+":00",step,note};
       if(editRec)await routinesApi.updateTraining(token,store,editRec.id,{...body,expected_revision:editRec.revision});
       else await routinesApi.addTraining(token,store,body);
       await refreshTrainings();setMessage(editRec?"Registro atualizado.":"Participação registrada. Não representa assinatura eletrônica.");
-      setEditRec(null);setNote("");setTitle("");
+      setEditRec(null);setNote("");
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao registrar.");}
     finally{setWorking(false);}
   }
@@ -260,7 +279,7 @@ export function TrainingPage({token,profile}:Props){
         <th>Versão</th><th>Etapa</th><th>Instrutor</th><th></th></tr></thead>
         <tbody>{hist.map(e=><tr key={e.id}>
           <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.procedure}</td>
-          <td>{e.version}</td><td>{e.step==="pratica"?"Prática verificada":"Apresentado"}</td>
+          <td>{e.version}</td><td>{stepLabel(e.step)}</td>
           <td>{e.instructor}</td>
           <td>{e.procedure_id&&<button className="btn-secondary"
             onClick={()=>setViewing({id:e.procedure_id!,versionId:e.procedure_version_id??undefined})}>
@@ -298,15 +317,27 @@ export function TrainingPage({token,profile}:Props){
             onChange={e=>setInstructor(e.target.value)}/></label>
           <label>Data<input type="date" value={day} onChange={e=>setDay(e.target.value)}/></label>
           <label>Horário<input type="time" value={hour} onChange={e=>setHour(e.target.value)}/></label>
-          <label>Etapa<select value={step} onChange={e=>setStep(e.target.value as typeof step)}>
-            <option value="participou">Treinamento apresentado</option>
-            <option value="pratica">Execução prática verificada</option></select></label>
-          <label className="routine-wide">Referência complementar<input maxLength={140}
-            value={title} onChange={e=>setTitle(e.target.value)}/></label>
+          <div className="step-multi" ref={stepRef}>
+            <span className="step-multi-label">Etapa</span>
+            <button type="button" className="step-multi-btn" aria-haspopup="listbox"
+              aria-expanded={stepOpen} onClick={()=>setStepOpen(o=>!o)}>
+              <span>{steps.length
+                ?STEP_OPTIONS.filter(o=>steps.includes(o.value)).map(o=>o.label).join(" + ")
+                :"Selecione…"}</span><ChevronDown size={14}/></button>
+            {stepOpen&&<div className="step-multi-panel" role="listbox" aria-multiselectable="true">
+              {STEP_OPTIONS.map(o=><label key={o.value} className="check-line" role="option"
+                aria-selected={steps.includes(o.value)}>
+                <input type="checkbox" checked={steps.includes(o.value)}
+                  onChange={e=>setSteps(prev=>e.target.checked
+                    ?STEP_OPTIONS.map(x=>x.value).filter(v=>prev.includes(v)||v===o.value)
+                    :prev.filter(v=>v!==o.value))}/>
+                {o.label}</label>)}
+            </div>}
+          </div>
           <label className="routine-wide">Observações<input maxLength={350}
             value={note} onChange={e=>setNote(e.target.value)}/></label>
         </div>
-        <button className="btn-primary" disabled={working||!participant||!procedureId||!instructor.trim()}
+        <button className="btn-primary" disabled={working||!participant||!procedureId||!instructor.trim()||!steps.length}
           onClick={()=>void save()}>{working?"Salvando…":editRec?"Salvar alterações":"Registrar participação"}</button>
       </article>
       {entries.length>0&&<article className="panel routine-form-panel">
@@ -333,7 +364,7 @@ export function TrainingPage({token,profile}:Props){
           <tbody>{entries.map(e=><tr key={e.id}>
             <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.participant}</td>
             <td>{e.procedure}</td><td>{e.version}</td>
-            <td>{e.step==="pratica"?"Prática verificada":"Apresentado"}</td>
+            <td>{stepLabel(e.step)}</td>
             <td>{e.document?<div className="routine-file-actions">
               <button className="btn-secondary" onClick={()=>void downloadDoc(e)}>Baixar</button>
               <button className="btn-secondary" disabled={working} onClick={()=>setDeletingDoc(e)}>Excluir</button>

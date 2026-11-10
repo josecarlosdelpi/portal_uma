@@ -356,7 +356,8 @@ class TrainingRecord(Base):
     """Metadados de participacao. Assinaturas e PDFs exigem armazenamento privado futuro."""
     __tablename__ = "training_records"
     __table_args__ = (
-        CheckConstraint("step IN ('participou','pratica')", name="ck_training_step"),
+        CheckConstraint("step IN ('participou','pratica','participou,pratica')",
+                      name="ck_training_step"),
     )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
@@ -366,7 +367,7 @@ class TrainingRecord(Base):
     title: Mapped[str] = mapped_column(String(140), nullable=False, default="")
     instructor: Mapped[str] = mapped_column(String(90), nullable=False)
     happened_on: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
-    step: Mapped[str] = mapped_column(String(15), nullable=False)
+    step: Mapped[str] = mapped_column(String(31), nullable=False)
     note: Mapped[str] = mapped_column(String(350), nullable=False, default="")
     procedure_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedures.id", ondelete="RESTRICT"))
     procedure_version_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedure_versions.id", ondelete="RESTRICT"))

@@ -24,17 +24,18 @@ export type InstagramRow={
   store_code:string;planned:number|null;completed:number|null;revision:number
 };
 export type InstagramSnapshot={year:number;month:number;stores:InstagramRow[]};
+export type TrainingStep="participou"|"pratica"|"participou,pratica";
 export type TrainingEntry={
   id:string;store_code:string;participant_id:string;participant:string;procedure:string;
   version:string;title:string;instructor:string;happened_on:string;
-  step:"participou"|"pratica";note:string;signed:false;
+  step:TrainingStep;note:string;signed:false;
   revision:number;procedure_id:string|null;procedure_version_id:string|null;
   document_attached:boolean;document:PrivateFileInfo|null
 };
 export type TrainingPayload={
   participant_id:string;procedure?:string;version?:string;procedure_id?:string|null;
   title:string;instructor:string;happened_on:string;
-  step:"participou"|"pratica";note:string
+  step:TrainingStep;note:string
 };
 
 export const routinesApi={

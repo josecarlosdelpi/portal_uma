@@ -64,7 +64,7 @@ class TrainingInput(Strict):
     title:str=Field(default="",max_length=140)
     instructor:str=Field(min_length=1,max_length=90)
     happened_on:datetime
-    step:str=Field(pattern=r"^(participou|pratica)$")
+    step:str=Field(pattern=r"^(participou|pratica)(,(participou|pratica))?$")
     note:str=Field(default="",max_length=350)
 
 
