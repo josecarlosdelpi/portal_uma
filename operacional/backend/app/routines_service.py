@@ -341,6 +341,45 @@ class RoutinesService(OperationsService):
         return {"store_code":store,"year":year,"month":month,
                 "planned":planned,"completed":completed,"revision":row.revision}
 
+    def trainings_multi(self,stores:list[str],participant_ids:list[UUID]|None=None,
+                        procedure_ids:list[UUID]|None=None,start:date|None=None,
+                        end:date|None=None,limit:int=500)->list[dict]:
+        """Historico consolidado por lojas autorizadas, com filtros multiplos."""
+        allowed=[s for s in stores if s in STORE_CODES
+                 and can_access(self.principal,"training.view",s)]
+        if not allowed:
+            raise OperationError(403,"Acesso negado")
+        query=(select(TrainingRecord,User.display_name)
+            .join(User,User.id==TrainingRecord.participant_id)
+            .where(TrainingRecord.store_code.in_(allowed),
+                   TrainingRecord.deleted_at.is_(None)))
+        for s in allowed:
+            if not can_access(self.principal,"training.edit",s):
+                query=query.where(TrainingRecord.participant_id==self.actor.id)
+                break
+        else:
+            if participant_ids:
+                query=query.where(TrainingRecord.participant_id.in_(participant_ids))
+        if procedure_ids:
+            query=query.where(TrainingRecord.procedure_id.in_(procedure_ids))
+        if start:
+            query=query.where(TrainingRecord.happened_on>=start_of(start))
+        if end:
+            query=query.where(TrainingRecord.happened_on<start_of(end)+timedelta(days=1))
+        rows=self.db.execute(
+            query.order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
+            .limit(limit)
+        ).all()
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]
+
     def training(self,store:str,limit:int=100,participant_id:UUID|None=None,
                  procedure_id:UUID|None=None,start:date|None=None,
                  end:date|None=None)->list[dict]:
@@ -505,4 +544,12 @@ class RoutinesService(OperationsService):
             .order_by(TrainingRecord.happened_on.desc())
             .limit(limit)
         ).all()
-        return [self._training(row,name) for row,name in rows]
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]

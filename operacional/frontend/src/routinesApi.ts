@@ -71,6 +71,16 @@ export const routinesApi={
                 planned:number,completed:number,expected_revision:number)=>
     request<InstagramRow>(token,`/api/v1/routines/instagram/${store}/${year}/${month}`,
       "PUT",{planned,completed,expected_revision}),
+  trainingsMulti:(token:string,stores:string[],filters:{
+    participant_ids?:string[];procedure_ids?:string[];start?:string;end?:string}={})=>{
+    const qs=new URLSearchParams();
+    qs.set("stores",stores.join(","));
+    if(filters.participant_ids?.length)qs.set("participant_ids",filters.participant_ids.join(","));
+    if(filters.procedure_ids?.length)qs.set("procedure_ids",filters.procedure_ids.join(","));
+    if(filters.start)qs.set("start",filters.start);
+    if(filters.end)qs.set("end",filters.end);
+    return request<TrainingEntry[]>(token,`/api/v1/routines/trainings?${qs}`);
+  },
   trainings:(token:string,store:string,filters:{
     participant_id?:string;procedure_id?:string;start?:string;end?:string}={})=>{
     const qs=new URLSearchParams();

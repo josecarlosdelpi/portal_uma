@@ -167,6 +167,22 @@ def my_trainings(svc:RoutinesService=Depends(service))->list[dict]:
     return checked(lambda:svc.my_trainings())
 
 
+def _csv_uuids(raw:str|None)->list[UUID]|None:
+    if not raw:return None
+    try:return [UUID(x) for x in raw.split(",") if x.strip()]
+    except ValueError:return None
+
+
+@router.get("/trainings")
+def trainings_multi(stores:str="",participant_ids:str|None=None,
+                    procedure_ids:str|None=None,start:date|None=None,
+                    end:date|None=None,
+                    svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.trainings_multi(
+        [s.strip() for s in stores.split(",") if s.strip()],
+        _csv_uuids(participant_ids),_csv_uuids(procedure_ids),start,end))
+
+
 @router.get("/trainings/{store_code}")
 def trainings(store_code:str,limit:int=Query(100,ge=1,le=500),
               participant_id:UUID|None=None,procedure_id:UUID|None=None,

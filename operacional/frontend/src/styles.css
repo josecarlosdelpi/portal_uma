@@ -360,3 +360,13 @@
 .pdf-frame{flex:1;min-height:0;width:100%;border:1px solid #e7e2d0;border-radius:8px;background:#525659}
 @keyframes rowflash{0%{background:#fff3b5}70%{background:#fff8d6}100%{background:transparent}}
 .row-new{animation:rowflash 11.5s ease-out}
+
+/* Filtros multiplos, edicao com destaque e previas de midia */
+.step-multi-tools{display:flex;gap:8px;justify-content:flex-end;padding-bottom:6px;
+  border-bottom:1px solid #efe9d3;margin-bottom:2px}
+.step-multi-tools button{background:none;border:0;color:#8a6d00;font-weight:700;
+  font-size:11.5px;cursor:pointer;padding:2px 4px}
+.step-multi-tools button:hover{text-decoration:underline}
+.editing-form{outline:2px solid #d9b100;outline-offset:3px;border-radius:16px}
+.file-preview-media{object-fit:contain}
+.file-audio{width:100%;margin:20px 0}

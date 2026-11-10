@@ -488,7 +488,7 @@ class TrainingDocument(Base):
         ForeignKey("training_records.id", ondelete="RESTRICT"), primary_key=True
     )
     original_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    media_type: Mapped[str] = mapped_column(String(30), nullable=False, default="application/pdf")
+    media_type: Mapped[str] = mapped_column(String(120), nullable=False, default="application/pdf")
     byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
     digest: Mapped[str] = mapped_column(String(64), nullable=False)
     content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)

@@ -347,7 +347,7 @@ class ProceduresService(OperationsService):
         if row.obsolete_at is not None:
             raise OperationError(409, "Procedimento obsoleto não recebe novos arquivos")
         name, mime = validated_file(
-            raw, filename, media_type, set(IMAGE_EXTENSIONS), MAX_IMAGE_BYTES
+            raw, filename, media_type, IMAGE_EXTENSIONS, MAX_IMAGE_BYTES
         )
         record = ProcedureFile(
             id=uuid4(), procedure_id=row.id,

@@ -10,7 +10,6 @@ import {ConfirmDialog} from "./ConfirmDialog";
 import {ChevronDown,X} from "lucide-react";
 
 type Props={token:string;profile:MyProfile};
-const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
 const STEP_OPTIONS=[
   {value:"participou",label:"Treinamento apresentado"},
   {value:"pratica",label:"Execução prática verificada"},
@@ -50,29 +49,75 @@ function DocView({token,procId,versionId,onBack}:{token:string;procId:string;ver
   </section>;
 }
 
-function PdfPreview({token,store,entry,onClose,onDownload}:{
+const mediaKind=(media:string)=>media.startsWith("image/")?"image"
+  :media==="application/pdf"?"pdf":media.startsWith("video/")?"video"
+  :media.startsWith("audio/")?"audio":"other";
+const fmtSize=(n:number)=>n>=1048576?(n/1048576).toFixed(1)+" MB":Math.max(1,Math.round(n/1024))+" KB";
+
+function FilePreview({token,store,entry,onClose,onDownload}:{
   token:string;store:string;entry:TrainingEntry;onClose:()=>void;onDownload:()=>void}){
   const [url,setUrl]=useState("");
   const [err,setErr]=useState("");
+  const kind=mediaKind(entry.document?.media_type??"");
   useEffect(()=>{
-    let objectUrl="";
+    let objectUrl="";let cancelled=false;
     attachmentsApi.previewTraining(token,store,entry.id)
-      .then(u=>{objectUrl=u;setUrl(u);})
-      .catch(c=>setErr(c instanceof Error?c.message:"Não foi possível exibir a prévia."));
-    return ()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);};
+      .then(u=>{if(cancelled){URL.revokeObjectURL(u);return;}objectUrl=u;setUrl(u);})
+      .catch(c=>{if(!cancelled)
+        setErr(c instanceof Error?c.message:"Não foi possível exibir a prévia.");});
+    return ()=>{cancelled=true;if(objectUrl)URL.revokeObjectURL(objectUrl);};
   },[token,store,entry]);
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Prévia do PDF">
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Prévia do anexo">
     <div className="modal-card pdf-view-card">
-      <div className="fav-org-head"><h3>{entry.document?.name??"PDF anexado"}</h3>
+      <div className="fav-org-head"><h3>{entry.document?.name??"Arquivo anexado"}</h3>
         <button type="button" className="fav-org-close" aria-label="Fechar" onClick={onClose}>
           <X size={16}/></button></div>
       {err?<div className="notice notice-error">{err} Baixe o arquivo para consultar.</div>
-        :url?<iframe className="pdf-frame" src={url} title="Prévia do PDF anexado"/>
-        :<p role="status">Carregando prévia…</p>}
+        :!url?<p role="status">Carregando prévia…</p>
+        :kind==="image"?<img className="pdf-frame file-preview-media" src={url} alt="Prévia do anexo"/>
+        :kind==="pdf"?<iframe className="pdf-frame" src={url} title="Prévia do PDF anexado"/>
+        :kind==="video"?<video className="pdf-frame" src={url} controls/>
+        :kind==="audio"?<audio src={url} controls className="file-audio"/>
+        :<p className="small-note">Este formato não pode ser exibido no portal. Baixe o arquivo.</p>}
       <div className="modal-actions">
-        <button type="button" className="btn-secondary" onClick={onDownload}>Baixar PDF</button>
+        <button type="button" className="btn-secondary" onClick={onDownload}>Baixar</button>
         <button type="button" className="btn-primary" onClick={onClose}>Fechar</button>
       </div></div></div>;
+}
+
+function MultiSelect({label,options,value,onChange,empty}:{
+  label:string;options:{value:string;label:string}[];value:string[];
+  onChange:(v:string[])=>void;empty:string}){
+  const [open,setOpen]=useState(false);
+  const ref=useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!open)return;
+    const onDown=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node))setOpen(false);};
+    const onKey=(e:KeyboardEvent)=>{if(e.key==="Escape")setOpen(false);};
+    document.addEventListener("mousedown",onDown);
+    document.addEventListener("keydown",onKey);
+    return ()=>{document.removeEventListener("mousedown",onDown);
+      document.removeEventListener("keydown",onKey);};
+  },[open]);
+  const toggle=(v:string)=>onChange(value.includes(v)?value.filter(x=>x!==v):[...value,v]);
+  const summary=!value.length?empty
+    :value.length===options.length?"Todos"
+    :value.length===1?(options.find(o=>o.value===value[0])?.label??"1 selecionado")
+    :`${value.length} selecionados`;
+  return <div className="step-multi" ref={ref}>
+    <span className="step-multi-label">{label}</span>
+    <button type="button" className="step-multi-btn" aria-haspopup="listbox" aria-expanded={open}
+      onClick={()=>setOpen(o=>!o)}><span>{summary}</span><ChevronDown size={14}/></button>
+    {open&&<div className="step-multi-panel" role="listbox" aria-multiselectable="true">
+      <div className="step-multi-tools">
+        <button type="button" onClick={()=>onChange(options.map(o=>o.value))}>Selecionar todos</button>
+        <button type="button" onClick={()=>onChange([])}>Limpar seleção</button></div>
+      {options.map(o=><label key={o.value} className="check-line" role="option"
+        aria-selected={value.includes(o.value)}>
+        <input type="checkbox" checked={value.includes(o.value)} onChange={()=>toggle(o.value)}/>
+        {o.label}</label>)}
+    </div>}
+  </div>;
 }
 
 function TrainingDetails({entry,canWrite,working,onBack,onViewProc,onPreviewPdf,onDownloadPdf,onDeletePdf}:{
@@ -98,13 +143,17 @@ function TrainingDetails({entry,canWrite,working,onBack,onViewProc,onPreviewPdf,
     {entry.procedure_id&&<div className="detail-actions">
       <button className="btn-secondary" onClick={onViewProc}>Ver procedimento utilizado</button></div>}
     </article>
-    <article className="panel"><div className="panel-head"><div><h2>PDF anexado</h2>
+    <article className="panel"><div className="panel-head"><div><h2>Arquivo anexado</h2>
       <p>Documento privado, acessível apenas com sua sessão.</p></div></div>
-      {entry.document?<div className="routine-file-actions">
-        <button className="btn-secondary" onClick={onPreviewPdf}>Visualizar PDF</button>
-        <button className="btn-secondary" onClick={onDownloadPdf}>Baixar PDF</button>
+      {entry.document?<div>
+        <p className="small-note">{entry.document.name} · {entry.document.media_type}
+          {" · "}{fmtSize(entry.document.size)}</p>
+        <div className="routine-file-actions">
+        {mediaKind(entry.document.media_type)!=="other"&&
+          <button className="btn-secondary" onClick={onPreviewPdf}>Visualizar</button>}
+        <button className="btn-secondary" onClick={onDownloadPdf}>Baixar</button>
         {canWrite&&<button className="btn-secondary" disabled={working} onClick={onDeletePdf}>Excluir</button>}
-      </div>:<p className="small-note">Nenhum PDF anexado a este registro.</p>}
+        </div></div>:<p className="small-note">Nenhum arquivo anexado a este registro.</p>}
     </article>
   </section>;
 }
@@ -127,7 +176,14 @@ export function TrainingPage({token,profile}:Props){
   const [saved,setSaved]=useState<TrainingEntry|null>(null);
   const [recentId,setRecentId]=useState("");
   const [pdfPreview,setPdfPreview]=useState<TrainingEntry|null>(null);
+  const [confirmingEdit,setConfirmingEdit]=useState<TrainingEntry|null>(null);
+  const [pendingUpload,setPendingUpload]=useState<{entry:TrainingEntry;file:File}|null>(null);
   const scrollPos=useRef(0);
+  const formRef=useRef<HTMLElement>(null);
+  const participantRef=useRef<HTMLSelectElement>(null);
+  const [fileKey,setFileKey]=useState(0);
+  const [attach,setAttach]=useState<File|null>(null);
+  const [filterStores,setFilterStores]=useState<string[]>([]);
 
   const [store,setStore]=useState(profile.stores[0]??"");
   const [entries,setEntries]=useState<TrainingEntry[]>([]);
@@ -137,18 +193,16 @@ export function TrainingPage({token,profile}:Props){
   const [participant,setParticipant]=useState("");
   const [procedureId,setProcedureId]=useState("");
   const [instructor,setInstructor]=useState("");
-  const [day,setDay]=useState(today);
-  const [hour,setHour]=useState("09:00");
-  const [steps,setSteps]=useState<string[]>(["participou"]);
+  const [day,setDay]=useState("");
+  const [hour,setHour]=useState("");
+  const [steps,setSteps]=useState<string[]>([]);
   const [stepOpen,setStepOpen]=useState(false);
   const stepRef=useRef<HTMLDivElement>(null);
   const [note,setNote]=useState("");
-  const [fPerson,setFPerson]=useState("");
-  const [fProc,setFProc]=useState("");
+  const [fPersons,setFPersons]=useState<string[]>([]);
+  const [fProcs,setFProcs]=useState<string[]>([]);
   const [fStart,setFStart]=useState("");
   const [fEnd,setFEnd]=useState("");
-  const [docFile,setDocFile]=useState<File|null>(null);
-  const [docId,setDocId]=useState("");
   const [loading,setLoading]=useState(false);
   const [working,setWorking]=useState(false);
   const [error,setError]=useState("");
@@ -161,17 +215,24 @@ export function TrainingPage({token,profile}:Props){
   },[token,q,statusFilter,storeFilter]);
   useEffect(()=>{void refreshProcs();},[refreshProcs]);
 
+  const activeStores=filterStores.length?filterStores:profile.stores;
   const refreshTrainings=useCallback(async()=>{
-    if(!store)return;setLoading(true);setError("");
+    const stores=filterStores.length?filterStores:profile.stores;
+    if(!stores.length)return;setLoading(true);setError("");
     try{
-      const [rows,team]=await Promise.all([
-        routinesApi.trainings(token,store,{participant_id:fPerson||undefined,
-          procedure_id:fProc||undefined,start:fStart||undefined,end:fEnd||undefined}),
-        canWrite?operationsApi.team(token,store):Promise.resolve([] as TeamMember[])]);
-      setEntries(rows);setPeople(team);
+      const [rows,...teams]=await Promise.all([
+        routinesApi.trainingsMulti(token,stores,{participant_ids:fPersons,
+          procedure_ids:fProcs,start:fStart||undefined,end:fEnd||undefined}),
+        ...(canWrite?stores.map(s=>operationsApi.team(token,s).catch(()=>[] as TeamMember[]))
+          :[Promise.resolve([] as TeamMember[])])]);
+      setEntries(rows);
+      const seen=new Map<string,TeamMember>();
+      for(const team of teams)for(const m of team)seen.set(m.id,m);
+      setPeople([...seen.values()]);
+      return rows;
     }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível carregar.");}
     finally{setLoading(false);}
-  },[token,store,canWrite,fPerson,fProc,fStart,fEnd]);
+  },[token,filterStores,canWrite,fPersons,fProcs,fStart,fEnd,profile.stores]);
   useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
   useEffect(()=>{if(!recentId)return;
     const t=setTimeout(()=>setRecentId(""),12000);return()=>clearTimeout(t);},[recentId]);
@@ -213,11 +274,35 @@ export function TrainingPage({token,profile}:Props){
     finally{setWorking(false);}
   }
 
-  function startEdit(entry:TrainingEntry){
-    setEditRec(entry);setParticipant(entry.participant_id);
-    setProcedureId(entry.procedure_id??"");
+  function clearForm(){setParticipant("");setProcedureId("");setInstructor("");
+    setDay("");setHour("");setSteps([]);setNote("");setAttach(null);
+    setStepOpen(false);setFileKey(k=>k+1);}
+
+  function startEdit(entry:TrainingEntry){setConfirmingEdit(entry);}
+
+  function applyEdit(){const entry=confirmingEdit;if(!entry)return;
+    setConfirmingEdit(null);setEditRec(entry);
+    setParticipant(entry.participant_id);setProcedureId(entry.procedure_id??"");
     setInstructor(entry.instructor);setDay(entry.happened_on.slice(0,10));
-    setHour(entry.happened_on.slice(11,16));setSteps(entry.step.split(","));setNote(entry.note);
+    setHour(entry.happened_on.slice(11,16));setSteps(entry.step.split(","));
+    setNote(entry.note);setAttach(null);setFileKey(k=>k+1);
+    requestAnimationFrame(()=>{
+      formRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
+      setTimeout(()=>participantRef.current?.focus(),400);});
+  }
+
+  async function uploadAttach(rec:TrainingEntry,file:File):Promise<boolean>{
+    try{await attachmentsApi.uploadTraining(token,rec.store_code,rec.id,file,
+      rec.document?.revision??0);return true;}
+    catch{setPendingUpload({entry:rec,file});return false;}
+  }
+  async function retryUpload(){
+    if(!pendingUpload)return;const {entry,file}=pendingUpload;
+    setWorking(true);setError("");
+    if(await uploadAttach(entry,file)){
+      setPendingUpload(null);const rows=await refreshTrainings();
+      setSaved(rows?.find(r=>r.id===entry.id)??entry);}
+    setWorking(false);
   }
 
   async function save(){
@@ -228,15 +313,20 @@ export function TrainingPage({token,profile}:Props){
       const body={participant_id:participant,procedure_id:procedureId||null,
         title:editRec?editRec.title:"",instructor,happened_on:day+"T"+hour+":00",step,note};
       if(editRec){
-        await routinesApi.updateTraining(token,store,editRec.id,{...body,expected_revision:editRec.revision});
+        await routinesApi.updateTraining(token,editRec.store_code,editRec.id,
+          {...body,expected_revision:editRec.revision});
+        if(attach){const ok=await uploadAttach(editRec,attach);setAttach(null);
+          if(!ok){setPendingUpload({entry:editRec,file:attach});
+            await refreshTrainings();return;}}
         await refreshTrainings();setMessage("Registro atualizado.");
-        setEditRec(null);setNote("");
+        setEditRec(null);clearForm();
       }else{
         const created=await routinesApi.addTraining(token,store,body);
-        await refreshTrainings();
-        setParticipant("");setProcedureId("");setInstructor("");
-        setDay(today());setHour("09:00");setSteps(["participou"]);setNote("");
-        setRecentId(created.id);setSaved(created);
+        const file=attach;clearForm();setRecentId(created.id);
+        if(file){const ok=await uploadAttach(created,file);
+          if(!ok){await refreshTrainings();return;}}
+        const rows=await refreshTrainings();
+        setSaved(rows?.find(r=>r.id===created.id)??created);
       }
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao registrar.");}
     finally{setWorking(false);}
@@ -252,14 +342,6 @@ export function TrainingPage({token,profile}:Props){
     finally{setWorking(false);}
   }
 
-  const selectedDoc=entries.find(x=>x.id===docId);
-  async function uploadDoc(){
-    if(!docFile||!selectedDoc)return;setWorking(true);setError("");
-    try{await attachmentsApi.uploadTraining(token,store,docId,docFile,selectedDoc.document?.revision??0);
-      setDocFile(null);await refreshTrainings();setMessage("PDF anexado (não é assinatura eletrônica).");}
-    catch(cause){setError(cause instanceof Error?cause.message:"Falha no anexo.");}
-    finally{setWorking(false);}
-  }
   async function downloadDoc(e:TrainingEntry){if(e.document)await attachmentsApi.downloadTraining(token,e.store_code,e.id,e.document.name).catch(c=>setError(c.message));}
   async function confirmDeleteDoc(){
     if(!deletingDoc?.document)return;const e=deletingDoc;
@@ -275,12 +357,12 @@ export function TrainingPage({token,profile}:Props){
     requestAnimationFrame(()=>window.scrollTo(0,scrollPos.current));}
 
   const docModals=<>
-    {deletingDoc&&<ConfirmDialog title="Excluir PDF anexado" confirmLabel="Confirmar exclusão"
+    {deletingDoc&&<ConfirmDialog title="Excluir arquivo anexado" confirmLabel="Confirmar exclusão"
       busy={working} onCancel={()=>setDeletingDoc(null)} onConfirm={()=>void confirmDeleteDoc()}>
-      <p>Tem certeza de que deseja excluir o PDF {deletingDoc.document?.name} anexado ao treinamento
+      <p>Tem certeza de que deseja excluir o arquivo {deletingDoc.document?.name} anexado ao treinamento
       de {deletingDoc.participant}?</p>
     </ConfirmDialog>}
-    {pdfPreview&&<PdfPreview token={token} store={pdfPreview.store_code} entry={pdfPreview}
+    {pdfPreview&&<FilePreview token={token} store={pdfPreview.store_code} entry={pdfPreview}
       onClose={()=>setPdfPreview(null)} onDownload={()=>void downloadDoc(pdfPreview)}/>}
   </>;
 
@@ -337,6 +419,21 @@ export function TrainingPage({token,profile}:Props){
       onCancel={()=>setSaved(null)} onConfirm={()=>{setDetails(saved);setSaved(null);}}>
       <p>{saved.participant} — {saved.procedure}{saved.version?` (versão ${saved.version})`:""}</p>
     </ConfirmDialog>}
+    {confirmingEdit&&<ConfirmDialog title="Editar treinamento"
+      confirmLabel="Continuar para edição" danger={false}
+      onCancel={()=>setConfirmingEdit(null)} onConfirm={applyEdit}>
+      <p>Deseja editar o treinamento de {confirmingEdit.participant}
+      {" — "}{confirmingEdit.procedure} ({confirmingEdit.happened_on.slice(0,10)})?
+      O formulário será preenchido com os dados existentes; nenhuma alteração será gravada
+      até você clicar em Salvar alterações.</p>
+    </ConfirmDialog>}
+    {pendingUpload&&<ConfirmDialog title="Anexo pendente"
+      confirmLabel="Tentar enviar novamente" cancelLabel="Fechar" danger={false}
+      busy={working} onCancel={()=>setPendingUpload(null)} onConfirm={()=>void retryUpload()}>
+      <p>O treinamento de {pendingUpload.entry.participant} foi registrado, mas o arquivo
+      {" "}{pendingUpload.file.name} não pôde ser enviado. O registro não será duplicado;
+      você pode tentar enviar o anexo novamente.</p>
+    </ConfirmDialog>}
     {docModals}
 
     {tab==="procedimentos"&&<>
@@ -391,24 +488,24 @@ export function TrainingPage({token,profile}:Props){
 
     {tab==="treinamentos"&&canWrite&&<>
       <div className="routine-filters">
-        <label>Loja<select value={store} onChange={e=>setStore(e.target.value)}>
-          {profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}
-        </select></label>
-        <label>Colaborador<select value={fPerson} onChange={e=>setFPerson(e.target.value)}>
-          <option value="">Todos</option>{people.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-        </select></label>
-        <label>Procedimento<select value={fProc} onChange={e=>setFProc(e.target.value)}>
-          <option value="">Todos</option>{procs.filter(p=>p.current_version).map(p=><option key={p.id} value={p.id}>{p.code} — {p.title}</option>)}
-        </select></label>
+        <MultiSelect label="Loja" empty="Todas" value={filterStores} onChange={setFilterStores}
+          options={profile.stores.map(c=>({value:c,label:labelStore(c)}))}/>
+        <MultiSelect label="Colaborador" empty="Todos" value={fPersons} onChange={setFPersons}
+          options={people.map(p=>({value:p.id,label:p.name}))}/>
+        <MultiSelect label="Procedimento" empty="Todos" value={fProcs} onChange={setFProcs}
+          options={procs.filter(p=>p.current_version)
+            .map(p=>({value:p.id,label:`${p.code} — ${p.title}`}))}/>
         <label>De<input type="date" value={fStart} onChange={e=>setFStart(e.target.value)}/></label>
         <label>Até<input type="date" value={fEnd} onChange={e=>setFEnd(e.target.value)}/></label>
       </div>
-      <article className="panel routine-form-panel">
+      <article ref={formRef} className={"panel routine-form-panel"+(editRec?" editing-form":"")}>
         <div className="panel-head"><div><h2>{editRec?"Editar treinamento":"Registrar treinamento"}</h2>
           <p>{editRec?`Revisão ${editRec.revision} · edição auditada`:"A versão publicada vigente é registrada automaticamente."}</p></div>
-          {editRec&&<button className="btn-secondary" onClick={()=>setEditRec(null)}>Cancelar edição</button>}</div>
+          {editRec&&<button className="btn-secondary" onClick={()=>{setEditRec(null);clearForm();}}>Cancelar edição</button>}</div>
         <div className="routine-form-grid">
-          <label>Colaborador<select value={participant} onChange={e=>setParticipant(e.target.value)}>
+          <label>Loja<select value={store} onChange={e=>setStore(e.target.value)}>
+            {profile.stores.map(c=><option key={c} value={c}>{labelStore(c)}</option>)}</select></label>
+          <label>Colaborador<select ref={participantRef} value={participant} onChange={e=>setParticipant(e.target.value)}>
             <option value="">Selecione…</option>
             {people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label>Procedimento<select value={procedureId} onChange={e=>setProcedureId(e.target.value)}>
@@ -439,33 +536,29 @@ export function TrainingPage({token,profile}:Props){
           </div>
           <label className="routine-wide">Observações<input maxLength={350}
             value={note} onChange={e=>setNote(e.target.value)}/></label>
+          <label className="routine-wide">Arquivo complementar (opcional)<input type="file" key={fileKey}
+            disabled={working}
+            accept=".jpg,.jpeg,.png,.webp,.pdf,.docx,.xlsx,.pptx,.txt,.csv,.mp4,.webm,.mov,.mp3,.wav"
+            onChange={e=>setAttach(e.target.files?.[0]??null)}/></label>
+          {editRec?.document&&<p className="small-note routine-wide">Anexo atual:
+            {" "}{editRec.document.name} · {fmtSize(editRec.document.size)}
+            {" — selecionar um novo arquivo substitui o atual."}</p>}
         </div>
-        <button className="btn-primary" disabled={working||!participant||!procedureId||!instructor.trim()||!steps.length}
+        <button className="btn-primary" disabled={working||!participant||!procedureId
+          ||!instructor.trim()||!steps.length||!day||!hour}
           onClick={()=>void save()}>{working?"Salvando…":editRec?"Salvar alterações":"Registrar participação"}</button>
       </article>
-      {entries.length>0&&<article className="panel routine-form-panel">
-        <div className="panel-head"><div><h2>Anexar PDF complementar</h2>
-          <p>PDF privado de até 5 MB. Não é assinatura eletrônica.</p></div></div>
-        <div className="routine-form-grid">
-          <label className="routine-wide">Registro<select value={docId} onChange={e=>setDocId(e.target.value)}>
-            <option value="">Selecione…</option>
-            {entries.map(r=><option key={r.id} value={r.id}>{r.participant} — {r.procedure} ({r.happened_on.slice(0,10)})</option>)}
-          </select></label>
-          <label className="routine-wide">PDF<input type="file" accept=".pdf,application/pdf"
-            key={docId+"-"+(selectedDoc?.document?.revision??0)} disabled={working}
-            onChange={e=>setDocFile(e.target.files?.[0]??null)}/></label>
-        </div>
-        <button className="btn-primary" disabled={!docFile||!selectedDoc||working}
-          onClick={()=>void uploadDoc()}>Anexar PDF</button>
-      </article>}
       <article className="panel routine-form-panel">
         <div className="panel-head"><div><h2>Histórico de treinamentos</h2>
           <p>Registros administrativos com edição e exclusão lógica auditadas.</p></div></div>
         {loading&&<p role="status">Consultando registros…</p>}
-        <div className="table-wrap"><table><thead><tr><th>Data</th><th>Colaborador</th>
-          <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>PDF</th><th>Ações</th></tr></thead>
+        <div className="table-wrap"><table><thead><tr><th>Data</th>
+          {activeStores.length>1&&<th>Loja</th>}<th>Colaborador</th>
+          <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>Anexo</th><th>Ações</th></tr></thead>
           <tbody>{entries.map(e=><tr key={e.id} className={e.id===recentId?"row-new":""}>
-            <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.participant}</td>
+            <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td>
+            {activeStores.length>1&&<td>{labelStore(e.store_code)}</td>}
+            <td>{e.participant}</td>
             <td>{e.procedure}</td><td>{e.version}</td>
             <td>{stepLabel(e.step)}</td>
             <td>{e.document?<span className="count">Anexado</span>:"—"}</td>

@@ -379,3 +379,95 @@ def test_private_attachments_require_authentication():
             assert client.put(uri+"?expected_revision=0",files={
                 "file":("a.png",SMALL_PNG,"image/png")
             }).status_code==401
+
+
+def _docx() -> bytes:
+    import io, zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml",
+                   '<Types><Override ContentType="application/vnd.openxmlformats'
+                   '-officedocument.wordprocessingml.document.main"/></Types>')
+    return buf.getvalue()
+
+
+SMALL_MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 32
+SMALL_WAV = b"RIFF" + b"\x24\x00\x00\x00" + b"WAVEfmt " + b"\x00" * 24
+SMALL_MP3 = b"ID3\x04\x00\x00\x00\x00\x00\x10" + b"\x00" * 16
+
+
+def test_training_attachments_accept_common_media(env):
+    """Novos formatos ate 10 MB sao aceitos; executaveis e excedentes nao."""
+    c, actor, engine, admin, seller, other = env
+    actor["user"] = admin
+    rec = c.post("/api/v1/routines/trainings/JOINVILLE", json={
+        "participant_id": str(seller.id), "procedure": "POP-0001", "version": "1",
+        "title": "", "instructor": "Gestão", "happened_on": "2026-10-21T09:00:00",
+        "step": "participou"})
+    assert rec.status_code == 201
+    link = f"/api/v1/routines/trainings/JOINVILLE/{rec.json()['id']}/document"
+
+    cases = [
+        ("foto.png", SMALL_PNG, "image/png"),
+        ("foto.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 32, "image/jpeg"),
+        ("lista.docx", _docx(), "application/octet-stream"),
+        ("tabela.txt", "conteúdo de texto".encode(), "text/plain"),
+        ("dados.csv", "a;b\n1;2".encode(), "text/csv"),
+        ("video.mp4", SMALL_MP4, "video/mp4"),
+        ("audio.wav", SMALL_WAV, "audio/wav"),
+        ("audio.mp3", SMALL_MP3, "audio/mpeg"),
+    ]
+    revision = 0
+    for name, payload, ctype in cases:
+        up = c.put(link + f"?expected_revision={revision}", files={
+            "file": (name, payload, ctype)})
+        assert up.status_code == 200, (name, up.text)
+        revision = up.json()["revision"]
+    big = c.put(link + f"?expected_revision={revision}", files={
+        "file": ("video.mp4", b"\x00" * (11 * 1024 * 1024), "video/mp4")})
+    assert big.status_code == 413
+    exe = c.put(link + f"?expected_revision={revision}", files={
+        "file": ("virus.exe", b"MZ\x90\x00" + b"\x00" * 32, "application/octet-stream")})
+    assert exe.status_code == 422
+    got = c.get(link)
+    assert got.status_code == 200
+    assert got.headers["content-type"].startswith("audio/mpeg")
+    # vendedor ve metadados do proprio anexo em my-trainings
+    actor["user"] = seller
+    mine = c.get("/api/v1/routines/my-trainings").json()
+    assert mine[0]["document"]["name"] == "audio.mp3"
+    assert mine[0]["document_attached"] is True
+
+
+def test_trainings_multi_store_and_filters(env):
+    """Endpoint consolidado cruza lojas, colaboradores, procedimentos e datas."""
+    c, actor, engine, admin, seller, other = env
+    actor["user"] = admin
+    with Session(engine) as db:
+        for code in ("TUBARAO", "ITAJAI"):
+            grp = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
+            db.add(grp); db.flush()
+            db.add(GroupMembership(user_id=seller.id, group_id=grp.id))
+        db.commit()
+    for store, day in [("JOINVILLE", "2026-10-20T09:00:00"),
+                       ("TUBARAO", "2026-10-22T09:00:00"),
+                       ("ITAJAI", "2026-11-30T09:00:00")]:
+        r = c.post(f"/api/v1/routines/trainings/{store}", json={
+            "participant_id": str(seller.id), "procedure": "POP-0001", "version": "1",
+            "title": "", "instructor": "Gestão", "happened_on": day,
+            "step": "participou"})
+        assert r.status_code == 201, r.text
+    rows = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO").json()
+    assert len(rows) == 2
+    assert rows[0]["happened_on"] > rows[1]["happened_on"]
+    three = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI").json()
+    assert len(three) == 3
+    by_person = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO"
+                      f"&participant_ids={seller.id}").json()
+    assert len(by_person) == 2
+    by_dates = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI"
+                     "&start=2026-11-01").json()
+    assert len(by_dates) == 1 and by_dates[0]["store_code"] == "ITAJAI"
+    unknown = c.get("/api/v1/routines/trainings?stores=JOINVILLE"
+                    f"&participant_ids={uuid4()}").json()
+    assert unknown == []
