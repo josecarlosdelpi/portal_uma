@@ -13,6 +13,7 @@ import {Extension} from "@tiptap/core";
 import type {Procedure,VersionInfo} from "./proceduresApi";
 import {proceduresApi,hydrateImages} from "./proceduresApi";
 import {stores,labelStore} from "./catalog";
+import {ConfirmDialog} from "./ConfirmDialog";
 
 const FontSize=Extension.create({
   name:"fontSize",
@@ -110,6 +111,7 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
   const [versions,setVersions]=useState<VersionInfo[]>([]);
   const [viewing,setViewing]=useState<VersionInfo|null>(null);
   const [working,setWorking]=useState(false);
+  const [confirmingObs,setConfirmingObs]=useState(false);
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const draft=proc.draft_version;
@@ -186,6 +188,14 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
     finally{setWorking(false);}
   }
 
+  async function confirmObsolete(){
+    setWorking(true);setError("");
+    try{setProc(await proceduresApi.obsolete(token,proc.id));
+      setConfirmingObs(false);setMessage("Procedimento marcado como obsoleto.");}
+    catch(c){setError(c instanceof Error?c.message:"Falha ao marcar obsoleto.");setConfirmingObs(false);}
+    finally{setWorking(false);}
+  }
+
   async function openVersion(v:VersionInfo){
     try{const full=await proceduresApi.getVersion(token,proc.id,v.id);setViewing(full);}
     catch{setError("Não foi possível abrir a versão.");}
@@ -218,13 +228,7 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
           setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
         }}>Criar nova versão</button>}
         {proc.current_version&&proc.status!=="obsoleto"&&<button className="btn-secondary" disabled={working}
-          onClick={async()=>{
-            if(!window.confirm(`Marcar ${proc.code} — ${proc.title} como OBSOLETO?\nVendedores deixarão de vê-lo.`))return;
-            setWorking(true);setError("");
-            try{setProc(await proceduresApi.obsolete(token,proc.id));setMessage("Procedimento marcado como obsoleto.");}
-            catch(c){setError(c instanceof Error?c.message:"Falha ao marcar obsoleto.");}
-            finally{setWorking(false);}
-          }}>Obsoleto</button>}
+          onClick={()=>setConfirmingObs(true)}>Obsoleto</button>}
         {!canEdit&&draft&&<button className="btn-primary" onClick={()=>{
           setEditingMode(true);editor?.setEditable(true);editor?.commands.focus();
         }}>Continuar edição</button>}
@@ -299,5 +303,12 @@ export function ProcedureEditor({token,procedure,onClose}:Props){
           <td><button className="btn-secondary" onClick={()=>void openVersion(v)}>Abrir</button></td>
         </tr>)}</tbody></table></div>
     </article>}
+    {confirmingObs&&<ConfirmDialog title="Marcar procedimento como obsoleto"
+      confirmLabel="Sim, marcar como obsoleto" danger={false}
+      busy={working} onCancel={()=>setConfirmingObs(false)} onConfirm={()=>void confirmObsolete()}>
+      <p>Tem certeza de que deseja marcar o procedimento {proc.code} — {proc.title} como obsoleto?
+      O procedimento deixará de aparecer para os vendedores, mas suas versões e o histórico de
+      treinamentos continuarão preservados para consulta administrativa.</p>
+    </ConfirmDialog>}
   </section>;
 }

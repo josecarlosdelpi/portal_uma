@@ -331,3 +331,60 @@
   .sidebar .brand{padding:16px 12px 13px;margin-bottom:10px}
   .sidebar .brand .brand-logo-image{width:130px;max-height:60px}
 }
+
+/* Selecao multipla de etapa do treinamento (checkboxes na lista suspensa) */
+.step-multi{display:flex;flex-direction:column;gap:6px;color:#635a3b;font-size:11px;font-weight:800;position:relative}
+.step-multi-btn{min-height:41px;border:1px solid #dbd4b3;border-radius:9px;padding:8px 12px;
+  color:#25231b;background:#fff;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;font-size:14px;font-weight:400;cursor:pointer;width:100%;text-align:left}
+.step-multi-btn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step-multi-btn svg{flex-shrink:0;color:#8a845f}
+.step-multi-panel{position:absolute;top:100%;left:0;right:0;z-index:20;margin-top:4px;
+  background:#fff;border:1px solid #dbd4b3;border-radius:9px;padding:10px 12px;
+  box-shadow:0 10px 24px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:9px}
+.step-multi-panel .check-line{display:flex;flex-direction:row;align-items:center;gap:8px;
+  font-weight:600;color:#25231b;font-size:13px;margin-right:0;cursor:pointer}
+
+/* Detalhes do treinamento + previa de PDF + destaque de registro novo */
+.detail-rows{display:flex;flex-direction:column;gap:12px}
+.detail-row{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:baseline;
+  padding-bottom:11px;border-bottom:1px solid #efe9d3}
+.detail-row:last-child{border-bottom:0;padding-bottom:0}
+.detail-row dt{color:#827b62;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.detail-row dd{margin:0;font-size:13.5px;color:#25231b;word-break:break-word}
+.detail-empty{color:#8f8a76;font-style:italic}
+.detail-actions{margin-top:16px}
+@media(max-width:650px){.detail-row{grid-template-columns:1fr;gap:3px}}
+.pdf-view-card{max-width:960px;width:94%;height:82vh;display:flex;flex-direction:column}
+.pdf-view-card .fav-org-head{margin-bottom:10px}
+.pdf-frame{flex:1;min-height:0;width:100%;border:1px solid #e7e2d0;border-radius:8px;background:#525659}
+@keyframes rowflash{0%{background:#fff3b5}70%{background:#fff8d6}100%{background:transparent}}
+.row-new{animation:rowflash 11.5s ease-out}
+
+/* Filtros multiplos, edicao com destaque e previas de midia */
+.step-multi-tools{display:flex;gap:8px;justify-content:flex-end;padding-bottom:6px;
+  border-bottom:1px solid #efe9d3;margin-bottom:2px}
+.step-multi-tools button{background:none;border:0;color:#8a6d00;font-weight:700;
+  font-size:11.5px;cursor:pointer;padding:2px 4px}
+.step-multi-tools button:hover{text-decoration:underline}
+.editing-form{outline:2px solid #d9b100;outline-offset:3px;border-radius:16px}
+.file-preview-media{object-fit:contain}
+.file-audio{width:100%;margin:20px 0}
+
+/* Filtros multi-selecao: largura util e painel sempre legivel */
+.routine-filters .step-multi{flex:1 1 210px;min-width:210px;max-width:300px}
+.step-multi-panel{left:0;right:auto;width:max-content;min-width:100%;
+  max-width:min(360px,92vw);z-index:90}
+.step-multi-tools{flex-wrap:nowrap;padding-top:2px;flex-shrink:0;
+  border-bottom:1px solid #efe9d3;margin-bottom:2px;position:sticky;top:0;
+  background:#fff;z-index:1}
+.step-multi-tools button{white-space:nowrap}
+.step-multi-options{display:flex;flex-direction:column;gap:9px;
+  overflow-y:auto;max-height:250px;padding-right:2px}
+@media(max-width:700px){
+  .routine-filters .step-multi{flex:1 1 100%;min-width:0;max-width:none}
+  .step-multi-panel{max-width:calc(100vw - 32px)}
+}
+
+/* Spacer que empurra os filtros para a direita da linha (aba Procedimentos). */
+.filters-spacer{flex:1}

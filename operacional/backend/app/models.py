@@ -356,7 +356,8 @@ class TrainingRecord(Base):
     """Metadados de participacao. Assinaturas e PDFs exigem armazenamento privado futuro."""
     __tablename__ = "training_records"
     __table_args__ = (
-        CheckConstraint("step IN ('participou','pratica')", name="ck_training_step"),
+        CheckConstraint("step IN ('participou','pratica','participou,pratica')",
+                      name="ck_training_step"),
     )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
@@ -366,7 +367,7 @@ class TrainingRecord(Base):
     title: Mapped[str] = mapped_column(String(140), nullable=False, default="")
     instructor: Mapped[str] = mapped_column(String(90), nullable=False)
     happened_on: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
-    step: Mapped[str] = mapped_column(String(15), nullable=False)
+    step: Mapped[str] = mapped_column(String(31), nullable=False)
     note: Mapped[str] = mapped_column(String(350), nullable=False, default="")
     procedure_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedures.id", ondelete="RESTRICT"))
     procedure_version_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedure_versions.id", ondelete="RESTRICT"))
@@ -480,14 +481,14 @@ class TrainingDocument(Base):
     """Small private PDF attached to training record; does NOT constitute e-signature."""
     __tablename__ = "training_documents"
     __table_args__ = (
-        CheckConstraint("byte_length BETWEEN 1 AND 5242880", name="ck_training_pdf_size"),
+        CheckConstraint("byte_length BETWEEN 1 AND 10485760", name="ck_training_pdf_size"),
         CheckConstraint("revision >= 1", name="ck_training_pdf_revision"),
     )
     training_id: Mapped[UUID] = mapped_column(
         ForeignKey("training_records.id", ondelete="RESTRICT"), primary_key=True
     )
     original_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    media_type: Mapped[str] = mapped_column(String(30), nullable=False, default="application/pdf")
+    media_type: Mapped[str] = mapped_column(String(120), nullable=False, default="application/pdf")
     byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
     digest: Mapped[str] = mapped_column(String(64), nullable=False)
     content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)

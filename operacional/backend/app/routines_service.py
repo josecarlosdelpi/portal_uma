@@ -31,6 +31,17 @@ def can_verify(week:date)->bool:
     return monday(week)<=monday(datetime.now(SAO_PAULO).date())
 
 
+STEP_VALUES=("participou","pratica")
+
+
+def canon_step(step:str)->str:
+    """Normaliza a(s) etapa(s): deduplica e ordena de forma canonica."""
+    parts=sorted({p for p in step.split(",") if p in STEP_VALUES},key=STEP_VALUES.index)
+    if not parts:
+        raise OperationError(422,"Etapa inválida")
+    return ",".join(parts)
+
+
 class RoutinesService(OperationsService):
     def week(self, store:str, reference:date)->dict:
         self.require(store,"checklist.view")
@@ -330,6 +341,67 @@ class RoutinesService(OperationsService):
         return {"store_code":store,"year":year,"month":month,
                 "planned":planned,"completed":completed,"revision":row.revision}
 
+    def trainings_multi(self,stores:list[str],participant_ids:list[UUID]|None=None,
+                        procedure_ids:list[UUID]|None=None,start:date|None=None,
+                        end:date|None=None,limit:int=200,offset:int=0)->list[dict]:
+        """Historico consolidado por lojas autorizadas, com filtros multiplos."""
+        allowed=[s for s in stores if s in STORE_CODES
+                 and can_access(self.principal,"training.view",s)]
+        if not allowed:
+            raise OperationError(403,"Acesso negado")
+        query=(select(TrainingRecord,User.display_name)
+            .join(User,User.id==TrainingRecord.participant_id)
+            .where(TrainingRecord.store_code.in_(allowed),
+                   TrainingRecord.deleted_at.is_(None)))
+        for s in allowed:
+            if not can_access(self.principal,"training.edit",s):
+                query=query.where(TrainingRecord.participant_id==self.actor.id)
+                break
+        else:
+            if participant_ids:
+                query=query.where(TrainingRecord.participant_id.in_(participant_ids))
+        if procedure_ids:
+            query=query.where(TrainingRecord.procedure_id.in_(procedure_ids))
+        if start:
+            query=query.where(TrainingRecord.happened_on>=start_of(start))
+        if end:
+            query=query.where(TrainingRecord.happened_on<start_of(end)+timedelta(days=1))
+        rows=self.db.execute(
+            query.order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
+            .offset(offset).limit(limit)
+        ).all()
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]
+
+    def trainings_procedures(self,stores:list[str])->list[dict]:
+        """Procedimentos distintos presentes no historico de treinamentos.
+
+        Inclui procedimentos obsoletos e excluidos logicamente (somente
+        metadados id+rotulo), independentemente da paginacao.
+        """
+        allowed=[s for s in stores if s in STORE_CODES
+                 and can_access(self.principal,"training.view",s)]
+        if not allowed:
+            raise OperationError(403,"Acesso negado")
+        query=(select(TrainingRecord.procedure_id,TrainingRecord.procedure)
+            .where(TrainingRecord.store_code.in_(allowed),
+                   TrainingRecord.deleted_at.is_(None),
+                   TrainingRecord.procedure_id.is_not(None))
+            .distinct())
+        for s in allowed:
+            if not can_access(self.principal,"training.edit",s):
+                query=query.where(TrainingRecord.participant_id==self.actor.id)
+                break
+        rows=self.db.execute(query).all()
+        return [{"procedure_id":str(pid),"procedure":name} for pid,name in rows]
+
     def training(self,store:str,limit:int=100,participant_id:UUID|None=None,
                  procedure_id:UUID|None=None,start:date|None=None,
                  end:date|None=None)->list[dict]:
@@ -406,6 +478,7 @@ class RoutinesService(OperationsService):
         proc_id,ver_id,p_code,p_label=self._procedure_snapshot(procedure_id)
         if proc_id is not None:
             procedure,version=p_code,p_label
+        step=canon_step(step)
         entry=TrainingRecord(
             id=uuid4(),store_code=store,participant_id=participant_id,
             procedure=procedure.strip(),version=version.strip(),
@@ -449,7 +522,7 @@ class RoutinesService(OperationsService):
         row.participant_id=participant_id
         row.procedure=procedure.strip();row.version=version.strip()
         row.title=title;row.instructor=instructor.strip()
-        row.happened_on=happened_on;row.step=step;row.note=note
+        row.happened_on=happened_on;row.step=canon_step(step);row.note=note
         row.revision+=1;row.updated_by=self.actor.id
         row.updated_at=datetime.now(timezone.utc)
         self.audit("training.updated","training_record",str(row.id),
@@ -493,4 +566,12 @@ class RoutinesService(OperationsService):
             .order_by(TrainingRecord.happened_on.desc())
             .limit(limit)
         ).all()
-        return [self._training(row,name) for row,name in rows]
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]

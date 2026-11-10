@@ -1,8 +1,8 @@
 """Regression tests: procedure versions, private files and training privacy."""
-from uuid import uuid4
+from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -10,7 +10,8 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    Base, GroupMembership, GroupPermission, Store, StoreGroup, User,
+    Base, GroupMembership, GroupPermission, Procedure, ProcedureVersion, Store,
+    StoreGroup, TrainingRecord, User,
 )
 
 
@@ -231,21 +232,62 @@ def test_obsolete_hides_from_seller_keeps_history(env):
     assert c.post(f"/api/v1/procedures/{draft['id']}/obsolete").status_code == 422
 
 
-def test_delete_only_never_published(env):
-    c, actor, _, admin, joi, *_ = env
+def test_delete_permissions_and_preservation(env):
+    """Rascunho nunca publicado: qualquer editor exclui. Publicado/obsoleto: so SuperAdmin.
+    A exclusao e logica: versoes e treinamentos historicos permanecem no banco."""
+    c, actor, engine, admin, joi, *_ = env
     draft = _proc(c, "Rascunho descartado")
     pub = _proc(c, "Publicado firme")
     c.post(f"/api/v1/procedures/{pub['id']}/publish", json={"expected_revision": 1})
-    # published cannot be deleted
-    assert c.delete(f"/api/v1/procedures/{pub['id']}").status_code == 409
-    # seller cannot delete
+    # published com nova versao em rascunho
+    mixed = _proc(c, "Publicado com rascunho")
+    c.post(f"/api/v1/procedures/{mixed['id']}/publish", json={"expected_revision": 1})
+    c.put(f"/api/v1/procedures/{mixed['id']}", json={
+        "title": "Publicado com rascunho", "summary": "", "applies_to_all": True,
+        "store_codes": [], "content_html": "<p>v2</p>", "expected_revision": 1})
+    # obsoleto
+    obs = _proc(c, "Obsoleto alvo")
+    c.post(f"/api/v1/procedures/{obs['id']}/publish", json={"expected_revision": 1})
+    assert c.post(f"/api/v1/procedures/{obs['id']}/obsolete").status_code == 200
+    # treinamento historico vinculado ao publicado
+    t = c.post("/api/v1/routines/trainings/JOINVILLE", json={
+        "participant_id": str(joi.id), "procedure_id": pub["id"], "title": "",
+        "instructor": "X", "happened_on": "2026-11-01T10:00:00",
+        "step": "participou", "note": ""}).json()
+    # admin nao exclui publicado, publicado+rascunho nem obsoleto
+    assert c.delete(f"/api/v1/procedures/{pub['id']}").status_code == 403
+    assert c.delete(f"/api/v1/procedures/{mixed['id']}").status_code == 403
+    assert c.delete(f"/api/v1/procedures/{obs['id']}").status_code == 403
+    # vendedor nao exclui nem rascunho
     actor["user"] = joi
     assert c.delete(f"/api/v1/procedures/{draft['id']}").status_code == 403
     actor["user"] = admin
-    # draft deleted logically: disappears from list and get
+    # admin exclui rascunho nunca publicado: some das listagens e do acesso direto
     assert c.delete(f"/api/v1/procedures/{draft['id']}").status_code == 200
     assert draft["id"] not in {x["id"] for x in c.get("/api/v1/procedures").json()}
     assert c.get(f"/api/v1/procedures/{draft['id']}").status_code == 404
+    # superadmin exclui publicado, publicado+rascunho e obsoleto
+    with Session(engine) as db:
+        root = User(id=uuid4(), auth_subject="root-proc", display_name="Super",
+                    profile="administrator", is_superadmin=True, active=True)
+        db.add(root); db.commit(); db.refresh(root)
+        actor["user"] = root
+    for target in (pub, mixed, obs):
+        assert c.delete(f"/api/v1/procedures/{target['id']}").status_code == 200
+        assert c.get(f"/api/v1/procedures/{target['id']}").status_code == 404
+    assert not c.get("/api/v1/procedures").json()
+    # vendedor e admin nao acessam por link direto
+    actor["user"] = joi
+    assert c.get(f"/api/v1/procedures/{pub['id']}").status_code == 404
+    actor["user"] = admin
+    assert c.get(f"/api/v1/procedures/{pub['id']}").status_code == 404
+    # versoes e treinamentos historicos preservados no banco (exclusao logica)
+    with Session(engine) as db:
+        assert db.scalar(select(func.count(ProcedureVersion.id)).where(
+            ProcedureVersion.procedure_id == UUID(pub["id"]))) >= 1
+        rec = db.get(TrainingRecord, UUID(t["id"]))
+        assert rec is not None and rec.procedure_version_id is not None
+        assert db.get(Procedure, UUID(pub["id"])).deleted_at is not None
 
 
 def test_training_delete_superadmin_only(env):
