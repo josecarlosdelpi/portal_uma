@@ -161,3 +161,173 @@
 .modal-card h3{margin:0 0 10px}.modal-card p{color:#555;line-height:1.5}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
 .btn-danger{background:#b3261e;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer}
+
+/* Sidebar retratil + favoritos */
+.sidebar{transition:transform .2s ease}
+.pin-btn{margin-left:auto;background:none;border:none;font-size:16px;cursor:pointer;color:#f3e9a8;padding:4px}
+.edge-strip{position:fixed;left:0;top:0;bottom:0;width:22px;z-index:55;background:#141414;border:none;color:#b7a92d;
+  font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.edge-strip span{writing-mode:vertical-rl;letter-spacing:2px}
+.side-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:56}
+.sb-unpinned .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:57;transform:translateX(-105%);box-shadow:8px 0 24px rgba(0,0,0,.25)}
+.sb-unpinned.sb-open .sidebar{transform:translateX(0)}
+.sb-unpinned .main{flex:1}
+.fav-list{margin-bottom:8px}
+.fav-empty{font-size:12px;color:#9a937a;padding:4px 12px;line-height:1.4}
+.nav-item{display:flex;align-items:center;gap:2px}
+.nav-link{flex:1;display:flex;align-items:center;gap:10px;background:none;border:none;color:inherit;
+  font:inherit;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer}
+.nav-link:hover{background:rgba(255,255,255,.08)}
+.nav-link.active{background:#b7a92d;color:#141414;font-weight:600}
+.star-btn{background:none;border:none;color:#8a845f;font-size:15px;cursor:pointer;padding:6px}
+.star-btn.starred{color:#b7a92d}
+.fav-item{border-radius:8px}
+.fav-item.drop-target{outline:2px dashed #b7a92d;outline-offset:-2px}
+.fav-item[draggable=true]{cursor:grab}
+.fav-reorder{display:flex;flex-direction:column;gap:0}
+.fav-reorder button{background:none;border:none;color:#8a845f;font-size:11px;cursor:pointer;padding:1px 6px;line-height:1}
+.fav-reorder button:disabled{opacity:.3;cursor:default}
+.menu-btn{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#141414;padding:4px 8px}
+@media (max-width:900px){
+  .edge-strip{display:none}
+  .menu-btn{display:block}
+  .sb-pinned .sidebar,.sb-unpinned .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:57;
+    transform:translateX(-105%);transition:transform .2s ease;box-shadow:8px 0 24px rgba(0,0,0,.25)}
+  .sb-open .sidebar{transform:translateX(0)}
+  .sb-pinned .side-backdrop{display:none}
+  .sb-unpinned .side-backdrop,.sb-pinned.sb-open .side-backdrop{display:block}
+}
+
+/* Correcoes PR7: grid expande + nav visivel no mobile */
+.sb-unpinned{grid-template-columns:minmax(0,1fr)!important}
+@media(max-width:940px){
+  .sidebar .side-heading{display:block;margin:14px 13px 6px}
+  .sidebar nav{display:block!important}
+  .sidebar .nav-item{flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;
+    min-height:0!important;font-size:13px!important;text-align:left!important;padding:6px 4px!important;gap:0!important}
+  .sidebar .nav-link{display:flex!important;flex-direction:row!important}
+  .sb-open .sidebar .sidebar-note,.sb-open .sidebar .sidebar-bottom{display:block}
+}
+
+/* Revisao visual da sidebar (PR7): compacta, elegante, icones Lucide */
+.sidebar{padding:14px 10px 16px;overflow-y:auto}
+.side-heading{font-size:9px;letter-spacing:1.6px;margin:16px 8px 6px;font-weight:800}
+.sidebar .nav-item{padding:0;margin:1px 0}
+.nav-link{gap:9px;padding:7px 9px;font-size:12.5px;border-radius:7px}
+.nav-link span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-link .nav-icon{flex-shrink:0;opacity:.85}
+.star-btn{padding:4px;opacity:.55}
+.star-btn:hover{opacity:1}
+.star-btn.starred{opacity:1;color:#d2b300}
+.fav-item{background:rgba(255,255,255,.05);border-radius:7px;margin:2px 0;padding:0 2px}
+.fav-item .nav-link{padding:6px 6px;font-size:12.5px}
+.fav-item .nav-link.active{background:rgba(210,179,0,.18);color:#fff;font-weight:600}
+.drag-grip{display:flex;align-items:center;color:#6b6b6b;padding:0 2px;flex-shrink:0}
+.fav-reorder{display:flex;flex-direction:row;gap:1px}
+.fav-reorder button{padding:2px;display:flex;align-items:center}
+.sidebar-note{font-size:10px;padding:9px;margin-top:12px}
+.sidebar-bottom{font-size:9px;padding:12px 8px 0}
+.pin-btn{color:#9a9378;padding:3px;display:flex;align-items:center}
+.pin-btn:hover{color:#d2b300}
+
+/* Refino visual final (PR7): larguras, logo, favs leves, sem scroll horizontal */
+.sb-pinned{grid-template-columns:262px minmax(0,1fr)}
+.sb-unpinned .sidebar{width:242px}
+.sidebar{overflow-x:hidden}
+.sidebar .nav-item{min-width:0}
+.nav-item,.nav-link{min-width:0}
+.nav-link span{flex:1;min-width:0}
+.nav-link .nav-icon{opacity:.8}
+/* ativo: indicador lateral dourado + fundo suave, sem cartao pesado */
+.nav-link.active{background:rgba(210,179,0,.14);color:#fff;font-weight:600;box-shadow:inset 3px 0 0 #d2b300}
+.fav-item{background:rgba(255,255,255,.035);border-radius:6px;margin:1px 0}
+.fav-item .nav-link.active{background:rgba(210,179,0,.12);box-shadow:inset 3px 0 0 #d2b300;font-weight:600}
+.fav-item.drop-target{outline:1px dashed #d2b300;outline-offset:-1px}
+/* controles de ordem: so aparecem no hover/foco; sempre visiveis em toque */
+.fav-reorder{opacity:0;transition:opacity .12s;flex-shrink:0}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{opacity:1}
+@media(hover:none){.fav-reorder{opacity:.9}}
+.star-btn{opacity:.4}
+.star-btn:hover{opacity:.9}
+.star-btn.starred{opacity:.95;color:#d2b300}
+@media(max-width:940px){
+  .sb-pinned .sidebar,.sb-unpinned .sidebar{width:min(280px,85vw)}
+}
+
+/* setas de ordem nao ocupam largura quando ocultas */
+.fav-reorder{width:0;overflow:hidden}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{width:auto;opacity:1}
+@media(hover:none){.fav-reorder{width:auto}}
+
+/* controles de ordem compactos tambem em dispositivos de toque */
+.fav-reorder button{padding:0 2px;width:16px;height:16px;line-height:0}
+@media(hover:none){.fav-reorder{width:34px;opacity:.85}}
+
+/* fecho definitivo dos controles de ordem */
+.fav-item .fav-reorder{width:0!important;opacity:0;overflow:hidden}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{width:36px!important;opacity:1}
+@media(hover:none){.fav-item .fav-reorder{width:36px!important;opacity:.85}}
+
+/* controles de ordem fora do fluxo - nunca comprimem o nome */
+.fav-item{position:relative}
+.fav-item .fav-reorder{position:absolute!important;right:4px;top:50%;transform:translateY(-50%);
+  width:auto!important;flex-direction:column;opacity:0;pointer-events:none;background:#1c1c1c;border-radius:5px;z-index:2}
+.fav-item:hover .fav-reorder,.fav-item:focus-within .fav-reorder{opacity:1;pointer-events:auto;width:auto!important}
+@media(hover:none){.fav-item .fav-reorder{position:static!important;transform:none;opacity:.85;
+  pointer-events:auto;flex-direction:row;width:auto!important;background:transparent}}
+
+/* scrollbar discreta */
+.sidebar::-webkit-scrollbar{width:8px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:4px}
+.sidebar::-webkit-scrollbar-thumb:hover{background:#4a4a4a}
+.sidebar{scrollbar-width:thin;scrollbar-color:#3a3a3a transparent}
+
+/* Modal de favoritos */
+.side-heading-fav{display:flex;align-items:center;justify-content:space-between}
+.fav-org-btn{background:none;border:none;color:#9a9378;padding:3px;display:flex;cursor:pointer}
+.fav-org-btn:hover{color:#d2b300}
+.fav-item .nav-link{padding:7px 9px}
+.fav-org-card{max-width:420px;width:92%;max-height:80vh;display:flex;flex-direction:column}
+.fav-org-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.fav-org-head h3{margin:0}
+.fav-org-close{background:none;border:none;color:#666;cursor:pointer;display:flex;padding:4px}
+.fav-org-list{overflow-y:auto;min-height:60px;display:flex;flex-direction:column;gap:4px}
+.fav-org-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e7e2d0;
+  border-radius:8px;background:#fffdf4;cursor:grab}
+.fav-org-item.drop-target{outline:2px dashed #d2b300;outline-offset:-2px}
+.fav-org-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.fav-org-actions{display:flex;gap:2px}
+.fav-org-actions button{background:none;border:1px solid #e0dac0;border-radius:5px;padding:3px;
+  display:flex;cursor:pointer;color:#554b00}
+.fav-org-actions button:disabled{opacity:.3;cursor:default}
+.fav-org-actions .fav-org-remove{color:#8a2a20;border-color:#e6c0bc}
+
+/* Cabecalho premium da sidebar (referencia UMA): card escuro + detalhes dourados.
+   flex:none impede que o card encolha e corte o conteudo quando a sidebar rola. */
+.sidebar .brand{
+  position:relative;display:flex;flex-direction:column;align-items:center;flex:none;
+  gap:0;padding:20px 12px 16px;margin:0 4px 12px;
+  background:linear-gradient(165deg,#0a0a0a 0%,#141414 55%,#171204 100%);
+  border:1px solid #ffd90033;border-radius:14px;overflow:hidden}
+.sidebar .brand::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(130px 70px at -5% -10%,rgba(255,217,0,.30),transparent 70%),
+    radial-gradient(150px 80px at 105% 110%,rgba(255,217,0,.22),transparent 70%)}
+.sidebar .brand .brand-logo-image{width:150px;max-height:72px;height:auto;object-fit:contain;
+  position:relative;z-index:1;mix-blend-mode:screen;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
+.sidebar .brand-title{position:relative;z-index:1;display:flex;align-items:center;justify-content:center;
+  gap:16px;width:100%;margin-top:10px}
+.sidebar .brand-title::before,.sidebar .brand-title::after{content:"";height:1px;flex:1;max-width:56px;
+  background:linear-gradient(90deg,transparent,#d2b300)}
+.sidebar .brand-title::after{background:linear-gradient(90deg,#d2b300,transparent)}
+.sidebar .brand-title strong{color:#fff;font-size:16.5px;font-weight:800;letter-spacing:2.4px;white-space:nowrap}
+.sidebar .brand-sub{position:relative;z-index:1;color:#b9b9b9;font-size:11.5px;margin-top:4px;letter-spacing:.3px}
+.pin-btn{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border:1px solid #ffd90066;border-radius:8px;
+  background:rgba(0,0,0,.35);color:#d2b300;cursor:pointer;transition:all .15s}
+.pin-btn:hover{background:rgba(210,179,0,.18);color:#ffe252}
+@media(max-width:940px){
+  .sidebar .brand{padding:16px 12px 13px;margin-bottom:10px}
+  .sidebar .brand .brand-logo-image{width:130px;max-height:60px}
+}

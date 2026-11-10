@@ -58,6 +58,7 @@ export type AuditEvent = {
 };
 
 export type AuditPage = { items: AuditEvent[]; limit: number; offset: number };
+export type UserPreferences = { sidebar_pinned: boolean; favorites: string[] };
 
 export type DailyBase = { date: string; weekday: number; base_daily_target: string | null };
 
@@ -240,6 +241,11 @@ const adminPath = "/api/v1/admin";
 export const api = {
   me: (token: string, signal?: AbortSignal) =>
     request<MyProfile>(token, "/api/v1/me", "GET", undefined, signal),
+
+  preferences: (token: string) =>
+    request<UserPreferences>(token, "/api/v1/me/preferences"),
+  savePreferences: (token: string, body: UserPreferences) =>
+    request<UserPreferences>(token, "/api/v1/me/preferences", "PUT", body),
 
   createLocalUser: (token: string, payload: {
     username: string; display_name: string; profile: "administrator" | "seller";
