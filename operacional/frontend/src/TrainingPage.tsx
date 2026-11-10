@@ -7,7 +7,7 @@ import {routinesApi,type TrainingEntry,type TrainingStep} from "./routinesApi";
 import {proceduresApi,hydrateImages,type Procedure,type VersionInfo} from "./proceduresApi";
 import {ProcedureEditor} from "./ProcedureEditor";
 import {ConfirmDialog} from "./ConfirmDialog";
-import {ChevronDown} from "lucide-react";
+import {ChevronDown,X} from "lucide-react";
 
 type Props={token:string;profile:MyProfile};
 const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
@@ -30,7 +30,11 @@ function DocView({token,procId,versionId,onBack}:{token:string;procId:string;ver
     ]).then(([p,v])=>{setFull(p);setVer(v);}).catch(c=>setError(c.message));
   },[token,procId,versionId]);
   useEffect(()=>{void hydrateImages(ref.current,token);},[full,ver,token]);
-  if(error)return <div className="notice notice-error">{error}</div>;
+  if(error)return <section>
+    <div className="page-header"><div><h1>Documento indisponível</h1>
+      <p>As informações históricas do treinamento foram preservadas.</p></div>
+      <button className="btn-secondary" onClick={onBack}>Voltar</button></div>
+    <div className="notice notice-error">{error}</div></section>;
   if(!full)return <p>Carregando…</p>;
   const html=ver?.content_html??full.content_html??"";
   const label=ver?`Versão ${ver.version_label} ${ver.status==="publicado"?"publicada":"(rascunho)"}`:
@@ -43,6 +47,65 @@ function DocView({token,procId,versionId,onBack}:{token:string;procId:string;ver
     {full.summary&&<p className="small-note">{full.summary}</p>}
     <article className="panel"><div ref={ref} className="doc-content doc-readonly"
       dangerouslySetInnerHTML={{__html:html}}/></article>
+  </section>;
+}
+
+function PdfPreview({token,store,entry,onClose,onDownload}:{
+  token:string;store:string;entry:TrainingEntry;onClose:()=>void;onDownload:()=>void}){
+  const [url,setUrl]=useState("");
+  const [err,setErr]=useState("");
+  useEffect(()=>{
+    let objectUrl="";
+    attachmentsApi.previewTraining(token,store,entry.id)
+      .then(u=>{objectUrl=u;setUrl(u);})
+      .catch(c=>setErr(c instanceof Error?c.message:"Não foi possível exibir a prévia."));
+    return ()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);};
+  },[token,store,entry]);
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Prévia do PDF">
+    <div className="modal-card pdf-view-card">
+      <div className="fav-org-head"><h3>{entry.document?.name??"PDF anexado"}</h3>
+        <button type="button" className="fav-org-close" aria-label="Fechar" onClick={onClose}>
+          <X size={16}/></button></div>
+      {err?<div className="notice notice-error">{err} Baixe o arquivo para consultar.</div>
+        :url?<iframe className="pdf-frame" src={url} title="Prévia do PDF anexado"/>
+        :<p role="status">Carregando prévia…</p>}
+      <div className="modal-actions">
+        <button type="button" className="btn-secondary" onClick={onDownload}>Baixar PDF</button>
+        <button type="button" className="btn-primary" onClick={onClose}>Fechar</button>
+      </div></div></div>;
+}
+
+function TrainingDetails({entry,canWrite,working,onBack,onViewProc,onPreviewPdf,onDownloadPdf,onDeletePdf}:{
+  entry:TrainingEntry;canWrite:boolean;working:boolean;
+  onBack:()=>void;onViewProc:()=>void;onPreviewPdf:()=>void;onDownloadPdf:()=>void;onDeletePdf:()=>void}){
+  return <section>
+    <div className="page-header"><div><div className="eyebrow">TREINAMENTO</div>
+      <h1>Detalhes do treinamento</h1>
+      <p>Consulta completa do registro · não representa assinatura eletrônica.</p></div>
+      <button className="btn-secondary" onClick={onBack}>Voltar ao histórico</button></div>
+    <article className="panel"><div className="detail-rows">
+      <div className="detail-row"><dt>Loja</dt><dd>{labelStore(entry.store_code)}</dd></div>
+      <div className="detail-row"><dt>Colaborador</dt><dd>{entry.participant}</dd></div>
+      <div className="detail-row"><dt>Data e horário</dt>
+        <dd>{new Date(entry.happened_on).toLocaleString("pt-BR")}</dd></div>
+      <div className="detail-row"><dt>Instrutor / responsável</dt><dd>{entry.instructor}</dd></div>
+      <div className="detail-row"><dt>Procedimento</dt><dd>{entry.procedure}</dd></div>
+      <div className="detail-row"><dt>Versão utilizada</dt><dd>{entry.version}</dd></div>
+      <div className="detail-row"><dt>Etapas realizadas</dt><dd>{stepLabel(entry.step)}</dd></div>
+      <div className="detail-row detail-wide"><dt>Observações</dt>
+        <dd>{entry.note?entry.note:<em className="detail-empty">Nenhuma observação registrada</em>}</dd></div>
+    </div>
+    {entry.procedure_id&&<div className="detail-actions">
+      <button className="btn-secondary" onClick={onViewProc}>Ver procedimento utilizado</button></div>}
+    </article>
+    <article className="panel"><div className="panel-head"><div><h2>PDF anexado</h2>
+      <p>Documento privado, acessível apenas com sua sessão.</p></div></div>
+      {entry.document?<div className="routine-file-actions">
+        <button className="btn-secondary" onClick={onPreviewPdf}>Visualizar PDF</button>
+        <button className="btn-secondary" onClick={onDownloadPdf}>Baixar PDF</button>
+        {canWrite&&<button className="btn-secondary" disabled={working} onClick={onDeletePdf}>Excluir</button>}
+      </div>:<p className="small-note">Nenhum PDF anexado a este registro.</p>}
+    </article>
   </section>;
 }
 
@@ -60,6 +123,11 @@ export function TrainingPage({token,profile}:Props){
   const [storeFilter,setStoreFilter]=useState("");
   const [viewing,setViewing]=useState<{id:string;versionId?:string}|null>(null);
   const [editing,setEditing]=useState<Procedure|null>(null);
+  const [details,setDetails]=useState<TrainingEntry|null>(null);
+  const [saved,setSaved]=useState<TrainingEntry|null>(null);
+  const [recentId,setRecentId]=useState("");
+  const [pdfPreview,setPdfPreview]=useState<TrainingEntry|null>(null);
+  const scrollPos=useRef(0);
 
   const [store,setStore]=useState(profile.stores[0]??"");
   const [entries,setEntries]=useState<TrainingEntry[]>([]);
@@ -105,7 +173,8 @@ export function TrainingPage({token,profile}:Props){
     finally{setLoading(false);}
   },[token,store,canWrite,fPerson,fProc,fStart,fEnd]);
   useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
-  useEffect(()=>{setParticipant(current=>people.some(p=>p.id===current)?current:people[0]?.id??"");},[people]);
+  useEffect(()=>{if(!recentId)return;
+    const t=setTimeout(()=>setRecentId(""),12000);return()=>clearTimeout(t);},[recentId]);
   useEffect(()=>{if(!canWrite)void routinesApi.myTrainings(token).then(setMine).catch(()=>{});},[token,canWrite]);
   useEffect(()=>{
     if(!stepOpen)return;
@@ -152,15 +221,23 @@ export function TrainingPage({token,profile}:Props){
   }
 
   async function save(){
+    if(working)return;
     setWorking(true);setError("");setMessage("");
     try{
       const step=STEP_OPTIONS.map(o=>o.value).filter(v=>steps.includes(v)).join(",") as TrainingStep;
       const body={participant_id:participant,procedure_id:procedureId||null,
         title:editRec?editRec.title:"",instructor,happened_on:day+"T"+hour+":00",step,note};
-      if(editRec)await routinesApi.updateTraining(token,store,editRec.id,{...body,expected_revision:editRec.revision});
-      else await routinesApi.addTraining(token,store,body);
-      await refreshTrainings();setMessage(editRec?"Registro atualizado.":"Participação registrada. Não representa assinatura eletrônica.");
-      setEditRec(null);setNote("");
+      if(editRec){
+        await routinesApi.updateTraining(token,store,editRec.id,{...body,expected_revision:editRec.revision});
+        await refreshTrainings();setMessage("Registro atualizado.");
+        setEditRec(null);setNote("");
+      }else{
+        const created=await routinesApi.addTraining(token,store,body);
+        await refreshTrainings();
+        setParticipant("");setProcedureId("");setInstructor("");
+        setDay(today());setHour("09:00");setSteps(["participou"]);setNote("");
+        setRecentId(created.id);setSaved(created);
+      }
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao registrar.");}
     finally{setWorking(false);}
   }
@@ -183,19 +260,44 @@ export function TrainingPage({token,profile}:Props){
     catch(cause){setError(cause instanceof Error?cause.message:"Falha no anexo.");}
     finally{setWorking(false);}
   }
-  async function downloadDoc(e:TrainingEntry){if(e.document)await attachmentsApi.downloadTraining(token,store,e.id,e.document.name).catch(c=>setError(c.message));}
+  async function downloadDoc(e:TrainingEntry){if(e.document)await attachmentsApi.downloadTraining(token,e.store_code,e.id,e.document.name).catch(c=>setError(c.message));}
   async function confirmDeleteDoc(){
     if(!deletingDoc?.document)return;const e=deletingDoc;
     setWorking(true);setError("");
-    try{await attachmentsApi.deleteTraining(token,store,e.id,e.document!.revision);
+    try{await attachmentsApi.deleteTraining(token,e.store_code,e.id,e.document!.revision);
+      if(details&&details.id===e.id)setDetails({...details,document:null,document_attached:false});
       setDeletingDoc(null);await refreshTrainings();setMessage("PDF anexado excluído.");}
     catch(cause){setError(cause instanceof Error?cause.message:"Falha ao excluir.");setDeletingDoc(null);}
     finally{setWorking(false);}}
+
+  function openDetails(e:TrainingEntry){scrollPos.current=window.scrollY;setDetails(e);}
+  function closeDetails(){setDetails(null);
+    requestAnimationFrame(()=>window.scrollTo(0,scrollPos.current));}
+
+  const docModals=<>
+    {deletingDoc&&<ConfirmDialog title="Excluir PDF anexado" confirmLabel="Confirmar exclusão"
+      busy={working} onCancel={()=>setDeletingDoc(null)} onConfirm={()=>void confirmDeleteDoc()}>
+      <p>Tem certeza de que deseja excluir o PDF {deletingDoc.document?.name} anexado ao treinamento
+      de {deletingDoc.participant}?</p>
+    </ConfirmDialog>}
+    {pdfPreview&&<PdfPreview token={token} store={pdfPreview.store_code} entry={pdfPreview}
+      onClose={()=>setPdfPreview(null)} onDownload={()=>void downloadDoc(pdfPreview)}/>}
+  </>;
 
   if(editing)return <ProcedureEditor token={token} procedure={editing}
     onClose={changed=>{setEditing(null);if(changed)void refreshProcs();}}/>;
   if(viewing)return <DocView token={token} procId={viewing.id} versionId={viewing.versionId}
     onBack={()=>setViewing(null)}/>;
+  if(details)return <>
+    <TrainingDetails entry={details} canWrite={canWrite} working={working}
+      onBack={closeDetails}
+      onViewProc={()=>{if(details.procedure_id)
+        setViewing({id:details.procedure_id,versionId:details.procedure_version_id??undefined});}}
+      onPreviewPdf={()=>setPdfPreview(details)}
+      onDownloadPdf={()=>void downloadDoc(details)}
+      onDeletePdf={()=>setDeletingDoc(details)}/>
+    {docModals}
+  </>;
 
   const hist=(canWrite?entries:mine);
   return <section>
@@ -230,11 +332,12 @@ export function TrainingPage({token,profile}:Props){
       <p>Tem certeza de que deseja excluir o treinamento de {removingRec.participant}
       {" "}({removingRec.happened_on.slice(0,10)})? A exclusão é lógica e auditada.</p>
     </ConfirmDialog>}
-    {deletingDoc&&<ConfirmDialog title="Excluir PDF anexado" confirmLabel="Confirmar exclusão"
-      busy={working} onCancel={()=>setDeletingDoc(null)} onConfirm={()=>void confirmDeleteDoc()}>
-      <p>Tem certeza de que deseja excluir o PDF {deletingDoc.document?.name} anexado ao treinamento
-      de {deletingDoc.participant}?</p>
+    {saved&&<ConfirmDialog title="Treinamento registrado com sucesso!"
+      confirmLabel="Ver registro" cancelLabel="Registrar outro treinamento" danger={false}
+      onCancel={()=>setSaved(null)} onConfirm={()=>{setDetails(saved);setSaved(null);}}>
+      <p>{saved.participant} — {saved.procedure}{saved.version?` (versão ${saved.version})`:""}</p>
     </ConfirmDialog>}
+    {docModals}
 
     {tab==="procedimentos"&&<>
       <div className="routine-filters">
@@ -281,9 +384,8 @@ export function TrainingPage({token,profile}:Props){
           <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.procedure}</td>
           <td>{e.version}</td><td>{stepLabel(e.step)}</td>
           <td>{e.instructor}</td>
-          <td>{e.procedure_id&&<button className="btn-secondary"
-            onClick={()=>setViewing({id:e.procedure_id!,versionId:e.procedure_version_id??undefined})}>
-            Abrir procedimento</button>}</td></tr>)}</tbody></table></div>
+          <td><button className="btn-secondary" onClick={()=>openDetails(e)}>Visualizar</button></td>
+        </tr>)}</tbody></table></div>
       {hist.length===0&&<p className="empty">Nenhum treinamento registrado.</p>}
     </article>}
 
@@ -307,6 +409,7 @@ export function TrainingPage({token,profile}:Props){
           {editRec&&<button className="btn-secondary" onClick={()=>setEditRec(null)}>Cancelar edição</button>}</div>
         <div className="routine-form-grid">
           <label>Colaborador<select value={participant} onChange={e=>setParticipant(e.target.value)}>
+            <option value="">Selecione…</option>
             {people.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label>Procedimento<select value={procedureId} onChange={e=>setProcedureId(e.target.value)}>
             <option value="">Selecione…</option>
@@ -361,15 +464,13 @@ export function TrainingPage({token,profile}:Props){
         {loading&&<p role="status">Consultando registros…</p>}
         <div className="table-wrap"><table><thead><tr><th>Data</th><th>Colaborador</th>
           <th>Procedimento</th><th>Versão</th><th>Etapa</th><th>PDF</th><th>Ações</th></tr></thead>
-          <tbody>{entries.map(e=><tr key={e.id}>
+          <tbody>{entries.map(e=><tr key={e.id} className={e.id===recentId?"row-new":""}>
             <td>{new Date(e.happened_on).toLocaleString("pt-BR")}</td><td>{e.participant}</td>
             <td>{e.procedure}</td><td>{e.version}</td>
             <td>{stepLabel(e.step)}</td>
-            <td>{e.document?<div className="routine-file-actions">
-              <button className="btn-secondary" onClick={()=>void downloadDoc(e)}>Baixar</button>
-              <button className="btn-secondary" disabled={working} onClick={()=>setDeletingDoc(e)}>Excluir</button>
-            </div>:"—"}</td>
+            <td>{e.document?<span className="count">Anexado</span>:"—"}</td>
             <td><div className="routine-file-actions">
+              <button className="btn-secondary" onClick={()=>openDetails(e)}>Visualizar</button>
               <button className="btn-secondary" onClick={()=>startEdit(e)}>Editar</button>
               {isSuperAdmin&&<button className="btn-secondary" disabled={working} onClick={()=>setRemovingRec(e)}>Excluir</button>}
             </div></td></tr>)}</tbody></table></div>

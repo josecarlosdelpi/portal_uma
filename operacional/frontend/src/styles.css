@@ -344,3 +344,19 @@
   box-shadow:0 10px 24px rgba(0,0,0,.12);display:flex;flex-direction:column;gap:9px}
 .step-multi-panel .check-line{display:flex;flex-direction:row;align-items:center;gap:8px;
   font-weight:600;color:#25231b;font-size:13px;margin-right:0;cursor:pointer}
+
+/* Detalhes do treinamento + previa de PDF + destaque de registro novo */
+.detail-rows{display:flex;flex-direction:column;gap:12px}
+.detail-row{display:grid;grid-template-columns:190px minmax(0,1fr);gap:12px;align-items:baseline;
+  padding-bottom:11px;border-bottom:1px solid #efe9d3}
+.detail-row:last-child{border-bottom:0;padding-bottom:0}
+.detail-row dt{color:#827b62;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.detail-row dd{margin:0;font-size:13.5px;color:#25231b;word-break:break-word}
+.detail-empty{color:#8f8a76;font-style:italic}
+.detail-actions{margin-top:16px}
+@media(max-width:650px){.detail-row{grid-template-columns:1fr;gap:3px}}
+.pdf-view-card{max-width:960px;width:94%;height:82vh;display:flex;flex-direction:column}
+.pdf-view-card .fav-org-head{margin-bottom:10px}
+.pdf-frame{flex:1;min-height:0;width:100%;border:1px solid #e7e2d0;border-radius:8px;background:#525659}
+@keyframes rowflash{0%{background:#fff3b5}70%{background:#fff8d6}100%{background:transparent}}
+.row-new{animation:rowflash 11.5s ease-out}
