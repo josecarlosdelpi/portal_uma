@@ -229,18 +229,15 @@ export function TrainingPage({token,profile}:Props){
     const seq=++reqSeq.current;
     setLoading(true);setError("");
     try{
-      const [rows,hprocs,formTeam,...teams]=await Promise.all([
+      const [rows,hprocs,...teams]=await Promise.all([
         routinesApi.trainingsMulti(token,stores,{participant_ids:fPersons,
           procedure_ids:fProcs,start:fStart||undefined,end:fEnd||undefined,
           limit:PAGE_SIZE}),
         routinesApi.trainingProcedures(token,stores),
-        canWrite&&store?operationsApi.team(token,store).catch(()=>[] as TeamMember[])
-          :Promise.resolve([] as TeamMember[]),
         ...(canWrite?stores.map(s=>operationsApi.team(token,s).catch(()=>[] as TeamMember[]))
           :[Promise.resolve([] as TeamMember[])])]);
       if(seq!==reqSeq.current)return rows;
       setEntries(rows);setHasMore(rows.length===PAGE_SIZE);setHistProcs(hprocs);
-      setTeam(formTeam);
       const seen=new Map<string,TeamMember>();
       for(const t of teams)for(const m of t)seen.set(m.id,m);
       setPeople([...seen.values()]);
@@ -248,8 +245,20 @@ export function TrainingPage({token,profile}:Props){
     }catch(cause){if(seq===reqSeq.current)
       setError(cause instanceof Error?cause.message:"Não foi possível carregar.");}
     finally{if(seq===reqSeq.current)setLoading(false);}
-  },[token,store,filterStores,canWrite,fPersons,fProcs,fStart,fEnd,profile.stores]);
+  },[token,filterStores,canWrite,fPersons,fProcs,fStart,fEnd,profile.stores]);
   useEffect(()=>{if(canWrite)void refreshTrainings();},[refreshTrainings,canWrite]);
+  // A equipe do formulario depende exclusivamente da loja de cadastro.
+  const teamSeq=useRef(0);
+  const [teamError,setTeamError]=useState("");
+  useEffect(()=>{
+    if(!canWrite||!store)return;
+    const seq=++teamSeq.current;setTeamError("");
+    void operationsApi.team(token,store)
+      .then(m=>{if(seq===teamSeq.current)setTeam(m);})
+      .catch(c=>{if(seq===teamSeq.current){setTeam([]);
+        setTeamError(c instanceof Error?c.message
+          :"Não foi possível carregar os colaboradores desta loja.");}});
+  },[token,store,canWrite]);
 
   async function loadMore(){
     if(loading)return;setLoading(true);setError("");
@@ -516,20 +525,6 @@ export function TrainingPage({token,profile}:Props){
     </article>}
 
     {tab==="treinamentos"&&canWrite&&<>
-      <div className="routine-filters">
-        <MultiSelect label="Loja" empty="Todas" value={filterStores} onChange={setFilterStores}
-          options={profile.stores.map(c=>({value:c,label:labelStore(c)}))}/>
-        <MultiSelect label="Colaborador" empty="Todos" value={fPersons} onChange={setFPersons}
-          options={people.map(p=>({value:p.id,label:p.name}))}/>
-        <MultiSelect label="Procedimento" empty="Todos" value={fProcs} onChange={setFProcs}
-          options={[...new Map([
-            ...procs.filter(p=>p.current_version)
-              .map(p=>[p.id,`${p.code} — ${p.title}`] as [string,string]),
-            ...histProcs.map(h=>[h.procedure_id,h.procedure] as [string,string]),
-          ]).entries()].map(([value,label])=>({value,label}))}/>
-        <label>De<input type="date" value={fStart} onChange={e=>setFStart(e.target.value)}/></label>
-        <label>Até<input type="date" value={fEnd} onChange={e=>setFEnd(e.target.value)}/></label>
-      </div>
       <article ref={formRef} className={"panel routine-form-panel"+(editRec?" editing-form":"")}>
         <div className="panel-head"><div><h2>{editRec?"Editar treinamento":"Registrar treinamento"}</h2>
           <p>{editRec?`Revisão ${editRec.revision} · edição auditada`:"A versão publicada vigente é registrada automaticamente."}</p></div>
@@ -542,7 +537,8 @@ export function TrainingPage({token,profile}:Props){
             <option value="">Selecione…</option>
             {editRec&&participant&&!team.some(p=>p.id===participant)&&
               <option value={participant}>{editRec.participant}</option>}
-            {team.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+            {team.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select>
+            {teamError&&<span className="notice notice-error" role="alert">{teamError}</span>}</label>
           <label>Procedimento<select value={procedureId} onChange={e=>setProcedureId(e.target.value)}>
             <option value="">Selecione…</option>
             {procs.filter(p=>p.current_version).map(p=><option key={p.id} value={p.id}>
@@ -586,6 +582,20 @@ export function TrainingPage({token,profile}:Props){
       <article className="panel routine-form-panel">
         <div className="panel-head"><div><h2>Histórico de treinamentos</h2>
           <p>Registros administrativos com edição e exclusão lógica auditadas.</p></div></div>
+        <div className="routine-filters">
+          <MultiSelect label="Loja" empty="Todas" value={filterStores} onChange={setFilterStores}
+            options={profile.stores.map(c=>({value:c,label:labelStore(c)}))}/>
+          <MultiSelect label="Colaborador" empty="Todos" value={fPersons} onChange={setFPersons}
+            options={people.map(p=>({value:p.id,label:p.name}))}/>
+          <MultiSelect label="Procedimento" empty="Todos" value={fProcs} onChange={setFProcs}
+            options={[...new Map([
+              ...procs.filter(p=>p.current_version)
+                .map(p=>[p.id,`${p.code} — ${p.title}`] as [string,string]),
+              ...histProcs.map(h=>[h.procedure_id,h.procedure] as [string,string]),
+            ]).entries()].map(([value,label])=>({value,label}))}/>
+          <label>De<input type="date" value={fStart} onChange={e=>setFStart(e.target.value)}/></label>
+          <label>Até<input type="date" value={fEnd} onChange={e=>setFEnd(e.target.value)}/></label>
+        </div>
         {loading&&<p role="status">Consultando registros…</p>}
         <div className="table-wrap"><table><thead><tr><th>Data</th>
           {activeStores.length>1&&<th>Loja</th>}<th>Colaborador</th>
