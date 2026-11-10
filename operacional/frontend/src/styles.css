@@ -161,3 +161,39 @@
 .modal-card h3{margin:0 0 10px}.modal-card p{color:#555;line-height:1.5}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
 .btn-danger{background:#b3261e;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer}
+
+/* Sidebar retratil + favoritos */
+.sidebar{transition:transform .2s ease}
+.pin-btn{margin-left:auto;background:none;border:none;font-size:16px;cursor:pointer;color:#f3e9a8;padding:4px}
+.edge-strip{position:fixed;left:0;top:0;bottom:0;width:22px;z-index:55;background:#141414;border:none;color:#b7a92d;
+  font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.edge-strip span{writing-mode:vertical-rl;letter-spacing:2px}
+.side-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:56}
+.sb-unpinned .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:57;transform:translateX(-105%);box-shadow:8px 0 24px rgba(0,0,0,.25)}
+.sb-unpinned.sb-open .sidebar{transform:translateX(0)}
+.sb-unpinned .main{flex:1}
+.fav-list{margin-bottom:8px}
+.fav-empty{font-size:12px;color:#9a937a;padding:4px 12px;line-height:1.4}
+.nav-item{display:flex;align-items:center;gap:2px}
+.nav-link{flex:1;display:flex;align-items:center;gap:10px;background:none;border:none;color:inherit;
+  font:inherit;text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer}
+.nav-link:hover{background:rgba(255,255,255,.08)}
+.nav-link.active{background:#b7a92d;color:#141414;font-weight:600}
+.star-btn{background:none;border:none;color:#8a845f;font-size:15px;cursor:pointer;padding:6px}
+.star-btn.starred{color:#b7a92d}
+.fav-item{border-radius:8px}
+.fav-item.drop-target{outline:2px dashed #b7a92d;outline-offset:-2px}
+.fav-item[draggable=true]{cursor:grab}
+.fav-reorder{display:flex;flex-direction:column;gap:0}
+.fav-reorder button{background:none;border:none;color:#8a845f;font-size:11px;cursor:pointer;padding:1px 6px;line-height:1}
+.fav-reorder button:disabled{opacity:.3;cursor:default}
+.menu-btn{display:none;background:none;border:none;font-size:20px;cursor:pointer;color:#141414;padding:4px 8px}
+@media (max-width:900px){
+  .edge-strip{display:none}
+  .menu-btn{display:block}
+  .sb-pinned .sidebar,.sb-unpinned .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:57;
+    transform:translateX(-105%);transition:transform .2s ease;box-shadow:8px 0 24px rgba(0,0,0,.25)}
+  .sb-open .sidebar{transform:translateX(0)}
+  .sb-pinned .side-backdrop{display:none}
+  .sb-unpinned .side-backdrop,.sb-pinned.sb-open .side-backdrop{display:block}
+}

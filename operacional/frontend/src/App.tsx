@@ -16,6 +16,24 @@ import { AccountsManager, TemporaryPasswordNotice } from "./AccountsManager";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
 type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training";
+
+/** Identificadores estaveis dos modulos (mesmos chaves do backend /preferences). */
+const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: string }> = [
+  { key: "overview", label: "Visão geral", icon: "▦" },
+  { key: "contacts", label: "Telemarketing", icon: "☎" },
+  { key: "reviews", label: "Avaliações Google", icon: "★" },
+  { key: "supplies", label: "Materiais e insumos", icon: "▣" },
+  { key: "checklist", label: "Checklist semanal", icon: "☑" },
+  { key: "daily", label: "Tarefas diárias", icon: "☷" },
+  { key: "targets", label: "Metas diárias", icon: "$" },
+  { key: "whatsapp", label: "Status WhatsApp / Instagram", icon: "▤" },
+  { key: "training", label: "Padrões e treinamento", icon: "☰" },
+  { key: "closing", label: "Fechamento Mensal", icon: "◎" },
+  { key: "access", label: "Configurações", icon: "⚙" },
+];
+const navLabel = (key: string) => NAV_ITEMS.find(i => i.key === key)?.label ?? key;
+
+/** Texto do breadcrumb a partir da area ativa. */
 const errorText = (error: unknown) => error instanceof Error ? error.message : "Não foi possível concluir.";
 const profileLabel = (profile: string) =>
   profile === "superadmin" ? "SuperAdmin" : profile === "administrator" ? "Administrador" : "Vendedor";
@@ -148,7 +166,110 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   const canViewWhatsApp = (profile?.features?.whatsapp_status??false)||(profile?.features?.instagram??false);
   const canViewTraining = profile?.features?.training ?? false;
 
-  return <div className="shell">
+  // ---- sidebar retratil + favoritos (preferencias por usuario no banco) ----
+  const [pinned, setPinned] = useState(true);
+  const [tempOpen, setTempOpen] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token || !profile || prefsLoaded) return;
+    void api.preferences(token).then(p => {
+      setPinned(p.sidebar_pinned); setFavorites(p.favorites); setPrefsLoaded(true);
+    }).catch(() => setPrefsLoaded(true));
+  }, [token, profile, prefsLoaded]);
+
+  const persist = useCallback((nextPinned: boolean, nextFavs: string[]) => {
+    api.savePreferences(token, { sidebar_pinned: nextPinned, favorites: nextFavs })
+      .then(saved => { setPinned(saved.sidebar_pinned); setFavorites(saved.favorites); })
+      .catch(problem => setError(errorText(problem)));
+  }, [token]);
+
+  const togglePin = () => { const next = !pinned; setPinned(next); if (next) setTempOpen(false); persist(next, favorites); };
+  const toggleFav = (key: string) => {
+    const next = favorites.includes(key) ? favorites.filter(k => k !== key) : [...favorites, key];
+    setFavorites(next); persist(pinned, next);
+  };
+  const moveFav = (index: number, dir: -1 | 1) => {
+    const target = index + dir; if (target < 0 || target >= favorites.length) return;
+    const next = [...favorites]; const [item] = next.splice(index, 1); next.splice(target, 0, item);
+    setFavorites(next); persist(pinned, next);
+  };
+  const onFavDrop = (targetKey: string) => {
+    if (!dragKey || dragKey === targetKey) { setDragKey(null); setDropTarget(null); return; }
+    const next = favorites.filter(k => k !== dragKey);
+    next.splice(next.indexOf(targetKey), 0, dragKey);
+    setFavorites(next); persist(pinned, next); setDragKey(null); setDropTarget(null);
+  };
+
+  const allowedAreas = new Set<Area>();
+  if (canViewOverview) allowedAreas.add("overview");
+  if (canViewContacts) allowedAreas.add("contacts");
+  if (canViewReviews) allowedAreas.add("reviews");
+  if (canViewSupplies) allowedAreas.add("supplies");
+  if (canViewChecklist) allowedAreas.add("checklist");
+  if (canViewDaily) allowedAreas.add("daily");
+  if (canViewTargets) allowedAreas.add("targets");
+  if (canViewWhatsApp) allowedAreas.add("whatsapp");
+  if (canViewTraining) allowedAreas.add("training");
+  if (canViewClosing) allowedAreas.add("closing");
+  if (isSuperAdmin) allowedAreas.add("access");
+  const visibleItems = NAV_ITEMS.filter(item => allowedAreas.has(item.key));
+  const favItems = favorites.filter(k => allowedAreas.has(k as Area))
+    .map(k => NAV_ITEMS.find(i => i.key === k)!).filter(Boolean);
+  const selectArea = (key: Area) => {
+    setArea(key); if (key === "access") setTab("usuarios");
+    if (!pinned) setTempOpen(false);
+  };
+
+  return <div className={"shell" + (pinned ? " sb-pinned" : " sb-unpinned") + (tempOpen ? " sb-open" : "")}>
+    {!pinned && <button type="button" className="edge-strip" aria-label="Abrir menu lateral"
+      onMouseEnter={() => setTempOpen(true)} onClick={() => setTempOpen(true)}>
+      <span aria-hidden="true">»</span></button>}
+    {tempOpen && <div className="side-backdrop" onClick={() => setTempOpen(false)} aria-hidden="true"/>}
+    <aside className={"sidebar" + (tempOpen ? " open" : "")} aria-label="Barra lateral">
+      <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div>
+        <button type="button" className="pin-btn" aria-label={pinned ? "Desafixar barra lateral" : "Fixar barra lateral"}
+          title={pinned ? "Desafixar barra" : "Fixar barra"} onClick={togglePin}>{pinned ? "📌" : "📍"}</button>
+      </div>
+      <div className="side-heading">FAVORITOS</div>
+      <nav aria-label="Favoritos" className="fav-list">
+
+        {favItems.length === 0 && <p className="fav-empty">Toque na ★ de um módulo para fixá-lo aqui.</p>}
+        {favItems.map((item, i) => <div key={item.key}
+          className={"nav-item fav-item" + (dropTarget === item.key ? " drop-target" : "")}
+          draggable onDragStart={() => setDragKey(item.key)}
+          onDragOver={e => { e.preventDefault(); setDropTarget(item.key); }}
+          onDragLeave={() => setDropTarget(prev => prev === item.key ? null : prev)}
+          onDrop={() => onFavDrop(item.key)} onDragEnd={() => { setDragKey(null); setDropTarget(null); }}>
+          <button className={"nav-link" + (area === item.key ? " active" : "")}
+            onClick={() => selectArea(item.key)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span></button>
+          <span className="fav-reorder">
+            <button type="button" aria-label={"Subir " + item.label} disabled={i === 0}
+              onClick={() => moveFav(i, -1)}>↑</button>
+            <button type="button" aria-label={"Descer " + item.label} disabled={i === favItems.length - 1}
+              onClick={() => moveFav(i, 1)}>↓</button>
+          </span>
+        </div>)}
+      </nav>
+      <div className="side-heading">PAINEL DE CONTROLE</div>
+      <nav aria-label="Menu principal">
+        {visibleItems.map(item => <div className="nav-item" key={item.key}>
+          <button className={"nav-link" + (area === item.key ? " active" : "")}
+            onClick={() => selectArea(item.key)}><span className="nav-icon">{item.icon}</span><span>{item.label}</span></button>
+          <button type="button" className={"star-btn" + (favorites.includes(item.key) ? " starred" : "")}
+            aria-label={(favorites.includes(item.key) ? "Remover " : "Favoritar ") + item.label}
+            aria-pressed={favorites.includes(item.key)}
+            onClick={() => toggleFav(item.key)}>{favorites.includes(item.key) ? "★" : "☆"}</button>
+        </div>)}
+        <div className="nav-item disabled"><span className="nav-icon">↗</span><span>Vendas</span><span className="soon">ERP pendente</span></div>
+      </nav>
+      <div className="side-spacer"/>
+      <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>
+      <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
+    </aside>
     <aside className="sidebar">
       <div className="brand"><img className="brand-logo-image" src={UMA_LOGO_DATA_URI} alt="Logotipo original da Universo das Mangueiras"/><div><strong>PORTAL UMA</strong><small>Gestão operacional</small></div></div>
       <div className="side-heading">PAINEL DE CONTROLE</div>
@@ -182,7 +303,8 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       <div className="sidebar-bottom">Universo das Mangueiras Automotivas</div>
     </aside>
     <main className="main">
-      <header className="topbar"><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{area === "overview" ? "Visão Geral" : area === "closing" ? "Fechamento mensal" : area === "reviews" ? "Avaliações Google" : area === "supplies" ? "Materiais e insumos" : area === "contacts" ? "Telemarketing" : area === "checklist" ? "Checklist semanal" : area === "daily" ? "Tarefas diárias" : area === "whatsapp" ? "Status WhatsApp" : area === "training" ? "Padrões e treinamento" : area === "targets" ? "Metas diárias" : isSuperAdmin ? "Configurações" : "Meu acesso"}</strong></div>
+      <header className="topbar"><button type="button" className="menu-btn" aria-label="Abrir menu"
+        onClick={() => setTempOpen(true)}>☰</button><div className="breadcrumb">Universo das Mangueiras <span> / </span> <strong>{navLabel(area)}</strong></div>
         <div className="topbar-right"><span>{profile?.display_name ?? "Usuário autenticado"}</span><span className="avatar">UMA</span><button className="btn-ghost" onClick={onLogout}>Sair</button></div>
       </header>
       <div className="workspace">
