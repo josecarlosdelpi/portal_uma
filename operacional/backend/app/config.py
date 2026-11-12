@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     google_service_account_json: str = ""
     erp_drive_vendas_name: str = "vendas.csv"
     erp_drive_devolucoes_name: str = "devolucoes.csv"
+    erp_drive_despesas_name: str = "despesas.csv"
 
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

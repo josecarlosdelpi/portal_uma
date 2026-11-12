@@ -23,6 +23,7 @@ MODULE_PERMISSION = {
     "daily": "daily_tasks.view",
     "targets": "targets.view",
     "sales": "sales.view",
+    "finance": "finance.view",
     "whatsapp": None,  # regra especial: whatsapp_status OU instagram
     "training": "training.view",
     "closing": "monthly_closing.view",

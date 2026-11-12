@@ -51,6 +51,13 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
       { code: "instagram.view", name: "Instagram" },
     ],
   },
+  {
+    title: "Financeiro",
+    help: "Despesas e pagamentos importados do ERP. Nesta etapa restrito ao SuperAdmin.",
+    permissions: [
+      { code: "finance.view", name: "Consultar módulo financeiro" },
+    ],
+  },
 ];
 
 export const readPermissionCodes = permissionGroups.flatMap(

@@ -16,6 +16,7 @@ def test_schema_has_expected_core_tables():
         "procedures", "procedure_stores", "procedure_versions", "procedure_files",
         "user_preferences",
         "erp_import_batches", "erp_sale_rows", "erp_return_rows", "erp_source_files",
+        "financial_obligations",
     }
 
 

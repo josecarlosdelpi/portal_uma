@@ -55,7 +55,13 @@ GOVERNANCE_PERMISSIONS = frozenset({
     "security.manage",
 })
 OPERATIONAL_PERMISSIONS = READ_PERMISSIONS | MANAGEMENT_READ_PERMISSIONS | WRITE_PERMISSIONS
-KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS
+# Financeiro nunca e herdado por perfil: somente SuperAdmin ou concessao
+# explicita (grupo da loja para vendedor, override por usuario). Nesta etapa
+# o Financeiro esta restrito ao SuperAdmin; 'finance.import' nao e concedivel.
+FINANCIAL_READ_PERMISSIONS = frozenset({"finance.view"})
+FINANCIAL_PERMISSIONS = FINANCIAL_READ_PERMISSIONS | frozenset({"finance.import"})
+
+KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS | FINANCIAL_PERMISSIONS
 
 
 @dataclass(frozen=True)
@@ -78,6 +84,9 @@ def can_access(principal: Principal, permission: str, store_code: str | None = N
 
     if principal.is_superadmin:
         return True
+
+    if permission in FINANCIAL_PERMISSIONS:
+        return _financial_access(principal, permission, store_code)
 
     if principal.profile == "administrator":
         return permission in OPERATIONAL_PERMISSIONS
@@ -104,3 +113,17 @@ def visible_stores(principal: Principal) -> frozenset[str]:
     if principal.profile == "seller" and len(principal.store_codes) == 1:
         return principal.store_codes & STORE_CODES
     return frozenset()
+
+
+def _financial_access(principal: Principal, permission: str, store_code: str | None) -> bool:
+    """Financeiro exige concessao explicita; importacao e exclusiva do SuperAdmin."""
+    if permission == "finance.import":
+        return False
+    if principal.profile == "seller":
+        if len(principal.store_codes) != 1 or store_code not in principal.store_codes:
+            return False
+        inherited = permission in principal.group_grants
+        return principal.overrides.get(permission, inherited)
+    if principal.profile == "administrator":
+        return principal.overrides.get(permission, False)
+    return False

@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.admin_repository import AdminRepository
 from app.models import AccessInvitation, StoreGroup, User
-from app.policy import READ_PERMISSIONS, STORE_CODES
+from app.policy import READ_PERMISSIONS, STORE_CODES, FINANCIAL_READ_PERMISSIONS
 
 
 class AdminError(Exception):
@@ -181,7 +181,7 @@ class AdminService:
         group = self.repo.group(group_id)
         if group is None or not group.active:
             raise AdminError(404, "Store group not found")
-        unknown = set(permissions) - READ_PERMISSIONS
+        unknown = set(permissions) - READ_PERMISSIONS - FINANCIAL_READ_PERMISSIONS
         if unknown:
             raise AdminError(422, "Only known read permissions may be granted to sellers")
         previous = self.repo.grants(group_id)
@@ -198,7 +198,7 @@ class AdminService:
             raise AdminError(404, "User not found")
         if user.is_superadmin or user.profile != "seller":
             raise AdminError(422, "Overrides are only supported for sellers")
-        if set(permissions) - READ_PERMISSIONS:
+        if set(permissions) - READ_PERMISSIONS - FINANCIAL_READ_PERMISSIONS:
             raise AdminError(422, "Only known read permissions may be overridden")
         previous = self.repo.overrides(user_id)
         self.repo.replace_overrides(user_id, permissions)

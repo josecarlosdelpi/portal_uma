@@ -11,7 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.erp_csv import KIND_DEVOLUCOES, KIND_VENDAS
+from app.erp_csv import KIND_DESPESAS, KIND_DEVOLUCOES, KIND_VENDAS
+from app.erp_expenses_import import expenses_handlers
 from app.erp_drive import EXPECTED_FILES, DriveClient, DriveError, load_service_account, sync_sources
 from app.erp_import import import_erp_file
 from app.models import (
@@ -145,9 +146,11 @@ def run_drive_sync(db: Session) -> list[dict]:
     expected = {
         KIND_VENDAS: settings.erp_drive_vendas_name,
         KIND_DEVOLUCOES: settings.erp_drive_devolucoes_name,
+        KIND_DESPESAS: settings.erp_drive_despesas_name,
     }
+    handlers = {**sales_handlers(db), **expenses_handlers(db)}
     if not settings.erp_sync_enabled or not settings.google_drive_folder_id:
-        return sync_sources(db, handlers=sales_handlers(db), expected_files=expected)
+        return sync_sources(db, handlers=handlers, expected_files=expected)
     try:
         service_account = load_service_account(settings.google_service_account_json)
     except DriveError as exc:
@@ -164,7 +167,7 @@ def run_drive_sync(db: Session) -> list[dict]:
         return [{"file_key": k, "status": "FAILED", "last_error": str(exc)} for k in expected]
     client = DriveClient(service_account, settings.google_drive_folder_id)
     return sync_sources(
-        db, handlers=sales_handlers(db), expected_files=expected, client=client,
+        db, handlers=handlers, expected_files=expected, client=client,
     )
 
 

@@ -599,7 +599,7 @@ class ErpImportBatch(Base):
     """Snapshot de um arquivo ERP recebido; garante auditoria e idempotencia."""
     __tablename__ = "erp_import_batches"
     __table_args__ = (
-        CheckConstraint("kind IN ('VENDAS','DEVOLUCOES')", name="ck_erp_batch_kind"),
+        CheckConstraint("kind IN ('VENDAS','DEVOLUCOES','DESPESAS')", name="ck_erp_batch_kind"),
         CheckConstraint("source IN ('MANUAL_UPLOAD','DRIVE_SYNC')", name="ck_erp_batch_source"),
         CheckConstraint("status IN ('RECEIVED','APPLIED','DUPLICATE','FAILED')", name="ck_erp_batch_status"),
     )
@@ -688,3 +688,36 @@ class ErpSourceFile(Base):
     last_error: Mapped[str | None] = mapped_column(String(500))
     consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+class FinancialObligation(Base):
+    """Obrigacao financeira vinda do ERP (despesa ou compra para revenda).
+
+    Uma linha por linha do arquivo: o ERP nao envia IDs transacionais, entao
+    a cardinalidade e preservada — registros identicos sao lancamentos
+    legitimos e nunca sao deduplicados. Somente o snapshot corrente alimenta
+    as consultas; linhas de lotes anteriores permanecem para auditoria.
+    """
+    __tablename__ = "financial_obligations"
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_obligation_amount"),
+        CheckConstraint("category IN ('despesa','compra_revenda')", name="ck_obligation_category"),
+        CheckConstraint("status IN ('aberto','pago')", name="ck_obligation_status"),
+        CheckConstraint("(status = 'pago') = (paid_at IS NOT NULL)", name="ck_obligation_status_paid"),
+        Index("ix_financial_obligations_batch", "batch_id"),
+        Index("ix_financial_obligations_due", "store_code", "due_date"),
+        Index("ix_financial_obligations_paid", "store_code", "paid_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("erp_import_batches.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_row: Mapped[int] = mapped_column(Integer, nullable=False)
+    supplier_doc: Mapped[str | None] = mapped_column(String(20))
+    supplier_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    due_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    paid_at: Mapped[date | None] = mapped_column(Date())
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
