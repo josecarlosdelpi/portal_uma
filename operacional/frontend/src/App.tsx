@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Phone, Star, Package, ListChecks, CalendarCheck,
   Target, MessageCircle, GraduationCap, ClipboardCheck, Settings,
   Pin, PinOff, GripVertical, ChevronUp, ChevronDown, Menu, ChevronsRight,
-  Settings2, X,
+  Settings2, X, Wallet,
 } from "lucide-react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent, type LocalResetPassword, ApiError } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
@@ -18,10 +18,11 @@ import { ChecklistPage } from "./ChecklistPage";
 import { DailyTasksPage } from "./DailyTasksPage";
 import { WhatsAppPage } from "./WhatsAppPage";
 import { TrainingPage } from "./TrainingPage";
+import { FinancePage } from "./FinancePage";
 import { AccountsManager, TemporaryPasswordNotice } from "./AccountsManager";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
-type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training";
+type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training" | "finance";
 
 /** Identificadores estaveis dos modulos (mesmos chaves do backend /preferences). */
 const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> = [
@@ -35,6 +36,7 @@ const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> 
   { key: "whatsapp", label: "Canais digitais", icon: MessageCircle },
   { key: "training", label: "Padrões e treinamentos", icon: GraduationCap },
   { key: "closing", label: "Fechamento Mensal", icon: ClipboardCheck },
+  { key: "finance", label: "Financeiro", icon: Wallet },
   { key: "access", label: "Configurações", icon: Settings },
 ];
 const navLabel = (key: string) => NAV_ITEMS.find(i => i.key === key)?.label ?? key;
@@ -142,6 +144,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (previous === "daily" && profile.features.daily_tasks) return previous;
       if (previous === "whatsapp" && (profile.features.whatsapp_status||profile.features.instagram)) return previous;
       if (previous === "training" && profile.features.training) return previous;
+      if (previous === "finance" && profile.features.finance) return previous;
       if (previous === "access" && profile.profile === "superadmin") return previous;
       if (profile.features.overview) return "overview";
       if (profile.features.targets) return "targets";
@@ -153,6 +156,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (profile.features.daily_tasks) return "daily";
       if (profile.features.whatsapp_status||profile.features.instagram) return "whatsapp";
       if (profile.features.training) return "training";
+      if (profile.features.finance) return "finance";
       return "access";
     });
   }, [profile]);
@@ -171,6 +175,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   const canViewDaily = profile?.features?.daily_tasks ?? false;
   const canViewWhatsApp = (profile?.features?.whatsapp_status??false)||(profile?.features?.instagram??false);
   const canViewTraining = profile?.features?.training ?? false;
+  const canViewFinance = profile?.features?.finance ?? false;
 
   // ---- sidebar retratil + favoritos (preferencias por usuario no banco) ----
   const [pinned, setPinned] = useState(true);
@@ -260,6 +265,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   if (canViewTargets) allowedAreas.add("targets");
   if (canViewWhatsApp) allowedAreas.add("whatsapp");
   if (canViewTraining) allowedAreas.add("training");
+  if (canViewFinance) allowedAreas.add("finance");
   if (canViewClosing) allowedAreas.add("closing");
   if (isSuperAdmin) allowedAreas.add("access");
   const visibleItems = NAV_ITEMS.filter(item => allowedAreas.has(item.key));
@@ -360,7 +366,8 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
          area === "checklist" && profile ? <ChecklistPage token={token} profile={profile} /> :
          area === "daily" && profile ? <DailyTasksPage token={token} profile={profile} /> :
          area === "whatsapp" && profile ? <WhatsAppPage token={token} profile={profile} /> :
-         area === "training" && profile ? <TrainingPage token={token} profile={profile} /> : <>
+         area === "training" && profile ? <TrainingPage token={token} profile={profile} /> :
+         area === "finance" && profile ? <FinancePage token={token} profile={profile} /> : <>
         <div className="page-header"><div><div className="eyebrow">PORTAL OPERACIONAL</div><h1>{isSuperAdmin ? "Configurações do sistema" : "Meu acesso ao Portal UMA"}</h1><p>Controle de usuários, unidades e permissões com registros de auditoria.</p></div></div>
         <div className="notice notice-amber">A versão operacional está em desenvolvimento. Não utilizar dados comerciais reais até a homologação.</div>
         {error && <div className="notice notice-error" role="alert">{error}</div>}

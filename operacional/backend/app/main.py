@@ -14,6 +14,7 @@ from app.closing_routes import router as closing_router
 from app.targets_routes import router as targets_router
 from app.procedures_routes import router as procedures_router
 from app.preferences_routes import router as preferences_router
+from app.finance_routes import router as finance_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
@@ -33,6 +34,7 @@ app.include_router(local_router)
 app.include_router(attachments_router)
 app.include_router(procedures_router)
 app.include_router(preferences_router)
+app.include_router(finance_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
@@ -67,6 +69,9 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
             "whatsapp_status": any(can_access(principal, "whatsapp_status.view", s) for s in visible_stores(principal)),
             "instagram": any(can_access(principal, "instagram.view", s) for s in visible_stores(principal)),
             "training": any(can_access(principal, "training.view", s) for s in visible_stores(principal)),
+            "finance": any(
+                can_access(principal, "finance.view", s) for s in visible_stores(principal)
+            ),
             "monthly_closing": (
                 (principal.is_superadmin or principal.profile == "administrator")
                 and can_access(principal, "monthly_closing.view")

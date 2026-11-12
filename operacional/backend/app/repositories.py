@@ -13,7 +13,12 @@ def load_principal(db: Session, user: User) -> Principal:
         return Principal(user_id=str(user.id), profile=user.profile, active=user.active, is_superadmin=True)
 
     if user.profile == "administrator":
-        return Principal(user_id=str(user.id), profile="administrator", active=user.active)
+        overrides = dict(db.execute(
+            select(UserPermissionOverride.code, UserPermissionOverride.granted)
+            .where(UserPermissionOverride.user_id == user.id)
+        ).all())
+        return Principal(user_id=str(user.id), profile="administrator", active=user.active,
+                         overrides=overrides)
 
     rows = db.execute(
         select(StoreGroup.store_code, GroupPermission.code, GroupPermission.granted)

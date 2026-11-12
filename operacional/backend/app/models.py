@@ -1,9 +1,9 @@
 """Modelo inicial de persistencia. Schema mantido por migrations Alembic."""
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -591,4 +591,79 @@ class ProcedureFile(Base):
     digest: Mapped[str] = mapped_column(String(64), nullable=False)
     content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
     uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpImportBatch(Base):
+    """Lote compartilhado de importacao do ERP (contrato comum das frentes).
+
+    Cada dominio ('despesas', 'vendas', 'devolucoes') tem no maximo um
+    snapshot corrente (is_current=True); lotes anteriores sao preservados
+    para auditoria, reconciliacao e rollback logico. O payload bruto fica
+    privado no banco, sem caminho publico, como nos anexos da revisao 0009.
+    A coluna 'coverage' prepara a transicao futura para arquivos por janela
+    movel sem perder o historico ja consolidado.
+    """
+    __tablename__ = "erp_import_batches"
+    __table_args__ = (
+        UniqueConstraint("domain", "sha256", name="uq_erp_batch_domain_hash"),
+        CheckConstraint("status IN ('imported','failed')", name="ck_erp_batch_status"),
+        CheckConstraint("channel IN ('manual','drive')", name="ck_erp_batch_channel"),
+        CheckConstraint("coverage IN ('full_snapshot','window')", name="ck_erp_batch_coverage"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    domain: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    channel: Mapped[str] = mapped_column(String(20), nullable=False)
+    drive_file_id: Mapped[str | None] = mapped_column(String(120))
+    file_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    coverage: Mapped[str] = mapped_column(String(20), nullable=False, default="full_snapshot")
+    period_start: Mapped[date | None] = mapped_column(Date())
+    period_end: Mapped[date | None] = mapped_column(Date())
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    error_detail: Mapped[str | None] = mapped_column(String(600))
+    quality_flags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    quality_flag_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    payload: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    imported_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class FinancialObligation(Base):
+    """Obrigacao financeira vinda do ERP (despesa ou compra para revenda).
+
+    Uma linha por linha do arquivo: o ERP nao envia IDs transacionais, entao
+    a cardinalidade e preservada — registros identicos sao lancamentos
+    legitimos e nunca sao deduplicados. Somente o snapshot corrente alimenta
+    as consultas; linhas de lotes anteriores permanecem para auditoria.
+    """
+    __tablename__ = "financial_obligations"
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_obligation_amount"),
+        CheckConstraint("category IN ('despesa','compra_revenda')", name="ck_obligation_category"),
+        CheckConstraint("status IN ('aberto','pago')", name="ck_obligation_status"),
+        CheckConstraint("(status = 'pago') = (paid_at IS NOT NULL)", name="ck_obligation_status_paid"),
+        Index("ix_financial_obligations_batch", "batch_id"),
+        Index("ix_financial_obligations_due", "store_code", "due_date"),
+        Index("ix_financial_obligations_paid", "store_code", "paid_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("erp_import_batches.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_row: Mapped[int] = mapped_column(Integer, nullable=False)
+    supplier_doc: Mapped[str | None] = mapped_column(String(20))
+    supplier_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    due_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    paid_at: Mapped[date | None] = mapped_column(Date())
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
