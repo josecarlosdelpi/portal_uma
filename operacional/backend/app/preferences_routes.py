@@ -1,4 +1,5 @@
 """Preferencias de navegacao do proprio usuario autenticado."""
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import current_user
 from app.db import get_db
 from app.models import User, UserPreference
-from app.policy import can_access, visible_stores
+from app.policy import STORE_CODES, can_access, visible_stores
 from app.repositories import load_principal
 
 router = APIRouter(prefix="/api/v1/me", tags=["preferences"])
@@ -28,10 +29,15 @@ MODULE_PERMISSION = {
 }
 
 
+STORE_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
 class PreferencesBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     sidebar_pinned: bool = True
     favorites: list[str] = Field(default_factory=list, max_length=15)
+    # None = nao alterar; dict vazio = limpar cores personalizadas.
+    store_colors: dict[str, str] | None = None
 
 
 def _allowed_modules(db: Session, user: User) -> set[str]:
@@ -69,8 +75,10 @@ def get_preferences(user: User = Depends(current_user),
     allowed = _allowed_modules(db, user)
     stored = row.favorites if row else []
     favorites = [key for key in stored if key in allowed]
+    prefs = row.ui_prefs if row else {}
     return {"sidebar_pinned": row.sidebar_pinned if row else True,
-            "favorites": favorites}
+            "favorites": favorites,
+            "store_colors": dict((prefs or {}).get("store_colors") or {})}
 
 
 @router.put("/preferences")
@@ -90,8 +98,18 @@ def save_preferences(body: PreferencesBody, user: User = Depends(current_user),
             favorites.insert(min(index, len(favorites)), key)
     row.sidebar_pinned = body.sidebar_pinned
     row.favorites = favorites
+    if body.store_colors is not None:
+        for code, color in body.store_colors.items():
+            if code not in STORE_CODES:
+                raise HTTPException(422, f"Loja desconhecida para cor: {code}")
+            if not STORE_COLOR_RE.match(color):
+                raise HTTPException(422, "Cor invalida: use o formato #RRGGBB.")
+        prefs = dict(row.ui_prefs or {})
+        prefs["store_colors"] = dict(body.store_colors)
+        row.ui_prefs = prefs
     db.commit()
     # resposta alinhada ao GET: somente modulos autorizados agora;
     # os ocultos ficam preservados apenas no banco.
     return {"sidebar_pinned": row.sidebar_pinned,
-            "favorites": [k for k in favorites if k in allowed]}
+            "favorites": [k for k in favorites if k in allowed],
+            "store_colors": dict((row.ui_prefs or {}).get("store_colors") or {})}

@@ -339,12 +339,14 @@ class SalesService:
 
     def top(
         self, dimension: str, first: date, last: date,
-        store_code: str | None, limit: int = 10,
+        store_code: str | None, limit: int = 10, sort: str = "revenue",
     ) -> dict:
         self._range(first, last)
         codes = self._scope(store_code)
         revenue_ok = self._revenue_map(codes)
         limit = max(1, min(limit, TOP_LIMIT))
+        if sort not in ("revenue", "quantity"):
+            raise SalesError(422, "Ordenação desconhecida.")
         is_admin = self.principal.is_superadmin or self.principal.profile == "administrator"
 
         if dimension == "products":
@@ -405,7 +407,9 @@ class SalesService:
         else:
             by_name = {}
 
-        items = sorted(merged.values(), key=lambda item: item["revenue"], reverse=True)[:limit]
+        items = sorted(
+            merged.values(), key=lambda item: (item[sort], item["revenue"]), reverse=True
+        )[:limit]
         return {
             "dimension": dimension,
             "from": first.isoformat(), "to": last.isoformat(),

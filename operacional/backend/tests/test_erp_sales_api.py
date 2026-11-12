@@ -310,3 +310,17 @@ def test_status_reports_last_sync(env):
     vendas = next(k for k in status.json()["kinds"] if k["kind"] == "VENDAS")
     assert vendas["last_applied_at"] is not None
     assert vendas["rows_applied"] == 1
+
+
+def test_top_products_sort_by_quantity(env):
+    client, *_ = env
+    upload(client, "vendas", sales_csv(LINE_JOI, LINE_JOI2, LINE_TUB2))
+    by_revenue = client.get(
+        "/api/v1/sales/top/products?from=2026-10-01&to=2026-10-31&sort=revenue").json()["items"]
+    assert by_revenue[0]["key"] == "P100"  # maior faturamento (100)
+    by_quantity = client.get(
+        "/api/v1/sales/top/products?from=2026-10-01&to=2026-10-31&sort=quantity").json()["items"]
+    keys = [item["key"] for item in by_quantity]
+    assert keys == ["P300", "P100", "P200"]  # 3 > 2 > 1 unidades
+    assert client.get(
+        "/api/v1/sales/top/products?from=2026-10-01&to=2026-10-31&sort=x").status_code == 422

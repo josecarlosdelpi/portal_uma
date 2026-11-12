@@ -399,7 +399,7 @@
 .sales-legend-item{display:flex;align-items:center;gap:7px;font-size:12px;color:#4f6a73}
 .sales-legend-item i{display:inline-block;width:11px;height:11px;border-radius:3px}
 .sales-chart-wrap{overflow-x:auto;padding-bottom:4px}
-.sales-chart{width:100%;min-width:520px;height:auto;display:block}
+.sales-chart{width:100%;min-width:640px;height:auto;display:block}
 .sales-chart-label{font-size:9px;fill:#82939d}
 .columns-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:0}
 .sales-top h3{font-size:13px;margin:0 0 10px}
@@ -418,3 +418,37 @@
 .store-progress i{display:block;height:100%;background:linear-gradient(90deg,#0e757a,#20bfc1);border-radius:3px}
 .pill-red{background:#fbe7e5;color:#a02c22}
 @media(max-width:1100px){.columns-3{grid-template-columns:1fr}}
+
+/* Filtros de vendas: modos mes / periodo personalizado */
+.sales-filters{gap:10px}
+.sales-mode-tabs{display:flex;gap:0;border:1px solid #dbe5e9;border-radius:9px;overflow:hidden;background:white}
+.sales-mode-tabs .tab{border:0;border-radius:0;padding:10px 14px;font-size:12px}
+.sales-mode-tabs .tab + .tab{border-left:1px solid #dbe5e9}
+.sales-month-nav{display:flex;align-items:end;gap:8px}
+.sales-month-nav .form-row{min-width:130px;margin:0}
+.sales-month-nav select{height:39px;border:1px solid #dbe5e9;border-radius:9px;padding:8px 11px;color:#203a44;background:white}
+.sales-arrow{height:39px;min-width:39px;padding:0 10px;font-size:18px;line-height:1}
+.sales-panel-head{flex-wrap:wrap;row-gap:8px}
+.sales-tab-bar{margin-bottom:0;flex-wrap:wrap}
+.tab-sm{padding:7px 11px;font-size:11px;border-radius:8px}
+
+/* Cores das lojas por usuario */
+.sales-colors{position:relative;font-size:12px}
+.sales-colors>summary{cursor:pointer;color:#027c81;font-weight:700;list-style:none;padding:6px 10px;border:1px solid #c6e4e2;border-radius:8px;background:#f5faf9}
+.sales-colors>summary::-webkit-details-marker{display:none}
+.sales-colors[open]>summary{background:#e4f6f2}
+.sales-colors-body{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:white;border:1px solid #e5ecef;border-radius:12px;padding:14px;box-shadow:0 14px 40px rgba(20,44,52,.16);display:flex;flex-direction:column;gap:10px;min-width:190px}
+.sales-color-line{display:flex;align-items:center;gap:10px;font-size:12px;color:#26434c;font-weight:600}
+.sales-color-line input{width:34px;height:26px;border:1px solid #dbe5e9;border-radius:6px;padding:1px;background:white;cursor:pointer}
+.sales-color-reset{font-size:11px;padding:7px 10px}
+
+/* Rodape compacto da tela de vendas */
+.sales-foot{margin-top:22px;padding:16px 20px;background:#fbfcfc}
+.sales-foot-grid{display:grid;grid-template-columns:1.1fr 1.2fr auto;gap:18px;align-items:start}
+.sales-foot-block{display:flex;flex-direction:column;gap:4px}
+.sales-foot-block strong{font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:#5a747d}
+.sales-foot-block span{font-size:11px;color:#82939d;line-height:1.45}
+.sales-foot-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.sales-foot-msg{font-size:11px;color:#187a58}
+@media(max-width:900px){.sales-foot-grid{grid-template-columns:1fr}.sales-foot-actions{align-items:flex-start}}
+@media(max-width:560px){.sales-mode-tabs{width:100%}.sales-mode-tabs .tab{flex:1}.sales-colors-body{right:auto;left:0}}

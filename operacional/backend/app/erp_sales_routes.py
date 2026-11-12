@@ -109,6 +109,7 @@ def sales_top(
     date_to: date = Query(alias="to"),
     store: str | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=25),
+    sort: Literal["revenue", "quantity"] = Query(default="revenue"),
     svc: SalesService = Depends(service),
 ) -> dict:
-    return checked(lambda: svc.top(dimension, date_from, date_to, store, limit))
+    return checked(lambda: svc.top(dimension, date_from, date_to, store, limit, sort))

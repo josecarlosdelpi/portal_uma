@@ -58,7 +58,10 @@ export type AuditEvent = {
 };
 
 export type AuditPage = { items: AuditEvent[]; limit: number; offset: number };
-export type UserPreferences = { sidebar_pinned: boolean; favorites: string[] };
+export type UserPreferences = {
+  sidebar_pinned: boolean; favorites: string[];
+  store_colors?: Record<string, string>;
+};
 
 export type DailyBase = { date: string; weekday: number; base_daily_target: string | null };
 
@@ -425,9 +428,11 @@ export const api = {
       (store ? "&store=" + encodeURIComponent(store) : "")),
 
   salesTop: (token: string, dimension: "products" | "sellers" | "customers",
-             from: string, to: string, store?: string, limit = 10) =>
+             from: string, to: string, store?: string, limit = 10,
+             sort?: "revenue" | "quantity") =>
     request<SalesTopResult>(token, "/api/v1/sales/top/" + dimension +
       "?from=" + from + "&to=" + to + "&limit=" + limit +
+      (sort ? "&sort=" + sort : "") +
       (store ? "&store=" + encodeURIComponent(store) : "")),
 
   triggerSalesSync: (token: string) =>

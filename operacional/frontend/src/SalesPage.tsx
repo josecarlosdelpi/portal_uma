@@ -1,7 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from "react";
 import {
-  api, uploadSalesFile, type MyProfile, type SalesBatch, type SalesDailyRow,
-  type SalesSummary, type SalesSyncStatus, type SalesTopItem,
+  api, type MyProfile, type SalesDailyRow, type SalesSummary,
+  type SalesSyncStatus, type SalesTopItem, type UserPreferences,
 } from "./api";
 import {labelStore} from "./catalog";
 
@@ -17,9 +17,14 @@ const dateTime = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("pt-BR") : "Nunca sincronizado";
 const dayMonth = (iso: string) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
 
-const STORE_COLORS: Record<string, string> = {
+const DEFAULT_COLORS: Record<string, string> = {
   JOINVILLE: "#0e757a", TUBARAO: "#b7a92d", ITAJAI: "#35566b",
 };
+const STORE_ORDER = ["JOINVILLE", "TUBARAO", "ITAJAI"];
+const MONTH_NAMES = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
 
 const firstOfMonth = () => {
   const now = new Date();
@@ -36,8 +41,13 @@ const daysAgo = (days: number) => {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") +
     "-" + String(d.getDate()).padStart(2, "0");
 };
+const monthRange = (year: number, month: number): [string, string] => {
+  const mm = String(month).padStart(2, "0");
+  const last = String(new Date(year, month, 0).getDate()).padStart(2, "0");
+  return [`${year}-${mm}-01`, `${year}-${mm}-${last}`];
+};
 
-function DailyChart({days}: {days: SalesDailyRow[]}) {
+function DailyChart({days, colors}: {days: SalesDailyRow[]; colors: Record<string, string>}) {
   const byDate = useMemo(() => {
     const map = new Map<string, Record<string, number>>();
     for (const row of days) {
@@ -50,52 +60,59 @@ function DailyChart({days}: {days: SalesDailyRow[]}) {
   const stores = useMemo(() => {
     const set = new Set<string>();
     for (const row of days) set.add(row.store_code);
-    return [...set].sort();
+    return [...set].sort((a, b) =>
+      (STORE_ORDER.indexOf(a) === -1 ? 99 : STORE_ORDER.indexOf(a)) -
+      (STORE_ORDER.indexOf(b) === -1 ? 99 : STORE_ORDER.indexOf(b)));
   }, [days]);
   if (byDate.length === 0) return <p className="empty">Nenhuma venda registrada no período.</p>;
   const max = Math.max(...byDate.map(([, v]) => Object.values(v).reduce((a, b) => a + b, 0)), 1);
-  const barW = Math.max(14, Math.min(40, Math.floor(920 / byDate.length)));
-  const width = byDate.length * barW;
-  const height = 190;
+  // Largura fixa do viewBox: barras ocupam o espaco proporcionalmente e os
+  // rotulos mantem o mesmo tamanho visual para qualquer quantidade de dias.
+  const W = 1000;
+  const H = 190;
+  const barW = W / byDate.length;
+  const gap = Math.min(8, barW * 0.14);
+  const labelEvery = Math.max(1, Math.ceil(byDate.length / 18));
   return <div>
     <div className="sales-legend">
       {stores.map(code => <span key={code} className="sales-legend-item">
-        <i style={{background: STORE_COLORS[code] ?? "#607d8b"}}/>{labelStore(code)}</span>)}
+        <i style={{background: colors[code] ?? "#607d8b"}}/>{labelStore(code)}</span>)}
     </div>
     <div className="sales-chart-wrap">
-      <svg className="sales-chart" viewBox={`0 0 ${width} ${height + 26}`}
+      <svg className="sales-chart" viewBox={`0 0 ${W} ${H + 30}`}
+        preserveAspectRatio="xMidYMid meet"
         role="img" aria-label="Faturamento diário por loja">
         {byDate.map(([iso, perStore], index) => {
           const total = Object.values(perStore).reduce((a, b) => a + b, 0);
-          const barH = (total / max) * (height - 30);
+          const barH = (total / max) * (H - 30);
           let offset = 0;
           return <g key={iso}>
             {stores.map(code => {
               const value = perStore[code] ?? 0;
               if (!value) return null;
               const h = (value / total) * barH;
-              const y = height - 10 - offset - h;
+              const y = H - 10 - offset - h;
               offset += h;
-              return <rect key={code} x={index * barW + 2} y={y} width={barW - 4} height={h}
-                rx={2} fill={STORE_COLORS[code] ?? "#607d8b"}>
+              return <rect key={code} x={index * barW + gap / 2} y={y}
+                width={Math.max(1, barW - gap)} height={h}
+                rx={Math.min(3, (barW - gap) / 3)} fill={colors[code] ?? "#607d8b"}>
                 <title>{labelStore(code)} · {dayMonth(iso)} · {money(value)}</title>
               </rect>;
             })}
-            {(index % Math.ceil(byDate.length / 15) === 0 || index === byDate.length - 1) &&
-              <text x={index * barW + barW / 2} y={height + 18} textAnchor="middle"
+            {(index % labelEvery === 0 || index === byDate.length - 1) &&
+              <text x={index * barW + barW / 2} y={H + 18} textAnchor="middle"
                 className="sales-chart-label">{dayMonth(iso)}</text>}
           </g>;
         })}
-        <line x1={0} y1={height - 10} x2={width} y2={height - 10} stroke="#dbe5e9"/>
+        <line x1={0} y1={H - 10} x2={W} y2={H - 10} stroke="#dbe5e9"/>
       </svg>
     </div>
   </div>;
 }
 
-function TopList({title, items, metric}: {title: string; items: SalesTopItem[]; metric: "revenue" | "quantity"}) {
+function TopList({items, metric}: {items: SalesTopItem[]; metric: "revenue" | "quantity"}) {
   const max = Math.max(...items.map(i => Number(metric === "revenue" ? i.revenue : i.quantity)), 1);
   return <div className="sales-top">
-    <h3>{title}</h3>
     {items.length === 0 && <p className="empty">Sem dados no período.</p>}
     {items.map((item, index) => {
       const value = Number(metric === "revenue" ? item.revenue : item.quantity);
@@ -111,6 +128,10 @@ function TopList({title, items, metric}: {title: string; items: SalesTopItem[]; 
 
 export function SalesPage({token, profile}: Props) {
   const stores = profile.stores;
+  const now = new Date();
+  const [mode, setMode] = useState<"month" | "range">("month");
+  const [selYear, setSelYear] = useState(now.getFullYear());
+  const [selMonth, setSelMonth] = useState(now.getMonth() + 1);
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(todayIso);
   const [store, setStore] = useState<string>("");
@@ -120,34 +141,37 @@ export function SalesPage({token, profile}: Props) {
   const [sellers, setSellers] = useState<SalesTopItem[]>([]);
   const [customers, setCustomers] = useState<SalesTopItem[]>([]);
   const [status, setStatus] = useState<SalesSyncStatus | null>(null);
-  const [batches, setBatches] = useState<SalesBatch[]>([]);
   const [metric, setMetric] = useState<"revenue" | "quantity">("revenue");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [kind, setKind] = useState<"vendas" | "devolucoes">("vendas");
-  const [importing, setImporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const canImport = profile.profile !== "seller";
+  const [prefs, setPrefs] = useState<UserPreferences | null>(null);
+  const [colors, setColors] = useState<Record<string, string>>({...DEFAULT_COLORS});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canSync = profile.profile !== "seller";
 
-  const load = async (f = from, t = to, s = store) => {
+  const yearOptions = useMemo(() => {
+    const current = new Date().getFullYear();
+    const years: number[] = [];
+    for (let y = current - 3; y <= current + 1; y += 1) years.push(y);
+    if (!years.includes(selYear)) years.push(selYear);
+    return years.sort((a, b) => a - b);
+  }, [selYear]);
+
+  const load = async (f = from, t = to, s = store, m = metric) => {
     setLoading(true); setError("");
     try {
       const [sum, daily, prod, sell, cust, stat] = await Promise.all([
         api.salesSummary(token, f, t, s || undefined),
         api.salesDaily(token, f, t, s || undefined),
-        api.salesTop(token, "products", f, t, s || undefined, 10),
+        api.salesTop(token, "products", f, t, s || undefined, 10, m),
         api.salesTop(token, "sellers", f, t, s || undefined, 10),
         api.salesTop(token, "customers", f, t, s || undefined, 10),
         api.salesStatus(token),
       ]);
       setSummary(sum); setDays(daily.days); setProducts(prod.items);
       setSellers(sell.items); setCustomers(cust.items); setStatus(stat);
-      if (canImport) {
-        const imp = await api.salesImports(token, 15);
-        setBatches(imp.items);
-      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível consultar as vendas.");
     } finally {
@@ -156,23 +180,58 @@ export function SalesPage({token, profile}: Props) {
   };
 
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, [token, store]);
+  useEffect(() => {
+    void api.preferences(token).then(p => {
+      setPrefs(p);
+      setColors({...DEFAULT_COLORS, ...(p.store_colors ?? {})});
+    }).catch(() => undefined);
+  }, [token]);
 
-  const doImport = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) { setError("Selecione o arquivo CSV do ERP."); return; }
-    setImporting(true); setError(""); setMessage("");
-    try {
-      const result = await uploadSalesFile(token, kind, file);
-      setMessage(result.batch.status === "DUPLICATE"
-        ? "Este arquivo já havia sido importado — nada foi duplicado."
-        : `Importação concluída: ${result.batch.rows_applied} linhas aplicadas.`);
-      if (fileRef.current) fileRef.current.value = "";
-      await load();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Falha na importação.");
-    } finally {
-      setImporting(false);
+  const applyMonth = (year: number, month: number) => {
+    const [f, t] = monthRange(year, month);
+    setSelYear(year); setSelMonth(month); setFrom(f); setTo(t);
+    void load(f, t);
+  };
+  const shiftMonth = (delta: number) => {
+    const base = new Date(selYear, selMonth - 1 + delta, 1);
+    applyMonth(base.getFullYear(), base.getMonth() + 1);
+  };
+  const switchMode = (next: "month" | "range") => {
+    setMode(next);
+    if (next === "month") {
+      const parsed = /^(\d{4})-(\d{2})-\d{2}$/.exec(from);
+      applyMonth(
+        parsed ? Number(parsed[1]) : now.getFullYear(),
+        parsed ? Number(parsed[2]) : now.getMonth() + 1,
+      );
     }
+  };
+
+  const toggleMetric = (next: "revenue" | "quantity") => {
+    setMetric(next);
+    void api.salesTop(token, "products", from, to, store || undefined, 10, next)
+      .then(r => setProducts(r.items))
+      .catch(() => undefined);
+  };
+
+  const persistColors = (next: Record<string, string>) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void api.savePreferences(token, {
+        sidebar_pinned: prefs?.sidebar_pinned ?? true,
+        favorites: prefs?.favorites ?? [],
+        store_colors: next,
+      }).then(saved => setPrefs(saved)).catch(() => undefined);
+    }, 500);
+  };
+  const changeColor = (code: string, value: string) => {
+    const next = {...colors, [code]: value};
+    setColors(next);
+    persistColors(next);
+  };
+  const resetColors = () => {
+    setColors({...DEFAULT_COLORS});
+    persistColors({});
   };
 
   const doSync = async () => {
@@ -194,6 +253,11 @@ export function SalesPage({token, profile}: Props) {
   const vendas = status?.kinds.find(k => k.kind === "VENDAS");
   const driveFiles = status?.drive.files ?? [];
   const lastError = driveFiles.find(f => f.last_error)?.last_error;
+  const orderedStores = summary
+    ? [...summary.stores].sort((a, b) =>
+        (STORE_ORDER.indexOf(a.code) === -1 ? 99 : STORE_ORDER.indexOf(a.code)) -
+        (STORE_ORDER.indexOf(b.code) === -1 ? 99 : STORE_ORDER.indexOf(b.code)))
+    : [];
 
   if (!profile.features.sales) {
     return <section className="panel"><h2>Vendas não disponíveis</h2>
@@ -209,48 +273,56 @@ export function SalesPage({token, profile}: Props) {
         : "Indicadores comerciais das três lojas, sincronizados do ERP."}</p>
     </div></div>
 
-    <div className="notice notice-amber" role="status">
-      Os números abaixo são dados em fase de testes e ainda não foram reconciliados
-      com os relatórios oficiais do ERP. Devoluções são exibidas separadamente e
-      não são descontadas do faturamento.
-    </div>
     {error && <div className="notice notice-error" role="alert">{error}</div>}
-    {message && <div className="notice notice-success" role="status">{message}</div>}
 
-    <section className="panel sales-sync">
-      <div className="sales-sync-info">
-        <strong>Google Drive · pasta DadosUMA</strong>
-        <span>Vendas: {vendas?.last_applied_at
-          ? "atualizado em " + dateTime(vendas.last_applied_at) + " (" + vendas.rows_applied + " linhas)"
-          : "nenhum arquivo importado ainda"}</span>
-        <span>Verificação automática: {status?.drive.enabled
-          ? "a cada " + Math.round((status.drive.interval_seconds ?? 600) / 60) + " min"
-          : "desativada (configure a conta de serviço)"}</span>
-        {lastError && <span className="sales-sync-error">Última falha: {lastError}</span>}
+    <div className="target-filters sales-filters">
+      <div className="sales-mode-tabs" role="group" aria-label="Modo de filtro">
+        <button type="button" className={mode === "month" ? "tab active" : "tab"}
+          onClick={() => switchMode("month")}>Mês</button>
+        <button type="button" className={mode === "range" ? "tab active" : "tab"}
+          onClick={() => switchMode("range")}>Período personalizado</button>
       </div>
-      {canImport && <button className="btn-secondary" type="button"
-        disabled={syncing} onClick={() => void doSync()}>
-        {syncing ? "Sincronizando…" : "Sincronizar agora"}</button>}
-    </section>
 
-    <div className="target-filters">
-      <div className="form-row"><label htmlFor="sales-from">De</label>
-        <input id="sales-from" type="date" value={from}
-          onChange={e => setFrom(e.target.value)}/></div>
-      <div className="form-row"><label htmlFor="sales-to">Até</label>
-        <input id="sales-to" type="date" value={to}
-          onChange={e => setTo(e.target.value)}/></div>
+      {mode === "month" ? <>
+        <div className="sales-month-nav">
+          <button type="button" className="btn-ghost sales-arrow" aria-label="Mês anterior"
+            onClick={() => shiftMonth(-1)}>‹</button>
+          <div className="form-row"><label htmlFor="sales-month">Mês</label>
+            <select id="sales-month" value={selMonth}
+              onChange={e => applyMonth(selYear, Number(e.target.value))}>
+              {MONTH_NAMES.map((name, i) =>
+                <option key={name} value={i + 1}>{name}</option>)}
+            </select></div>
+          <div className="form-row"><label htmlFor="sales-year">Ano</label>
+            <select id="sales-year" value={selYear}
+              onChange={e => applyMonth(Number(e.target.value), selMonth)}>
+              {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+            </select></div>
+          <button type="button" className="btn-ghost sales-arrow" aria-label="Próximo mês"
+            onClick={() => shiftMonth(1)}>›</button>
+        </div>
+      </> : <>
+        <div className="form-row"><label htmlFor="sales-from">De</label>
+          <input id="sales-from" type="date" value={from}
+            onChange={e => setFrom(e.target.value)}/></div>
+        <div className="form-row"><label htmlFor="sales-to">Até</label>
+          <input id="sales-to" type="date" value={to}
+            onChange={e => setTo(e.target.value)}/></div>
+        <button className="btn-secondary" type="button" disabled={loading}
+          onClick={() => void load()}>{loading ? "Atualizando…" : "Aplicar"}</button>
+        <button className="btn-ghost" type="button"
+          onClick={() => { setMode("month"); applyMonth(now.getFullYear(), now.getMonth() + 1); }}>
+          Este mês</button>
+        <button className="btn-ghost" type="button"
+          onClick={() => { setFrom(daysAgo(30)); setTo(todayIso()); void load(daysAgo(30), todayIso()); }}>
+          Últimos 30 dias</button>
+      </>}
+
       {stores.length > 1 && <div className="form-row"><label htmlFor="sales-store">Loja</label>
         <select id="sales-store" value={store} onChange={e => setStore(e.target.value)}>
           <option value="">Todas as lojas</option>
           {stores.map(code => <option key={code} value={code}>{labelStore(code)}</option>)}
         </select></div>}
-      <button className="btn-secondary" type="button" disabled={loading}
-        onClick={() => void load()}>{loading ? "Atualizando…" : "Aplicar"}</button>
-      <button className="btn-ghost" type="button"
-        onClick={() => { setFrom(firstOfMonth()); setTo(todayIso()); }}>Este mês</button>
-      <button className="btn-ghost" type="button"
-        onClick={() => { setFrom(daysAgo(30)); setTo(todayIso()); }}>Últimos 30 dias</button>
     </div>
 
     {summary && <>
@@ -258,37 +330,52 @@ export function SalesPage({token, profile}: Props) {
         <div className="panel overview-kpi"><span>Faturamento do período</span>
           <strong>{money(summary.totals.revenue)}</strong>
           <small>{qty(summary.totals.quantity)} itens em {summary.totals.rows} linhas</small></div>
-        <div className="panel overview-kpi"><span>Devoluções registradas</span>
-          <strong>{money(summary.totals.returns_revenue)}</strong>
-          <small>{summary.totals.returns_rows} linha(s) · exibidas separadamente</small></div>
-        {summary.stores.map(item => <div className="panel overview-kpi" key={item.code}>
+        {orderedStores.map(item => <div className="panel overview-kpi" key={item.code}>
           <span>{labelStore(item.code)}</span>
           <strong>{item.revenue_visibility === "restricted" ? "Restrito" : money(item.revenue)}</strong>
           <small>{qty(item.quantity)} itens · {money(item.returns_revenue)} em devoluções</small></div>)}
+        <div className="panel overview-kpi"><span>Devoluções registradas</span>
+          <strong>{money(summary.totals.returns_revenue)}</strong>
+          <small>{summary.totals.returns_rows} linha(s) · exibidas separadamente</small></div>
       </div>
 
       <section className="panel">
-        <div className="panel-head"><div><h2>Evolução diária do faturamento</h2>
-          <p>Soma das linhas de venda por dia e loja. Barras empilhadas por unidade.</p></div></div>
-        <DailyChart days={days}/>
+        <div className="panel-head sales-panel-head"><div><h2>Evolução diária do faturamento</h2>
+          <p>Soma das linhas de venda por dia e loja. Barras empilhadas por unidade.</p></div>
+          <details className="sales-colors">
+            <summary>Personalizar cores</summary>
+            <div className="sales-colors-body">
+              {Object.keys(DEFAULT_COLORS).filter(code => stores.includes(code)).map(code =>
+                <label key={code} className="sales-color-line">
+                  <input type="color" value={colors[code] ?? DEFAULT_COLORS[code]}
+                    onChange={e => changeColor(code, e.target.value)}
+                    aria-label={"Cor da loja " + labelStore(code)}/>
+                  <span>{labelStore(code)}</span>
+                </label>)}
+              <button type="button" className="btn-ghost sales-color-reset"
+                onClick={resetColors}>Restaurar padrão</button>
+            </div>
+          </details>
+        </div>
+        <DailyChart days={days} colors={colors}/>
       </section>
 
       <div className="columns-3">
         <section className="panel">
-          <div className="panel-head"><div><h2>Produtos</h2>
+          <div className="panel-head sales-panel-head"><div><h2>Produtos</h2>
             <p>Códigos do ERP sem descrição cadastrada.</p></div>
-            <div className="tab-bar">
-              <button className={metric === "revenue" ? "tab active" : "tab"}
-                onClick={() => setMetric("revenue")}>Faturamento</button>
-              <button className={metric === "quantity" ? "tab active" : "tab"}
-                onClick={() => setMetric("quantity")}>Quantidade</button>
+            <div className="tab-bar sales-tab-bar">
+              <button className={metric === "revenue" ? "tab tab-sm active" : "tab tab-sm"}
+                onClick={() => toggleMetric("revenue")}>Faturamento</button>
+              <button className={metric === "quantity" ? "tab tab-sm active" : "tab tab-sm"}
+                onClick={() => toggleMetric("quantity")}>Quantidade</button>
             </div></div>
-          <TopList title="" items={products} metric={metric}/>
+          <TopList items={products} metric={metric}/>
         </section>
         <section className="panel">
           <div className="panel-head"><div><h2>Vendedores</h2>
             <p>Códigos do ERP; a identificação de nomes depende do cadastro oficial.</p></div></div>
-          <TopList title="" items={sellers} metric="revenue"/>
+          <TopList items={sellers} metric="revenue"/>
         </section>
         <section className="panel">
           <div className="panel-head"><div><h2>Clientes</h2>
@@ -322,38 +409,31 @@ export function SalesPage({token, profile}: Props) {
       </section>
     </>}
 
-    {canImport && <section className="panel">
-      <div className="panel-head"><div><h2>Importação e histórico</h2>
-        <p>Importação manual dos CSVs do ERP (mesmo caminho da sincronização automática).</p></div></div>
-      <div className="sales-import">
-        <select aria-label="Tipo de arquivo" value={kind}
-          onChange={e => setKind(e.target.value as "vendas" | "devolucoes")} disabled={importing}>
-          <option value="vendas">Vendas.csv</option>
-          <option value="devolucoes">Devolucoes.csv</option>
-        </select>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" disabled={importing}/>
-        <button className="btn-primary" type="button" disabled={importing}
-          onClick={() => void doImport()}>{importing ? "Importando…" : "Importar arquivo"}</button>
+    <section className="panel sales-foot">
+      <div className="sales-foot-grid">
+        <div className="sales-foot-block">
+          <strong>Dados em fase de testes</strong>
+          <span>Números ainda não reconciliados com os relatórios oficiais do ERP.
+            Devoluções são exibidas separadamente e não descontadas do faturamento.</span>
+        </div>
+        <div className="sales-foot-block">
+          <strong>Google Drive · pasta DadosUMA</strong>
+          <span>Vendas: {vendas?.last_applied_at
+            ? "atualizado em " + dateTime(vendas.last_applied_at) + " (" + vendas.rows_applied + " linhas)"
+            : "nenhum arquivo importado ainda"}</span>
+          <span>Verificação automática: {status?.drive.enabled
+            ? "a cada " + Math.round((status.drive.interval_seconds ?? 600) / 60) + " min"
+            : "desativada (configure a conta de serviço)"}</span>
+          {lastError && <span className="sales-sync-error">Última falha: {lastError}</span>}
+        </div>
+        <div className="sales-foot-actions">
+          {message && <span className={"sales-foot-msg" +
+            (message.includes("falha") ? " sales-sync-error" : "")}>{message}</span>}
+          {canSync && <button className="btn-secondary" type="button"
+            disabled={syncing} onClick={() => void doSync()}>
+            {syncing ? "Sincronizando…" : "Sincronizar agora"}</button>}
+        </div>
       </div>
-      <div className="table-wrap"><table><thead><tr>
-        <th>Data/hora</th><th>Tipo</th><th>Origem</th><th>Arquivo</th><th>Status</th>
-        <th>Linhas</th><th>Período</th>
-      </tr></thead><tbody>
-        {batches.map(batch => <tr key={batch.id}>
-          <td>{dateTime(batch.applied_at)}</td><td>{batch.kind}</td>
-          <td>{batch.source === "DRIVE_SYNC" ? "Drive" : "Manual"}</td>
-          <td>{batch.file_name}</td>
-          <td><span className={"pill " + (batch.status === "APPLIED" ? "pill-green"
-            : batch.status === "FAILED" ? "pill-red"
-            : "pill-grey")}>{batch.status === "APPLIED" ? "Aplicado"
-            : batch.status === "DUPLICATE" ? "Já importado"
-            : batch.status === "FAILED" ? "Falhou" : batch.status}</span></td>
-          <td>{batch.rows_applied}{batch.rows_rejected ? " (+" + batch.rows_rejected + " rejeitadas)" : ""}</td>
-          <td>{batch.period_start && batch.period_end
-            ? dayMonth(batch.period_start) + " – " + dayMonth(batch.period_end) : "—"}</td>
-        </tr>)}
-        {batches.length === 0 && <tr><td colSpan={7} className="empty">Nenhuma importação registrada.</td></tr>}
-      </tbody></table></div>
-    </section>}
+    </section>
   </div>;
 }
