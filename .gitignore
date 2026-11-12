@@ -1,0 +1,14 @@
+# Credenciais locais: nunca versionar conta de servico, chaves ou tokens.
+# O JSON da conta de servico do Google Drive fica em operacional/secrets/
+# (montado no container via volume, fora do controle de versao).
+secrets/
+**/secrets/
+*service-account*.json
+*service_account*.json
+*credentials*.json
+*drive-sa*.json
+*.p12
+*.pem
+.env
+.env.*
+!**/.env.example

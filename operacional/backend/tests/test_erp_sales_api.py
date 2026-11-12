@@ -241,6 +241,7 @@ def test_overview_and_targets_consume_pilot_data(env):
 class FakeDriveClient:
     def __init__(self, files: dict[str, tuple[bytes, str]]):
         self.files = files
+        self.download_count = 0
 
     def find_file(self, expected_name: str):
         for name, (content, file_id) in self.files.items():
@@ -250,6 +251,7 @@ class FakeDriveClient:
         return None
 
     def download(self, file_id: str) -> bytes:
+        self.download_count += 1
         for name, (content, fid) in self.files.items():
             if fid == file_id:
                 return content
@@ -280,6 +282,12 @@ def test_drive_sync_ingests_and_skips_unchanged(env):
             expected_files={"VENDAS": "vendas.csv", "DEVOLUCOES": "devolucoes.csv"},
         )
         assert all(r["status"] == "SKIPPED" for r in again)
+        third = sync_sources(
+            db, handlers=sales_handlers(db), client=fake,
+            expected_files={"VENDAS": "vendas.csv", "DEVOLUCOES": "devolucoes.csv"},
+        )
+        assert all(r["status"] == "SKIPPED" for r in third)
+        assert fake.download_count == 2
 
 
 def test_failed_file_creates_failed_batch_without_touching_rows(env):

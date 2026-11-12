@@ -165,6 +165,23 @@ def _modified_at(remote: dict) -> datetime | None:
         return None
 
 
+def _unchanged(remote: dict, state: ErpSourceFile) -> bool:
+    """Conteudo remoto igual ao ultimo ja processado com sucesso.
+
+    Compara md5Checksum quando disponivel; sem ele (exports do Google),
+    usa modifiedTime. So evita download se a ultima ingestao desse arquivo
+    terminou bem (OK) ou ja foi pulada por ser identica (SKIPPED); uma
+    falha anterior sempre dispara nova tentativa de download/ingestao.
+    """
+    if state.last_status not in ("OK", "SKIPPED"):
+        return False
+    remote_md5 = remote.get("md5Checksum")
+    if remote_md5:
+        return remote_md5 == state.drive_md5
+    modified = _modified_at(remote)
+    return modified is not None and modified == state.remote_modified_at
+
+
 def sync_sources(
     db: Session,
     *,
@@ -203,10 +220,7 @@ def sync_sources(
                 state.last_status = "FAILED"
                 state.last_error = f"Arquivo '{expected_name}' nao encontrado na pasta DadosUMA."
                 state.consecutive_failures += 1
-            elif (
-                remote.get("md5Checksum") == state.drive_md5
-                and state.last_status == "OK"
-            ):
+            elif _unchanged(remote, state):
                 state.last_status = "SKIPPED"
                 state.last_error = None
                 state.consecutive_failures = 0
