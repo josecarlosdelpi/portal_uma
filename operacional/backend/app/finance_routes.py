@@ -45,6 +45,11 @@ def list_batches(svc: FinanceService = Depends(service)) -> dict:
     return checked(svc.list_batches)
 
 
+@router.get("/sync")
+def sync_status(svc: FinanceService = Depends(service)) -> dict:
+    return checked(svc.sync_status)
+
+
 @router.get("/batches/{batch_id}")
 def batch_detail(batch_id: str, svc: FinanceService = Depends(service)) -> dict:
     try:

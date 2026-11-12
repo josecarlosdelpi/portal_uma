@@ -276,3 +276,76 @@ def test_sem_dados_respostas_vazias_coerentes(env):
     assert c.get("/api/v1/finance/payments").json()["total"] == 0
     assert c.get("/api/v1/finance/purchases").json()["has_data"] is False
     assert c.get("/api/v1/finance/batches").json()["items"] == []
+
+
+class FakeDriveClient:
+    """Stub minimo do cliente Drive para o contrato sync_sources."""
+
+    def __init__(self, files: dict[str, tuple[bytes, str]]):
+        self.files = files
+        self.download_count = 0
+
+    def find_file(self, expected_name: str):
+        for name, (content, file_id) in self.files.items():
+            if name.lower() == expected_name.lower():
+                return {"id": file_id, "name": name,
+                        "md5Checksum": "md5-" + file_id, "modifiedTime": "2026-11-11T12:00:00Z"}
+        return None
+
+    def download(self, file_id: str) -> bytes:
+        self.download_count += 1
+        for name, (content, fid) in self.files.items():
+            if fid == file_id:
+                return content
+        raise AssertionError("file_id desconhecido")
+
+
+def test_sync_endpoint_exibe_estado_e_ultima_atualizacao(env):
+    c, actor, *_ = env
+    res = c.get("/api/v1/finance/sync")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["file_key"] == "DESPESAS"
+    assert data["last_applied"] is None
+
+    assert upload(c).status_code == 200
+    data = c.get("/api/v1/finance/sync").json()
+    assert data["last_applied"]["file_name"] == "Despesas.csv"
+    assert data["last_applied"]["row_count"] == 5
+    assert data["last_applied"]["imported_at"] is not None
+
+
+def test_sync_drive_ingere_despesas_automaticamente(env):
+    """Aquisicao automatica: expenses_handlers dentro do sync_sources unico."""
+    from app.erp_drive import sync_sources
+    from app.erp_expenses_import import expenses_handlers
+    from app.models import ErpSourceFile
+
+    c, _, engine, *_ = env
+    fake = FakeDriveClient({"Despesas.csv": (SNAPSHOT_1.encode(), "file-desp-1")})
+    with Session(engine) as db:
+        result = sync_sources(
+            db, handlers=expenses_handlers(db), client=fake,
+            expected_files={"DESPESAS": "despesas.csv"},
+        )
+        assert [r["file_key"] for r in result] == ["DESPESAS"]
+        assert result[0]["status"] == "OK"
+        state = db.get(ErpSourceFile, "DESPESAS")
+        assert state.last_status == "OK"
+        batch = db.scalar(select(ErpImportBatch).where(ErpImportBatch.kind == "DESPESAS"))
+        assert batch.status == "APPLIED" and batch.source == "DRIVE_SYNC"
+        assert len(db.scalars(select(FinancialObligation)).all()) == 5
+
+        # segundo ciclo: arquivo inalterado -> SKIPPED, sem novo download
+        again = sync_sources(
+            db, handlers=expenses_handlers(db), client=fake,
+            expected_files={"DESPESAS": "despesas.csv"},
+        )
+        assert again[0]["status"] == "SKIPPED"
+        assert fake.download_count == 1
+
+    # dados vindos do Drive alimentam as consultas normalmente
+    data = c.get("/api/v1/finance/sync").json()
+    assert data["last_applied"]["row_count"] == 5
+    assert data["last_status"] in ("OK", "SKIPPED")
+    assert c.get("/api/v1/finance/obligations").json()["total"] == 5

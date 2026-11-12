@@ -1,8 +1,8 @@
 import {Fragment,useCallback,useEffect,useState} from "react";
 import type {MyProfile} from "./api";
 import {labelStore} from "./catalog";
-import {financeApi,type FinanceBatch,type FinanceOverview,type ObligationItem,
-  type ObligationPage,type PaymentsPage,type PurchasesView} from "./financeApi";
+import {financeApi,type FinanceBatch,type FinanceOverview,type FinanceSyncStatus,
+  type ObligationItem,type ObligationPage,type PaymentsPage,type PurchasesView} from "./financeApi";
 
 type Props={token:string;profile:MyProfile};
 type FinTab="overview"|"payables"|"payments"|"purchases";
@@ -124,9 +124,7 @@ export function FinancePage({token,profile}:Props){
 
   const [tab,setTab]=useState<FinTab>("overview");
   const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
-  const [importing,setImporting]=useState(false);
-  const [file,setFile]=useState<File|null>(null);
+  const [sync,setSync]=useState<FinanceSyncStatus|null>(null);
   const [batches,setBatches]=useState<FinanceBatch[]|null>(null);
   const [showBatches,setShowBatches]=useState(false);
   const [batchFlags,setBatchFlags]=useState<{id:string;flags:{row:number;code:string;detail:string}[]}|null>(null);
@@ -211,24 +209,11 @@ export function FinancePage({token,profile}:Props){
   },[token,pcStore,debouncedPcSupplier,pcPage]);
   useEffect(()=>{if(tab==="purchases")void loadPurchases();},[tab,loadPurchases]);
 
-  useEffect(()=>{void refreshBatches();},[refreshBatches]);
-
-  async function doImport(){
-    if(!file)return;
-    setImporting(true);setError("");setNotice("");
-    try{
-      const res=await financeApi.importDespesas(token,file);
-      setNotice(res.duplicated
-        ?"Arquivo já importado anteriormente — nenhum lançamento duplicado."
-        :`Importação concluída: ${res.batch.row_count} lançamentos`+
-          (res.batch.quality_flag_count?` · ${res.batch.quality_flag_count} avisos de qualidade`:""));
-      setFile(null);
-      await Promise.all([refreshBatches(),loadOverview(),loadPayables(),loadPayments(),loadPurchases()]);
-    }catch(cause){
-      setError(cause instanceof Error?cause.message:"Falha ao importar.");
-      void refreshBatches();
-    }finally{setImporting(false);}
-  }
+  const loadSync=useCallback(async()=>{
+    try{setSync(await financeApi.sync(token));}catch{setSync(null);}
+  },[token]);
+  useEffect(()=>{void loadSync();const t=setInterval(()=>void loadSync(),120000);
+    return()=>clearInterval(t);},[loadSync]);
 
   async function showFlags(batch:FinanceBatch){
     try{
@@ -262,46 +247,48 @@ export function FinancePage({token,profile}:Props){
 
     {error&&<div className="notice notice-error" role="alert">{error}
       <button className="fin-notice-close" onClick={()=>setError("")} aria-label="Fechar">×</button></div>}
-    {notice&&<div className="notice notice-success" role="status">{notice}</div>}
 
-    {isSuperAdmin&&<article className="panel fin-import">
-      <div className="panel-head"><div>
-        <h2>Importação do ERP</h2>
-        <p>Envie o arquivo <strong>Despesas.csv</strong> exportado do ERP. Reenviar o mesmo
-          arquivo não duplica lançamentos; versões anteriores ficam preservadas para auditoria.</p>
-      </div></div>
-      <div className="fin-import-row">
-        <input type="file" accept=".csv,text/csv" aria-label="Arquivo Despesas.csv"
-          onChange={e=>setFile(e.target.files?.[0]??null)}/>
-        <button className="btn-primary" disabled={!file||importing} onClick={()=>void doImport()}>
-          {importing?"Importando…":"Importar Despesas.csv"}</button>
-        <button className="btn-ghost" onClick={()=>{setShowBatches(s=>!s);if(!showBatches)void refreshBatches();}}>
-          {showBatches?"Ocultar histórico":"Histórico de importações"}</button>
-      </div>
-      {showBatches&&<div className="fin-batches">
-        {!batches?.length&&<p className="empty">Nenhuma importação registrada ainda.</p>}
-        {batches?.map(b=><div className={"fin-batch"+(b.is_current?" current":"")+(b.status==="failed"?" failed":"")} key={b.id}>
-          <div className="fin-batch-main">
-            <strong>{b.file_name}</strong>
-            <span>{dtHora(b.imported_at)} · {b.channel==="manual"?"manual":"drive"} · {b.row_count} lançamentos
-              {b.period_start&&` · ${dmy(b.period_start)} a ${dmy(b.period_end)}`}</span>
-            {b.error_detail&&<span className="fin-batch-error">{b.error_detail}</span>}
-            {batchFlags?.id===b.id&&<div className="fin-flags">
-              {!batchFlags.flags.length&&<small>Sem avisos de qualidade registrados.</small>}
-              {batchFlags.flags.map((f,i)=><small key={i}>Linha {f.row}: {f.detail} <em>({f.code})</em></small>)}
-              {b.quality_flag_count>batchFlags.flags.length&&
-                <small>… e mais {b.quality_flag_count-batchFlags.flags.length} avisos.</small>}
-            </div>}
-          </div>
-          <div className="fin-batch-side">
-            {b.status==="failed"?<span className="fin-flag fin-flag-vencido">Falhou</span>:
-              b.is_current?<span className="pill pill-green">Vigente</span>:<span className="pill pill-grey">Histórico</span>}
-            {b.quality_flag_count>0&&<button className="btn-ghost" onClick={()=>void showFlags(b)}>
-              {b.quality_flag_count} avisos</button>}
-          </div>
-        </div>)}
-      </div>}
-    </article>}
+    <div className={"fin-sync"+(sync&&(sync.last_status==="FAILED"||!sync.last_applied)?" fin-sync-warn":"")}>
+      <span className="fin-sync-dot" aria-hidden="true"/>
+      {!sync&&<span>Dados do ERP — verificando sincronização…</span>}
+      {sync&&sync.last_status==="FAILED"&&<span>
+        {sync.last_applied?<>Dados do ERP — última atualização: <strong>{dtHora(sync.last_applied.imported_at)}</strong></>
+          :"Dados do ERP"}
+        {" — "}<strong>falha na última verificação</strong>
+        {sync.last_error?`: ${sync.last_error}`:""}</span>}
+      {sync&&sync.last_status!=="FAILED"&&!sync.last_applied&&
+        <span>Dados do ERP — aguardando a primeira sincronização do arquivo.</span>}
+      {sync&&sync.last_status!=="FAILED"&&sync.last_applied&&<span>
+        Dados do ERP — última atualização: <strong>{dtHora(sync.last_applied.imported_at)}</strong>
+        {" · "}{sync.last_applied.file_name}</span>}
+      {isSuperAdmin&&<button className="fin-sync-history"
+        onClick={()=>{setShowBatches(s=>!s);if(!showBatches)void refreshBatches();}}>
+        {showBatches?"Ocultar histórico":"Histórico"}</button>}
+    </div>
+
+    {isSuperAdmin&&showBatches&&<div className="fin-batches">
+      {!batches?.length&&<p className="empty">Nenhuma importação registrada ainda.</p>}
+      {batches?.map(b=><div className={"fin-batch"+(b.is_current?" current":"")+(b.status==="failed"?" failed":"")} key={b.id}>
+        <div className="fin-batch-main">
+          <strong>{b.file_name}</strong>
+          <span>{dtHora(b.imported_at)} · {b.channel==="manual"?"manual":"drive"} · {b.row_count} lançamentos
+            {b.period_start&&` · ${dmy(b.period_start)} a ${dmy(b.period_end)}`}</span>
+          {b.error_detail&&<span className="fin-batch-error">{b.error_detail}</span>}
+          {batchFlags?.id===b.id&&<div className="fin-flags">
+            {!batchFlags.flags.length&&<small>Sem avisos de qualidade registradas.</small>}
+            {batchFlags.flags.map((f,i)=><small key={i}>Linha {f.row}: {f.detail} <em>({f.code})</em></small>)}
+            {b.quality_flag_count>batchFlags.flags.length&&
+              <small>… e mais {b.quality_flag_count-batchFlags.flags.length} avisos.</small>}
+          </div>}
+        </div>
+        <div className="fin-batch-side">
+          {b.status==="failed"?<span className="fin-flag fin-flag-vencido">Falhou</span>:
+            b.is_current?<span className="pill pill-green">Vigente</span>:<span className="pill pill-grey">Histórico</span>}
+          {b.quality_flag_count>0&&<button className="btn-ghost" onClick={()=>void showFlags(b)}>
+            {b.quality_flag_count} avisos</button>}
+        </div>
+      </div>)}
+    </div>}
 
     <div className="tabs" role="tablist" aria-label="Módulo financeiro">
       <button role="tab" aria-selected={tab==="overview"} className={"tab"+(tab==="overview"?" active":"")}
@@ -324,7 +311,7 @@ export function FinancePage({token,profile}:Props){
       {overview&&!ovLoading&&<>
         <LastImport info={overview.last_import}/>
         {!overview.has_data?<p className="empty">Nenhum lançamento importado ainda.
-          {isSuperAdmin?" Importe o Despesas.csv para visualizar os indicadores.":""}</p>:<>
+          {" Aguarde a sincronização automática do arquivo Despesas.csv."}</p>:<>
         <div className="fin-kpis">
           <button className="panel fin-kpi" onClick={()=>drill("open")}>
             <span>Contas em aberto</span><strong>{fmt(k?.open_amount)}</strong>

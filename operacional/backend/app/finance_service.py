@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.erp_csv import KIND_DESPESAS
 from app.erp_expenses_import import apply_despesas_file
 from app.erp_import import _latest_applied
-from app.models import ErpImportBatch, FinancialObligation, User
+from app.models import ErpImportBatch, ErpSourceFile, FinancialObligation, User
 from app.operations_service import OperationError
 from app.policy import STORE_CODES, can_access
 from app.repositories import load_principal
@@ -231,6 +231,25 @@ class FinanceService:
         if row is None:
             raise OperationError(404, "Lote nao localizado")
         return self._batch_public(row, with_flags=True)
+
+    def sync_status(self) -> dict:
+        """Estado da aquisicao automatica (erp_source_files) + ultimo lote
+        aplicado de despesas — sem revelar que a pasta existe ou nomes de outras
+        fontes."""
+        self.require_view()
+        state = self.db.get(ErpSourceFile, KIND_DESPESAS)
+        applied = self._current_batch()
+        return {
+            "file_key": KIND_DESPESAS,
+            "last_status": state.last_status if state else None,
+            "last_check_at": state.last_check_at.isoformat()
+                if state and state.last_check_at else None,
+            "last_sync_at": state.last_sync_at.isoformat()
+                if state and state.last_sync_at else None,
+            "last_error": state.last_error if state else None,
+            "consecutive_failures": state.consecutive_failures if state else 0,
+            "last_applied": self._last_import_public(applied),
+        }
 
     # ---------- consultas do snapshot corrente ----------
 

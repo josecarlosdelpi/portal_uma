@@ -26,6 +26,17 @@ export type FinanceBatchList = {items: FinanceBatch[]};
 
 export type FinanceImportResult = {duplicated: boolean; batch: FinanceBatch};
 
+export type FinanceSyncStatus = {
+  file_key: string;
+  last_status: string | null;
+  last_check_at: string | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+  last_applied: {imported_at: string | null; file_name: string;
+    row_count: number} | null;
+};
+
 export type CategoryTotals = {
   open_amount: string; open_count: number;
   paid_month_amount: string; paid_month_count: number;
@@ -134,6 +145,9 @@ export const financeApi = {
     }
     return response.json() as Promise<FinanceImportResult>;
   },
+
+  sync: (token: string) =>
+    request<FinanceSyncStatus>(token, "/api/v1/finance/sync"),
 
   batches: (token: string) =>
     request<FinanceBatchList>(token, "/api/v1/finance/batches"),

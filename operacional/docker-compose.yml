@@ -22,15 +22,15 @@ services:
       APP_ENV: development
       CORS_ORIGINS: http://localhost:8080,http://localhost:5173
       # Integracao ERP (pasta privada DadosUMA). Ajuste e recrie o servico.
-      # ERP_SYNC_ENABLED: "true"
-      # ERP_SYNC_INTERVAL_SECONDS: "600"
-      # GOOGLE_DRIVE_FOLDER_ID: id-da-pasta-no-drive
-      # GOOGLE_SERVICE_ACCOUNT_JSON: /run/secrets/uma-drive-sa.json
+      ERP_SYNC_ENABLED: "true"
+      ERP_SYNC_INTERVAL_SECONDS: "600"
+      GOOGLE_DRIVE_FOLDER_ID: 1Ynd7GaNTsbiREU7-NxUThy73PQkyRgYH
+      GOOGLE_SERVICE_ACCOUNT_JSON: /run/secrets/uma-drive-sa.json
     ports:
       - "127.0.0.1:8000:8000"
     # Montar o JSON da conta de servico (arquivo local, nao versionado):
-    # volumes:
-    #   - ./secrets/uma-drive-sa.json:/run/secrets/uma-drive-sa.json:ro
+    volumes:
+      - ./secrets/uma-drive-sa.json:/run/secrets/uma-drive-sa.json:ro
     depends_on:
       db:
         condition: service_healthy
