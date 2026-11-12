@@ -49,7 +49,7 @@ def test_defaults_and_roundtrip(env):
     c, actor, _, admin, joi = env
     r = c.get("/api/v1/me/preferences")
     assert r.status_code == 200
-    assert r.json() == {"sidebar_pinned": True, "favorites": []}
+    assert r.json() == {"sidebar_pinned": True, "favorites": [], "store_colors": {}}
     r = c.put("/api/v1/me/preferences", json={
         "sidebar_pinned": False, "favorites": ["training", "overview", "targets"]})
     assert r.status_code == 200, r.text
@@ -149,3 +149,59 @@ def test_order_moves_and_pruning(env):
         "sidebar_pinned": True, "favorites": ["access"]}).status_code == 200
     # admin nao e superadmin: 'access' filtrado
     assert c.get("/api/v1/me/preferences").json()["favorites"] == []
+
+
+def test_store_colors_roundtrip_and_validation(env):
+    c, *_ = env
+    r = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": [],
+        "store_colors": {"JOINVILLE": "#112233", "ITAJAI": "#aAbBcC"}})
+    assert r.status_code == 200
+    assert r.json()["store_colors"] == {"JOINVILLE": "#112233", "ITAJAI": "#aAbBcC"}
+    again = c.get("/api/v1/me/preferences").json()
+    assert again["store_colors"]["JOINVILLE"] == "#112233"
+    # PUT sem store_colors preserva as cores gravadas
+    r = c.put("/api/v1/me/preferences", json={"sidebar_pinned": False, "favorites": []})
+    assert r.json()["store_colors"]["ITAJAI"] == "#aAbBcC"
+    # dict vazio limpa as cores
+    r = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": [], "store_colors": {}})
+    assert r.json()["store_colors"] == {}
+
+
+def test_store_colors_rejected_values(env):
+    c, *_ = env
+    bad_hex = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": [],
+        "store_colors": {"JOINVILLE": "verde"}})
+    assert bad_hex.status_code == 422
+    bad_store = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": [],
+        "store_colors": {"NARNIA": "#112233"}})
+    assert bad_store.status_code == 422
+
+
+def test_sales_module_can_be_favorited(env):
+    """Regressao: 'sales' era rejeitado como modulo desconhecido (422)."""
+    c, actor, engine, admin, joi = env
+    actor["user"] = joi
+    # Sem sales.view: descartado silenciosamente, mas nunca 422 de desconhecido.
+    r = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": ["sales"]})
+    assert r.status_code == 200, r.text
+    assert r.json()["favorites"] == []
+    # Com a permissao: favorita, desfavorita e persiste como os demais modulos.
+    with Session(engine) as db:
+        group = db.scalar(select(StoreGroup).where(StoreGroup.store_code == "JOINVILLE"))
+        db.add(GroupPermission(group_id=group.id, code="sales.view", granted=True))
+        db.commit()
+    r = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": ["sales", "training"]})
+    assert r.status_code == 200
+    assert r.json()["favorites"] == ["sales", "training"]
+    again = c.get("/api/v1/me/preferences").json()
+    assert again["favorites"] == ["sales", "training"]
+    r = c.put("/api/v1/me/preferences", json={
+        "sidebar_pinned": True, "favorites": ["training"]})
+    assert r.json()["favorites"] == ["training"]
+    assert c.get("/api/v1/me/preferences").json()["favorites"] == ["training"]

@@ -4,10 +4,11 @@ from decimal import Decimal
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
+from app.erp_sales_service import month_bounds, sales_by_date_for_store
 from app.models import User
 from app.policy import STORE_CODES, can_access
 from app.repositories import load_principal
-from app.targets_domain import business_days, preview_distribution
+from app.targets_domain import business_days, dynamic_plan, preview_distribution
 from app.targets_repository import TargetRepository
 
 
@@ -56,6 +57,26 @@ class TargetService:
         days = business_days(year, month, days_off)
         target = row.amount if row else None
         daily_base = preview_distribution(target, days)
+        first, last = month_bounds(year, month)
+        can_revenue = (
+            self.principal.is_superadmin or self.principal.profile == "administrator"
+            or can_access(self.principal, "sales.revenue.view", store_code)
+        )
+        sales_by_date = (
+            sales_by_date_for_store(self.repo.session, store_code, first, last)
+            if can_revenue else {}
+        )
+        monthly_revenue = sum(sales_by_date.values(), Decimal("0"))
+        has_sales = bool(sales_by_date)
+        minimum = settings.minimum_daily if settings else None
+        plan = (
+            dynamic_plan(target, days, sales_by_date, minimum)
+            if target is not None and has_sales else None
+        )
+        attainment = (
+            (monthly_revenue / target * 100).quantize(Decimal("0.1"))
+            if target and target > 0 and has_sales else None
+        )
         return {
             "store_code": store_code,
             "year": year,
@@ -73,10 +94,27 @@ class TargetService:
             "working_day_count": len(days),
             "base_plan": daily_base,
             "sales": {
-                "status": "awaiting_official_import",
-                "monthly_revenue": None,
-                "attainment_percent": None,
-                "dynamic_day_plan": None,
+                "status": "pilot_unverified" if has_sales else "awaiting_official_import",
+                "monthly_revenue": str(monthly_revenue) if has_sales else None,
+                "attainment_percent": str(attainment) if attainment is not None else None,
+                "dynamic_day_plan": (
+                    [
+                        {
+                            "date": item["date"],
+                            "daily_target": (
+                                str(item["daily_target"])
+                                if item["daily_target"] is not None else None
+                            ),
+                            "sales_before": str(item["sales_before"]),
+                        }
+                        for item in plan
+                    ]
+                    if plan else None
+                ),
+                "daily_sales": [
+                    {"date": day.isoformat(), "revenue": str(value)}
+                    for day, value in sorted(sales_by_date.items())
+                ],
             },
         }
 

@@ -15,6 +15,7 @@ def test_schema_has_expected_core_tables():
         "whatsapp_posts", "whatsapp_files", "training_documents", "whatsapp_days_off", "instagram_months", "training_records",
         "procedures", "procedure_stores", "procedure_versions", "procedure_files",
         "user_preferences",
+        "erp_import_batches", "erp_sale_rows", "erp_return_rows", "erp_source_files",
     }
 
 
