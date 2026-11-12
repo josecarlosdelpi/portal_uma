@@ -452,3 +452,4 @@
 .sales-foot-msg{font-size:11px;color:#187a58}
 @media(max-width:900px){.sales-foot-grid{grid-template-columns:1fr}.sales-foot-actions{align-items:flex-start}}
 @media(max-width:560px){.sales-mode-tabs{width:100%}.sales-mode-tabs .tab{flex:1}.sales-colors-body{right:auto;left:0}}
+.sales-top-secondary{display:block;font-size:10px;font-weight:400;color:#8a9aa2;text-align:right;margin-top:1px}

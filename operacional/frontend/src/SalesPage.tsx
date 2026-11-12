@@ -110,7 +110,10 @@ function DailyChart({days, colors}: {days: SalesDailyRow[]; colors: Record<strin
   </div>;
 }
 
-function TopList({items, metric}: {items: SalesTopItem[]; metric: "revenue" | "quantity"}) {
+function TopList({items, metric, secondary}: {
+  items: SalesTopItem[]; metric: "revenue" | "quantity";
+  secondary?: (item: SalesTopItem) => string;
+}) {
   const max = Math.max(...items.map(i => Number(metric === "revenue" ? i.revenue : i.quantity)), 1);
   return <div className="sales-top">
     {items.length === 0 && <p className="empty">Sem dados no período.</p>}
@@ -120,7 +123,10 @@ function TopList({items, metric}: {items: SalesTopItem[]; metric: "revenue" | "q
         <span className="sales-top-rank">{index + 1}</span>
         <span className="sales-top-name" title={item.key}>{item.key}</span>
         <span className="sales-top-bar"><i style={{width: (value / max * 100) + "%"}}/></span>
-        <span className="sales-top-value">{metric === "revenue" ? money(item.revenue) : qty(item.quantity)}</span>
+        <span className="sales-top-value">
+          {metric === "revenue" ? money(item.revenue) : qty(item.quantity)}
+          {secondary && <small className="sales-top-secondary">{secondary(item)}</small>}
+        </span>
       </div>;
     })}
   </div>;
@@ -370,7 +376,8 @@ export function SalesPage({token, profile}: Props) {
               <button className={metric === "quantity" ? "tab tab-sm active" : "tab tab-sm"}
                 onClick={() => toggleMetric("quantity")}>Quantidade</button>
             </div></div>
-          <TopList items={products} metric={metric}/>
+          <TopList items={products} metric={metric}
+            secondary={item => metric === "revenue" ? qty(item.quantity) : money(item.revenue)}/>
         </section>
         <section className="panel">
           <div className="panel-head"><div><h2>Vendedores</h2>
