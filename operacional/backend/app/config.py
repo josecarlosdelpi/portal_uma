@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     oidc_audience: str = ""
     oidc_jwks_url: str = ""
 
+    # Integracao ERP — pasta privada DadosUMA (Google Drive, somente leitura).
+    erp_sync_enabled: bool = False
+    erp_sync_interval_seconds: int = 600
+    google_drive_folder_id: str = ""
+    # Caminho para o JSON da conta de servico (fora do repositorio) ou JSON inline.
+    google_service_account_json: str = ""
+    erp_drive_vendas_name: str = "vendas.csv"
+    erp_drive_devolucoes_name: str = "devolucoes.csv"
+
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 

@@ -6,7 +6,7 @@ export type MyProfile = {
   display_name: string;
   profile: "superadmin" | "administrator" | "seller";
   stores: string[];
-  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean; checklist: boolean; daily_tasks: boolean; whatsapp_status: boolean; instagram: boolean; training: boolean };
+  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean; checklist: boolean; daily_tasks: boolean; whatsapp_status: boolean; instagram: boolean; training: boolean; sales: boolean };
 };
 
 export type PortalUser = {
@@ -62,6 +62,9 @@ export type UserPreferences = { sidebar_pinned: boolean; favorites: string[] };
 
 export type DailyBase = { date: string; weekday: number; base_daily_target: string | null };
 
+export type DynamicDayPlan = { date: string; daily_target: string | null; sales_before: string };
+export type DailySale = { date: string; revenue: string };
+
 export type TargetSnapshot = {
   store_code: string;
   year: number;
@@ -72,10 +75,11 @@ export type TargetSnapshot = {
   working_day_count: number;
   base_plan: DailyBase[];
   sales: {
-    status: "awaiting_official_import";
-    monthly_revenue: null;
-    attainment_percent: null;
-    dynamic_day_plan: null;
+    status: "awaiting_official_import" | "pilot_unverified";
+    monthly_revenue: string | null;
+    attainment_percent: string | null;
+    dynamic_day_plan: DynamicDayPlan[] | null;
+    daily_sales: DailySale[];
   };
 };
 
@@ -85,10 +89,10 @@ export type OverviewStore = {
   name: string;
   target: string | null;
   target_visibility: "allowed" | "restricted";
-  revenue: null;
-  attainment_percent: null;
-  previous_month_change_percent: null;
-  previous_year_change_percent: null;
+  revenue: string | null;
+  attainment_percent: string | null;
+  previous_month_change_percent: string | null;
+  previous_year_change_percent: string | null;
 };
 
 export type OverviewSnapshot = {
@@ -98,12 +102,12 @@ export type OverviewSnapshot = {
   stores: OverviewStore[];
   summary: {
     monthly_target: string | null;
-    revenue: null;
-    attainment_percent: null;
-    previous_month_change_percent: null;
-    previous_year_change_percent: null;
+    revenue: string | null;
+    attainment_percent: string | null;
+    previous_month_change_percent: string | null;
+    previous_year_change_percent: string | null;
   };
-  source: { sales_status: "awaiting_erp_integration"; sales_updated_at: null; message: string };
+  source: { sales_status: string; sales_updated_at: string | null; message: string };
 };
 
 export type ClosingPriority = {
@@ -127,15 +131,15 @@ export type ClosingDraft = {
 
 export type ClosingData = {
   stores: Array<{
-    code: string; name: string; target: string | null; revenue: null;
-    attainment_percent: null; change_percent: null;
+    code: string; name: string; target: string | null; revenue: string | null;
+    attainment_percent: string | null; change_percent: string | null;
   }>;
   total_target: string | null;
-  revenue: null;
-  attainment_percent: null;
-  previous_month_change_percent: null;
-  previous_year_change_percent: null;
-  source: {status: "awaiting_erp_integration"; sales_updated_at: null};
+  revenue: string | null;
+  attainment_percent: string | null;
+  previous_month_change_percent: string | null;
+  previous_year_change_percent: string | null;
+  source: {status: string; sales_updated_at: string | null};
 };
 
 export type ClosingSnapshot = {
@@ -161,6 +165,65 @@ export type ClosingArchiveRef = {
   id: string; version: number; state: string; created_at: string;
 };
 export type ClosingArchive = ClosingArchiveRef & {snapshot: ClosingSnapshot};
+
+// ---- Integracao ERP — Vendas e Devolucoes (piloto) ----
+
+export type SalesBatch = {
+  id: string; kind: "VENDAS" | "DEVOLUCOES"; source: "MANUAL_UPLOAD" | "DRIVE_SYNC";
+  status: "RECEIVED" | "APPLIED" | "DUPLICATE" | "FAILED";
+  file_name: string; rows_total: number; rows_applied: number; rows_rejected: number;
+  period_start: string | null; period_end: string | null;
+  error_summary: {errors: string[]; warnings: string[]} | null;
+  applied_at: string | null;
+};
+
+export type SalesSyncStatus = {
+  kinds: Array<{
+    kind: "VENDAS" | "DEVOLUCOES"; last_applied_at: string | null;
+    file_name: string | null; rows_applied: number;
+    period_start: string | null; period_end: string | null;
+  }>;
+  drive: {
+    enabled: boolean; interval_seconds: number;
+    files: Array<{
+      file_key: string; file_name: string | null;
+      last_check_at: string | null; last_sync_at: string | null;
+      remote_modified_at: string | null; last_status: string;
+      last_error: string | null; consecutive_failures: number;
+    }>;
+  };
+};
+
+export type SalesStoreSummary = {
+  code: string; revenue: string | null; revenue_visibility: "allowed" | "restricted";
+  quantity: string; rows: number;
+  returns_revenue: string | null; returns_quantity: string; returns_rows: number;
+};
+
+export type SalesSummary = {
+  from: string; to: string;
+  stores: SalesStoreSummary[];
+  totals: {
+    revenue: string; quantity: string; rows: number;
+    returns_revenue: string; returns_quantity: string; returns_rows: number;
+  };
+};
+
+export type SalesDailyRow = {
+  date: string; store_code: string;
+  revenue: string; quantity: string;
+  returns_revenue: string; returns_quantity: string;
+};
+
+export type SalesTopItem = {
+  key: string; customer_cnpj: string | null;
+  revenue: string; quantity: string; rows: number; stores: string[];
+};
+
+export type SalesTopResult = {
+  dimension: "products" | "sellers" | "customers";
+  from: string; to: string; items: SalesTopItem[];
+};
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -346,4 +409,51 @@ export const api = {
     request<ClosingArchive>(token, "/api/v1/monthly-closing/" + year + "/" + month +
       "/archives/" + encodeURIComponent(id)),
 
+  salesStatus: (token: string) =>
+    request<SalesSyncStatus>(token, "/api/v1/sales/status"),
+
+  salesImports: (token: string, limit = 30) =>
+    request<{items: SalesBatch[]}>(token, "/api/v1/sales/imports?limit=" + limit),
+
+  salesSummary: (token: string, from: string, to: string, store?: string) =>
+    request<SalesSummary>(token, "/api/v1/sales/summary?from=" + from + "&to=" + to +
+      (store ? "&store=" + encodeURIComponent(store) : "")),
+
+  salesDaily: (token: string, from: string, to: string, store?: string) =>
+    request<{from: string; to: string; days: SalesDailyRow[]}>(
+      token, "/api/v1/sales/daily?from=" + from + "&to=" + to +
+      (store ? "&store=" + encodeURIComponent(store) : "")),
+
+  salesTop: (token: string, dimension: "products" | "sellers" | "customers",
+             from: string, to: string, store?: string, limit = 10) =>
+    request<SalesTopResult>(token, "/api/v1/sales/top/" + dimension +
+      "?from=" + from + "&to=" + to + "&limit=" + limit +
+      (store ? "&store=" + encodeURIComponent(store) : "")),
+
+  triggerSalesSync: (token: string) =>
+    request<{results: Array<{file_key: string; status: string; last_error: string | null}>}>(
+      token, "/api/v1/sales/sync", "POST"),
+
 };
+
+export async function uploadSalesFile(
+  token: string, kind: "vendas" | "devolucoes", file: File,
+): Promise<{batch: SalesBatch}> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(baseUrl + "/api/v1/sales/imports/" + kind, {
+    method: "POST", mode: "cors", cache: "no-store",
+    headers: {Authorization: "Bearer " + token}, body: form,
+  });
+  if (!response.ok) {
+    let message = "Não foi possível importar o arquivo.";
+    try {
+      const detail = await response.json();
+      const first = detail?.detail?.batch?.error_summary?.errors?.[0];
+      if (typeof first === "string") message = first;
+      else if (typeof detail?.detail?.message === "string") message = detail.detail.message;
+    } catch { /* resposta sem corpo JSON */ }
+    throw new ApiError(response.status, message);
+  }
+  return response.json() as Promise<{batch: SalesBatch}>;
+}
