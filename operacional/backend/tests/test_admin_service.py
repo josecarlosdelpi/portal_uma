@@ -413,11 +413,89 @@ def test_preview_user_access_shows_grants_and_revocations(monkeypatch):
     monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
     service = AdminService(repo, repo.actor)
     preview = service.preview_user_access(repo.target.id, group_id=richer.id)
-    assert set(preview["granted"]) == {"targets.edit", "targets.view"}
-    assert preview["revoked"] == ["checklist.edit"]
+    granted = {(d["code"], tuple(d["stores"])) for d in preview["granted"]}
+    assert granted == {
+        ("targets.edit", ("JOINVILLE", "TUBARAO")),
+        ("targets.view", ("JOINVILLE", "TUBARAO")),
+        ("sales.view", ("TUBARAO",)),          # mesma permissao, loja acrescentada
+    }
+    assert preview["revoked"] == [{"code": "checklist.edit", "stores": ["JOINVILLE"]}]
     assert preview["before"]["checklist.edit"] == ["JOINVILLE"]
     assert preview["stores"] == ["JOINVILLE", "TUBARAO"]
     assert repo.commits == 0  # previa nunca persiste
+
+
+def test_preview_diff_is_per_permission_and_store(monkeypatch):
+    """sales.view de uma loja para as tres: a previa lista as lojas
+    acrescentadas, nao apenas o codigo ja existente."""
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"sales.view"}
+    wide = fake_group(stores=("JOINVILLE", "TUBARAO", "ITAJAI"), name="Amplo")
+    repo.groups[wide.id] = wide
+    repo.grant_sets[wide.id] = {"sales.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_user_access(repo.target.id, group_id=wide.id)
+    assert preview["granted"] == [
+        {"code": "sales.view", "stores": ["ITAJAI", "TUBARAO"]}]
+    assert preview["revoked"] == []
+
+
+def test_preview_same_group_with_scope_change(monkeypatch):
+    """Mesmo grupo, mudanca de lojas: a previa ainda mostra o impacto."""
+    repo = FakeAdminRepository()
+    repo.access_group.stores = {"JOINVILLE", "TUBARAO"}
+    repo.grant_sets[repo.access_group.id] = {"sales.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_user_access(
+        repo.target.id, group_id=repo.access_group.id,
+        store_codes=["JOINVILLE"])
+    assert preview["granted"] == []
+    assert preview["revoked"] == [
+        {"code": "sales.view", "stores": ["TUBARAO"]}]
+    assert preview["stores"] == ["JOINVILLE"]
+
+
+def test_group_change_with_fully_incompatible_scope_requires_explicit_choice():
+    """Restricao que nao existe no novo grupo nao vira 'herdar tudo'
+    silenciosamente: o backend exige definicao explicita."""
+    repo = FakeAdminRepository()
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    other = fake_group(stores=("TUBARAO",), name="So Tubarao")
+    repo.groups[other.id] = other
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.update_user_access(repo.target.id, group_id=other.id)
+    assert error.value.status_code == 422
+    assert "escopo" in error.value.message.lower()
+    assert repo.commits == 0
+    # Explicitamente vazio = decisao consciente de herdar toda a abrangencia
+    result = service.update_user_access(
+        repo.target.id, group_id=other.id, store_codes=[])
+    assert result["stores"] == ["TUBARAO"]
+    assert result["store_scope"] == []
+    # Ou explicitamente com uma loja do novo grupo
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    repo.membership[repo.target.id] = repo.access_group.id
+    result = service.update_user_access(
+        repo.target.id, group_id=other.id, store_codes=["TUBARAO"])
+    assert result["store_scope"] == ["TUBARAO"]
+
+
+def test_group_change_with_partially_compatible_scope_is_preserved():
+    """Se parte da restricao segue valida, ela e preservada sem exigir
+    redefinicao — o acesso nunca e ampliado."""
+    repo = FakeAdminRepository()
+    repo.access_group.stores = {"JOINVILLE", "ITAJAI"}
+    repo.scopes[repo.target.id] = {"JOINVILLE", "ITAJAI"}
+    narrower = fake_group(stores=("JOINVILLE",), name="Restrito")
+    repo.groups[narrower.id] = narrower
+    service = AdminService(repo, repo.actor)
+    result = service.update_user_access(repo.target.id, group_id=narrower.id)
+    # escopo preservado (inclusive a loja fora da nova abrangencia, que
+    # simplesmente nao tem efeito) — efetivo segue restrito a JOINVILLE
+    assert result["stores"] == ["JOINVILLE"]
 
 
 def test_preview_user_access_respects_scope_intersection(monkeypatch):
@@ -453,7 +531,11 @@ def test_preview_reassignment_reports_per_member_impact(monkeypatch):
     # que o grupo de destino nao cobre -> acesso efetivo cai para zero.
     assert member["stores_after"] == []
     assert member["stores_before"] == ["JOINVILLE"]
-    assert set(member["revoked"]) == {"sales.view", "checklist.edit"}
+    revoked = {(d["code"], tuple(d["stores"])) for d in member["revoked"]}
+    assert revoked == {
+        ("sales.view", ("JOINVILLE",)),
+        ("checklist.edit", ("JOINVILLE",)),
+    }
 
 
 def test_preview_reassignment_rejects_invalid_target():

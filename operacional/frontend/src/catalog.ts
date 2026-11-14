@@ -11,6 +11,8 @@ export type PermissionMeta = {
   name: string;
   kind: "view" | "edit" | "action";
   requiresAllStores?: boolean;
+  /** Regra especial exibida ao lado da permissao (ex.: efeito global). */
+  note?: string;
 };
 
 export type PermissionGroup = {
@@ -114,7 +116,8 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
     help: "Calendário de postagens da loja.",
     permissions: [
       { code: "whatsapp_status.view", name: "Ver status WhatsApp", kind: "view" },
-      { code: "whatsapp_status.edit", name: "Editar status WhatsApp", kind: "edit" },
+      { code: "whatsapp_status.edit", name: "Editar status WhatsApp", kind: "edit",
+        note: "Calendário global da UMA: a edição vale independentemente da loja pela qual a concessão foi feita." },
     ],
   },
   {

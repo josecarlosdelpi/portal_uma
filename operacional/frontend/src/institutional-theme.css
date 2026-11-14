@@ -234,6 +234,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  padding:8px 12px;border:1px solid #e7dfbc;border-radius:10px;background:#fffdf4;font-size:12px}
 .scope-checks input{accent-color:#d1aa00}
 .perm-kind{display:block;color:#8a7d52;font-size:10px;font-weight:600;margin-top:2px}
+.perm-note{display:block;color:#0b6474;font-size:10px;font-weight:500;margin-top:2px}
 .access-summary{border:1px solid #dec371;background:#fff6c9;border-radius:13px;
  padding:14px 16px;margin:14px 0}
 .access-summary h4{margin:0 0 8px;font-size:13px;color:#5d4f1f}

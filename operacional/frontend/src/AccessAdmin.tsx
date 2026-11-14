@@ -53,6 +53,7 @@ function PermissionMatrix({ selected, onToggle, disabled }: {
         <span>{permission.name}
           <small className="perm-kind">{kindLabel(permission.kind)}
             {permission.requiresAllStores ? " · exige as 3 lojas" : ""}</small>
+          {permission.note && <small className="perm-note">{permission.note}</small>}
         </span>
       </label>)}
     </div>)}
@@ -71,6 +72,9 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
   const [overrides, setOverrides] = useState<Record<string, boolean | null>>({});
   const [effective, setEffective] = useState<EffectivePermissions | null>(null);
   const [preview, setPreview] = useState<AccessPreview | null>(null);
+  const [previewStatus, setPreviewStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [inheritAll, setInheritAll] = useState(false);
   const [resetResult, setResetResult] = useState<LocalResetPassword | null>(null);
   const [showEffective, setShowEffective] = useState(false);
 
@@ -81,15 +85,22 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
     setOverrides(user.overrides);
     setEffective(null);
     setPreview(null);
+    setPreviewStatus("idle");
+    setInheritAll(false);
     setResetResult(null);
     setShowEffective(false);
   }, [user.id, user.profile, user.group?.id, user.store_scope, user.overrides]);
 
   const selectedGroup = groups.find((g) => g.id === groupId) ?? null;
   const groupStores = selectedGroup?.stores ?? [];
-  const accessDirty = profile !== user.profile ||
-    groupId !== (user.group?.id ?? "") ||
-    JSON.stringify([...scope].sort()) !== JSON.stringify([...user.store_scope].sort());
+  const groupChanged = groupId !== (user.group?.id ?? "");
+  const scopeChanged = JSON.stringify([...scope].sort()) !==
+    JSON.stringify([...user.store_scope].sort());
+  const accessDirty = profile !== user.profile || groupChanged || scopeChanged;
+  // Restricao individual que nao existe na nova abrangencia nunca vira
+  // "herdar tudo" por conta propria: exige definicao explicita.
+  const scopeConflict = groupChanged && user.store_scope.length > 0 &&
+    scope.length === 0;
 
   const loadEffective = () => {
     setShowEffective(true);
@@ -97,20 +108,31 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
       .then(setEffective).catch(() => setEffective(null));
   };
 
+  const refreshPreview = (gid: string, codes: string[]) => {
+    if (!gid) { setPreview(null); setPreviewStatus("idle"); return; }
+    setPreview(null);
+    setPreviewStatus("loading");
+    void api.previewUserAccess(token, user.id, {
+      group_id: gid, store_codes: [...codes].sort(),
+    }).then((result) => {
+      setPreview(result);
+      setPreviewStatus("ready");
+    }).catch(() => {
+      setPreview(null);
+      setPreviewStatus("error");
+    });
+  };
+
   // Ao trocar de grupo, preserva as restricoes ainda validas na nova
   // abrangencia — o acesso nunca e ampliado sem acao explicita. A previa
   // recebe exatamente o escopo que sera salvo, para nao divergir.
   const changeGroup = (id: string) => {
     setGroupId(id);
+    setInheritAll(false);
     const next = groups.find((g) => g.id === id);
     const filtered = scope.filter((s) => next?.stores.includes(s));
     setScope(filtered);
-    setPreview(null);
-    if (id && id !== (user.group?.id ?? "")) {
-      void api.previewUserAccess(token, user.id, {
-        group_id: id, store_codes: filtered,
-      }).then(setPreview).catch(() => setPreview(null));
-    }
+    refreshPreview(id, filtered);
   };
 
   const overrideOf = (code: string) =>
@@ -121,12 +143,16 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
     const nextScope = scope.includes(code)
       ? scope.filter((c) => c !== code) : [...scope, code];
     setScope(nextScope);
-    if (groupId && groupId !== (user.group?.id ?? "")) {
-      void api.previewUserAccess(token, user.id, {
-        group_id: groupId, store_codes: nextScope,
-      }).then(setPreview).catch(() => setPreview(null));
-    }
+    setInheritAll(false);
+    refreshPreview(groupId, nextScope);
   };
+
+  // Salvar so com a previa carregada quando grupo ou lojas mudam —
+  // falha ou ausencia de previa bloqueia a confirmacao.
+  const storeChangePending = (groupChanged || scopeChanged) &&
+    previewStatus !== "ready";
+  const saveBlocked = working || !accessDirty || !groupId ||
+    storeChangePending || (scopeConflict && !inheritAll);
 
   return <>
     <div className="panel-head"><div><h2>{user.display_name}</h2>
@@ -160,25 +186,54 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
         <p className="small-note">Sem seleção, o usuário herda toda a abrangência
           do grupo ({selectedGroup.stores.map(labelStore).join(", ")}).</p>
       </div>}
-      {preview && groupId !== (user.group?.id ?? "") && <div className="access-summary">
-        <h4>Impacto da transferência</h4>
-        <p className="small-note">Ao mover para <strong>{preview.group?.name}</strong>:
-          {preview.granted.length === 0 && preview.revoked.length === 0
-            ? " nenhuma permissão muda."
-            : <> {"+" + preview.granted.length + " concedida(s), −" +
-                preview.revoked.length + " revogada(s)."}</>}
-          {" "}Lojas efetivas: <strong>{preview.stores.map(labelStore).join(", ") || "nenhuma"}</strong>.</p>
-        {preview.revoked.length > 0 && <p className="small-note">
-          Perde: {preview.revoked.slice(0, 6).map(permissionName).join(", ")}
-          {preview.revoked.length > 6 ? "…" : ""}</p>}
+      {scopeConflict && <div className="access-summary">
+        <h4>Restrição individual incompatível</h4>
+        <p className="small-note">O usuário hoje está restrito a{" "}
+          {user.store_scope.map(labelStore).join(", ")}, que não faz parte da
+          abrangência do novo grupo. Escolha as lojas acima ou confirme
+          explicitamente a opção abaixo — nada é decidido automaticamente.</p>
+        <label className="check-line">
+          <input type="checkbox" checked={inheritAll} disabled={working}
+            onChange={(e) => { setInheritAll(e.target.checked);
+              if (e.target.checked) refreshPreview(groupId, []); }} />
+          <span>Herdar toda a abrangência do novo grupo
+            ({selectedGroup?.stores.map(labelStore).join(", ")})</span>
+        </label>
       </div>}
-      <button className="btn-primary" disabled={working || !accessDirty || !groupId}
+      {(groupChanged || scopeChanged) && <div className="access-summary">
+        <h4>Impacto da alteração de acesso</h4>
+        {previewStatus === "loading" &&
+          <p className="small-note">Calculando acesso efetivo…</p>}
+        {previewStatus === "error" && <p className="small-note">
+          Não foi possível calcular a prévia — revise os dados antes de salvar
+          (a confirmação fica bloqueada).</p>}
+        {previewStatus === "ready" && preview && <>
+          <p className="small-note">{groupChanged
+            ? <>Ao mover para <strong>{preview.group?.name}</strong>:</>
+            : "Com o novo escopo de lojas:"}
+            {preview.granted.length === 0 && preview.revoked.length === 0
+              ? " nenhum acesso muda."
+              : <> {"+" + preview.granted.length + " acesso(s) acrescentado(s), −" +
+                  preview.revoked.length + " removido(s)."}</>}
+            {" "}Lojas efetivas: <strong>{preview.stores.map(labelStore).join(", ") || "nenhuma"}</strong>.</p>
+          {preview.granted.length > 0 && <p className="small-note">
+            Ganha: {preview.granted.slice(0, 8).map((d) =>
+              permissionName(d.code) + " (" + d.stores.map(labelStore).join(", ") + ")"
+            ).join(", ")}{preview.granted.length > 8 ? "…" : ""}</p>}
+          {preview.revoked.length > 0 && <p className="small-note">
+            Perde: {preview.revoked.slice(0, 8).map((d) =>
+              permissionName(d.code) + " (" + d.stores.map(labelStore).join(", ") + ")"
+            ).join(", ")}{preview.revoked.length > 8 ? "…" : ""}</p>}
+        </>}
+      </div>}
+      <button className="btn-primary" disabled={saveBlocked}
         onClick={() => void update(() => api.updateUserAccess(token, user.id, {
           ...(profile !== user.profile ? { profile } : {}),
-          ...(groupId !== (user.group?.id ?? "") ? { group_id: groupId } : {}),
-          ...(JSON.stringify([...scope].sort()) !== JSON.stringify([...user.store_scope].sort())
-            ? { store_codes: [...scope].sort() } : {}),
+          ...(groupChanged ? { group_id: groupId } : {}),
+          ...(scopeChanged ? { store_codes: [...scope].sort() } : {}),
         }), "Acesso do usuário atualizado.")}>Salvar função, grupo e lojas</button>
+      {storeChangePending && previewStatus !== "error" &&
+        <p className="small-note">Aguarde a prévia de acesso para confirmar.</p>}
 
       <h3>Exceções individuais</h3>
       <p className="small-note">Herdar usa a configuração do grupo. Permitir concede
@@ -189,7 +244,9 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
           {section.permissions.map((permission) => <div className="permission-line"
             key={permission.code}>
             <div>{permission.name}
-              <small className="perm-kind">{kindLabel(permission.kind)}</small></div>
+              <small className="perm-kind">{kindLabel(permission.kind)}</small>
+              {permission.note && <small className="perm-note">{permission.note}</small>}
+            </div>
             <select aria-label={"Exceção: " + permission.name} disabled={working}
               value={overrideOf(permission.code)}
               onChange={(event) => setOverrides((previous) => ({
@@ -290,6 +347,8 @@ export function GroupEditor({ token, groups, working, update }: {
   const [dupName, setDupName] = useState("");
   const [reassign, setReassign] = useState("");
   const [reassignImpact, setReassignImpact] = useState<ReassignmentPreview | null>(null);
+  const [reassignStatus, setReassignStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
 
   const selected = groups.find((g) => g.id === selectedId) ?? null;
 
@@ -309,14 +368,21 @@ export function GroupEditor({ token, groups, working, update }: {
     setDupName("");
     setReassign("");
     setReassignImpact(null);
+    setReassignStatus("idle");
   };
 
   const chooseReassign = (id: string) => {
     setReassign(id);
     setReassignImpact(null);
     if (id && selectedId) {
+      setReassignStatus("loading");
       void api.reassignmentPreview(token, selectedId, id)
-        .then(setReassignImpact).catch(() => setReassignImpact(null));
+        .then((result) => {
+          setReassignImpact(result);
+          setReassignStatus("ready");
+        }).catch(() => setReassignStatus("error"));
+    } else {
+      setReassignStatus("idle");
     }
   };
 
@@ -446,17 +512,31 @@ export function GroupEditor({ token, groups, working, update }: {
             {groups.filter((g) => g.id !== selected.id && g.active)
               .map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select></div>}
-        {reassignImpact && reassignImpact.member_count > 0 && <div className="access-summary">
+        {selected.member_count > 0 && reassign && <div className="access-summary">
           <h4>Impacto da reatribuição</h4>
-          {reassignImpact.members.map((member) => <p key={member.user_id}
-            className="small-note"><strong>{member.display_name}</strong>:
-            {member.granted.length === 0 && member.revoked.length === 0
-              ? " sem mudança de permissões"
-              : " +" + member.granted.length + " / −" + member.revoked.length + " permissão(ões)"}
-            {" · lojas: " + (member.stores_after.map(labelStore).join(", ") || "nenhuma")}</p>)}
+          {reassignStatus === "loading" &&
+            <p className="small-note">Calculando o acesso de cada usuário…</p>}
+          {reassignStatus === "error" && <p className="small-note">
+            Não foi possível calcular o impacto — a exclusão fica bloqueada
+            até a prévia carregar.</p>}
+          {reassignStatus === "ready" && reassignImpact &&
+            reassignImpact.members.map((member) => <p key={member.user_id}
+              className="small-note"><strong>{member.display_name}</strong>:
+              {member.granted.length === 0 && member.revoked.length === 0
+                ? " sem mudança de acesso"
+                : " +" + member.granted.length + " / −" + member.revoked.length + " acesso(s)"}
+              {" · lojas: " + (member.stores_after.map(labelStore).join(", ") || "nenhuma")}
+              {member.granted.length + member.revoked.length > 0 &&
+                <><br />{"Δ " + [...member.granted.map((d) => "+" + permissionName(d.code) +
+                  " (" + d.stores.map(labelStore).join(",") + ")"),
+                  ...member.revoked.map((d) => "−" + permissionName(d.code) +
+                  " (" + d.stores.map(labelStore).join(",") + ")"),
+                  ].slice(0, 6).join(", ")}</>}
+            </p>)}
         </div>}
         <button className="btn-secondary local-delete-action" disabled={working ||
-          (selected.member_count > 0 && !reassign)}
+          (selected.member_count > 0 &&
+            (!reassign || reassignStatus !== "ready"))}
           onClick={() => {
             if (!window.confirm(
               "Excluir o grupo " + selected.name + "?" +

@@ -260,6 +260,51 @@ def test_legacy_store_code_rejected_when_store_has_multiple_groups(env):
     assert explicit.json()["group"]["name"] == "Vendedores JOINVILLE"
 
 
+def test_transfer_with_incompatible_scope_requires_explicit_choice(env):
+    """Vendedor restrito a JOINVILLE transferido para grupo so de TUBARAO:
+    omitir o escopo nao pode virar 'herdar tudo' — a API exige definicao."""
+    client, *_ = env
+    seller = create_seller(client, "restrito")
+    gid_joi = group_id_for(client, "JOINVILLE")
+    # restricao individual explicita a JOINVILLE
+    scoped = client.put(f"/api/v1/admin/users/{seller['id']}/access", json={
+        "store_codes": ["JOINVILLE"]})
+    assert scoped.status_code == 200, scoped.text
+    assert scoped.json()["store_scope"] == ["JOINVILLE"]
+    # grupo novo so de Tubarao
+    tub_group = client.post("/api/v1/admin/groups", json={
+        "name": "Estoque Tubarao", "description": "",
+        "store_codes": ["TUBARAO"], "permissions": ["supplies.view"]})
+    assert tub_group.status_code == 201, tub_group.text
+    gid_tub = tub_group.json()["id"]
+    # transferencia sem escopo explicito -> 422 (nunca herda tudo sozinho)
+    rejected = client.put(f"/api/v1/admin/users/{seller['id']}/access", json={
+        "group_id": gid_tub})
+    assert rejected.status_code == 422, rejected.text
+    # escopo explicito decide conscientemente
+    accepted = client.put(f"/api/v1/admin/users/{seller['id']}/access", json={
+        "group_id": gid_tub, "store_codes": ["TUBARAO"]})
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["stores"] == ["TUBARAO"]
+
+
+def test_access_preview_endpoint_shows_store_level_diff(env):
+    """A previa de acesso compara permissao + loja: ampliar a abrangencia
+    lista as lojas acrescentadas em cada permissao."""
+    client, *_ = env
+    seller = create_seller(client, "preview")
+    wide = client.post("/api/v1/admin/groups", json={
+        "name": "Amplo", "description": "",
+        "store_codes": ["JOINVILLE", "TUBARAO"], "permissions": ["sales.view"]})
+    assert wide.status_code == 201, wide.text
+    response = client.post(
+        f"/api/v1/admin/users/{seller['id']}/access-preview", json={
+            "group_id": wide.json()["id"]})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert {"code": "sales.view", "stores": ["TUBARAO"]} in body["granted"]
+
+
 def test_legacy_store_code_still_works_with_single_covering_group(env):
     """Fluxo legado preservado quando so um grupo ativo cobre a loja."""
     client, *_ = env

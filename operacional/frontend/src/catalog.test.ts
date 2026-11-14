@@ -23,6 +23,13 @@ describe("catalogo de permissoes", () => {
     expect(closing?.permissions.every((p) => p.requiresAllStores)).toBe(true);
   });
 
+  it("whatsapp_status.edit declara o efeito global da concessao", () => {
+    const whatsapp = permissionGroups
+      .find((g) => g.module === "whatsapp_status")
+      ?.permissions.find((p) => p.code === "whatsapp_status.edit");
+    expect(whatsapp?.note).toMatch(/global da UMA/i);
+  });
+
   it("tem somente as tres lojas existentes", () => {
     expect(Object.keys(stores).sort()).toEqual(["ITAJAI", "JOINVILLE", "TUBARAO"]);
   });

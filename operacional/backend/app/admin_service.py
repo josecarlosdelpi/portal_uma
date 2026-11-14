@@ -221,6 +221,21 @@ class AdminService:
                     result[code] = stores
         return result
 
+    @staticmethod
+    def _access_diff(before: dict[str, list[str]],
+                     after: dict[str, list[str]]) -> tuple[list[dict], list[dict]]:
+        """Diferenca por permissao E loja: sales.view que passa de uma loja
+        para as tres aparece como concessao nas lojas acrescentadas."""
+        granted, revoked = [], []
+        for code in sorted(set(before) | set(after)):
+            gained = sorted(set(after.get(code, ())) - set(before.get(code, ())))
+            lost = sorted(set(before.get(code, ())) - set(after.get(code, ())))
+            if gained:
+                granted.append({"code": code, "stores": gained})
+            if lost:
+                revoked.append({"code": code, "stores": lost})
+        return granted, revoked
+
     def _simulated(self, user, group: AccessGroup,
                    scope_rows: set[str]) -> tuple[Principal, list[str]]:
         """Principal hipotetico: grupo alvo + escopo individual indicado."""
@@ -250,13 +265,13 @@ class AdminService:
         before = self._permission_map(load_principal(self.repo.db, user))
         simulated, stores = self._simulated(user, group, scope)
         after = self._permission_map(simulated)
+        granted, revoked = self._access_diff(before, after)
         return {
             "user_id": str(user_id),
             "group": {"id": str(group.id), "name": group.name},
             "stores": stores, "store_scope": sorted(scope),
             "before": before, "after": after,
-            "granted": sorted(set(after) - set(before)),
-            "revoked": sorted(set(before) - set(after)),
+            "granted": granted, "revoked": revoked,
         }
 
     def preview_reassignment(self, group_id: UUID, reassign_to: UUID) -> dict:
@@ -275,13 +290,13 @@ class AdminService:
             before = self._permission_map(load_principal(self.repo.db, member))
             simulated, stores = self._simulated(member, target, scope)
             after = self._permission_map(simulated)
+            granted, revoked = self._access_diff(before, after)
             members.append({
                 "user_id": str(member.id),
                 "display_name": member.display_name,
                 "stores_before": self.repo.user_stores(member.id),
                 "stores_after": stores,
-                "granted": sorted(set(after) - set(before)),
-                "revoked": sorted(set(before) - set(after)),
+                "granted": granted, "revoked": revoked,
             })
         return {
             "group": {"id": str(group.id), "name": group.name},
@@ -553,6 +568,21 @@ class AdminService:
         # atualizacao parcial nunca amplia o acesso do usuario. Lista vazia
         # enviada explicitamente = herdar toda a abrangencia do grupo.
         scope = self._valid_scope(group, store_codes) if store_codes is not None else None
+        if scope is None and group_id is not None:
+            # Troca de grupo com restricao individual TOTALMENTE incompativel:
+            # preservar as linhas deixaria o usuario sem nenhuma loja, e limpa-
+            # las equivaleria a "herdar tudo" sem pedido explicito. Exige-se a
+            # definicao consciente do novo escopo (lista, mesmo vazia).
+            current = self.repo.group_of(user_id)
+            existing_scope = set(self.repo.user_scope(user_id))
+            if (current is not None and current.id != group.id and existing_scope
+                    and not (existing_scope & set(self.repo.group_stores(group.id)))):
+                raise AdminError(
+                    422,
+                    "A restricao individual do usuario nao existe na abrangencia "
+                    "do novo grupo. Defina o escopo explicitamente "
+                    "(store_codes, mesmo vazio para herdar toda a abrangencia).",
+                )
 
         previous = {
             "profile": user.profile,

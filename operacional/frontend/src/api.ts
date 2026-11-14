@@ -84,6 +84,8 @@ export type EffectivePermissions = {
   }>;
 };
 
+export type AccessDiffEntry = { code: string; stores: string[] };
+
 export type AccessPreview = {
   user_id: string;
   group: { id: string; name: string } | null;
@@ -91,8 +93,8 @@ export type AccessPreview = {
   store_scope: string[];
   before: Record<string, string[]>;
   after: Record<string, string[]>;
-  granted: string[];
-  revoked: string[];
+  granted: AccessDiffEntry[];
+  revoked: AccessDiffEntry[];
 };
 
 export type ReassignmentPreview = {
@@ -104,8 +106,8 @@ export type ReassignmentPreview = {
     display_name: string;
     stores_before: string[];
     stores_after: string[];
-    granted: string[];
-    revoked: string[];
+    granted: AccessDiffEntry[];
+    revoked: AccessDiffEntry[];
   }>;
 };
 
