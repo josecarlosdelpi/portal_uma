@@ -59,15 +59,13 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
     result = []
     for code in stores:
         # Permissao do modulo nao autoriza automaticamente os indicadores.
-        is_manager = principal.profile == "administrator" or principal.is_superadmin
         can_target = (
-            is_manager
-            or can_access(principal, "sales.target.view", code)
+            can_access(principal, "sales.target.view", code)
             or can_access(principal, "targets.view", code)
         )
-        can_revenue = is_manager or can_access(principal, "sales.revenue.view", code)
-        can_attainment = is_manager or can_access(principal, "sales.attainment.view", code)
-        can_previous = is_manager or can_access(principal, "sales.previous_month.view", code)
+        can_revenue = can_access(principal, "sales.revenue.view", code)
+        can_attainment = can_access(principal, "sales.attainment.view", code)
+        can_previous = can_access(principal, "sales.previous_month.view", code)
         store_revenue = revenue.get(code, {}).get("revenue") if can_revenue else None
         target = Decimal(amounts[code]) if can_target and amounts[code] is not None else None
         attainment = (
@@ -91,7 +89,9 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
             "previous_month_change_percent": str(change) if change is not None else None,
             "previous_year_change_percent": None,
         })
-    full_consolidation = (principal.is_superadmin or principal.profile == "administrator") and set(stores) == STORE_CODES
+    # Consolidado somente quando o usuario esta autorizado nas tres lojas;
+    # cada indicador continua exigindo sua propria concessao.
+    full_consolidation = set(stores) == STORE_CODES
     all_targets = all(x["target_visibility"] == "allowed" and x["target"] is not None for x in result)
     goal = (
         str(sum((Decimal(x["target"]) for x in result), start=Decimal("0.00")))

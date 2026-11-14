@@ -23,7 +23,7 @@ from app.finance_routes import router as finance_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
-from app.models import User
+from app.models import AccessGroup, GroupMembership, User
 from app.policy import can_access, visible_stores
 from app.repositories import load_principal
 
@@ -74,10 +74,18 @@ def health() -> dict[str, str]:
 @app.get("/api/v1/me", tags=["identity"])
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     principal = load_principal(db, user)
+    from sqlalchemy import select
+    group = db.scalar(
+        select(AccessGroup)
+        .join(GroupMembership, GroupMembership.group_id == AccessGroup.id)
+        .where(GroupMembership.user_id == user.id, AccessGroup.active.is_(True))
+        .order_by(AccessGroup.name).limit(1)
+    )
     return {
         "id": str(user.id),
         "display_name": user.display_name,
         "profile": "superadmin" if principal.is_superadmin else principal.profile,
+        "group": group.name if group is not None else None,
         "stores": sorted(visible_stores(principal)),
         "features": {
             "targets": any(can_access(principal, "targets.view", store) for store in visible_stores(principal)),
@@ -94,10 +102,7 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
             "finance": any(
                 can_access(principal, "finance.view", s) for s in visible_stores(principal)
             ),
-            "monthly_closing": (
-                (principal.is_superadmin or principal.profile == "administrator")
-                and can_access(principal, "monthly_closing.view")
-            ),
+            "monthly_closing": can_access(principal, "monthly_closing.view"),
         },
     }
 

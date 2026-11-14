@@ -10,7 +10,8 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import Base,Store,User,GroupMembership,GroupPermission,StoreGroup,AuditEvent,Procedure,TrainingRecord
+from app.models import AccessGroup,AccessGroupStore,Base,Store,User,AuditEvent,Procedure,TrainingRecord
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -28,11 +29,10 @@ def env():
         tub=User(id=uuid4(),auth_subject="more-tub",display_name="Vendedor Tub",
                  profile="seller",is_superadmin=False,active=True)
         db.add_all([admin,joi,tub]);db.flush()
-        group=StoreGroup(id=uuid4(),store_code="JOINVILLE",name="Joinville",active=True)
-        db.add(group);db.flush()
-        db.add(GroupMembership(user_id=joi.id,group_id=group.id))
-        for permission in ["checklist.view","whatsapp_status.view","instagram.view","training.view"]:
-            db.add(GroupPermission(group_id=group.id,code=permission,granted=True))
+        seed_admin_access(db, admin)
+        seed_group(db,"Vendedores Joinville",["JOINVILLE"],
+                   ["checklist.view","whatsapp_status.view","instagram.view","training.view"],
+                   [joi])
         db.commit()
     actor={"user":admin}
     def user_override():return actor["user"]
@@ -150,6 +150,45 @@ def test_whatsapp_plan_can_be_removed_before_day_off_with_audit(env):
     with Session(engine) as db:
         changes=[x.action for x in db.scalars(select(AuditEvent))]
         assert "whatsapp.plan.deleted" in changes
+
+
+def test_whatsapp_global_edit_uses_any_store_grant_not_joinville(env):
+    """O calendario de WhatsApp e global da UMA: a edicao vale com
+    whatsapp_status.edit efetivo em QUALQUER loja autorizada. Uma concessao
+    restrita a TUBARAO nao pode depender de abrangencia em JOINVILLE."""
+    c,actor,engine,_,seller,tub=env
+    with Session(engine) as db:
+        seed_group(db,"Marketing Tubarao",["TUBARAO"],
+                   ["whatsapp_status.view","whatsapp_status.edit"],[tub])
+        db.commit()
+    route="/api/v1/routines/whatsapp/2026-10-20"
+    actor["user"]=tub
+    # tub so tem concessao em TUBARAO — e edita o calendario global
+    assert c.put(route,json={
+        "product_code":"Global Tub","status":"planejado","expected_revision":0
+    }).status_code==200
+    # usuario so com visualizacao nao edita
+    actor["user"]=seller
+    assert c.put("/api/v1/routines/whatsapp/2026-10-21",json={
+        "product_code":"Nao pode","status":"planejado","expected_revision":0
+    }).status_code==403
+    # consulta do mes permanece autorizada nas duas contas
+    assert c.get("/api/v1/routines/whatsapp/2026/10").status_code==200
+    actor["user"]=tub
+    assert c.get("/api/v1/routines/whatsapp/2026/10").status_code==200
+    actor["user"]=env[3]
+
+
+def test_whatsapp_edit_denied_without_any_grant(env):
+    """Sem nenhuma concessao de whatsapp_status.edit, a edicao global e 403."""
+    c,actor,engine,_,_,tub=env
+    actor["user"]=tub  # tub nao tem grupo neste fixture
+    assert c.put("/api/v1/routines/whatsapp/2026-10-20",json={
+        "product_code":"Sem permissao","status":"planejado","expected_revision":0
+    }).status_code==403
+    assert c.put("/api/v1/routines/whatsapp/2026-10-20/day-off",json={
+        "off":True,"reason":"x"}).status_code==403
+    actor["user"]=env[3]
 
 
 def test_instagram_is_manual_and_store_bound(env):
@@ -443,11 +482,11 @@ def test_trainings_multi_store_and_filters(env):
     """Endpoint consolidado cruza lojas, colaboradores, procedimentos e datas."""
     c, actor, engine, admin, seller, other = env
     actor["user"] = admin
+    # um grupo principal por usuario: ampliar a abrangencia do grupo atual
     with Session(engine) as db:
+        grp = db.scalar(select(AccessGroup).where(AccessGroup.name == "Vendedores Joinville"))
         for code in ("TUBARAO", "ITAJAI"):
-            grp = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
-            db.add(grp); db.flush()
-            db.add(GroupMembership(user_id=seller.id, group_id=grp.id))
+            db.add(AccessGroupStore(group_id=grp.id, store_code=code))
         db.commit()
     for store, day in [("JOINVILLE", "2026-10-20T09:00:00"),
                        ("TUBARAO", "2026-10-22T09:00:00"),

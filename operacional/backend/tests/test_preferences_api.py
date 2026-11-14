@@ -10,8 +10,9 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    Base, GroupMembership, GroupPermission, Store, StoreGroup, User,
+    AccessGroup, Base, GroupPermission, Store, User,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -26,10 +27,8 @@ def env():
         joi = User(id=uuid4(), auth_subject="pref-joi", display_name="Vendedora Joi",
                    profile="seller", is_superadmin=False, active=True)
         db.add_all([admin, joi]); db.flush()
-        group = StoreGroup(id=uuid4(), store_code="JOINVILLE", name="Joinville", active=True)
-        db.add(group); db.flush()
-        db.add(GroupMembership(user_id=joi.id, group_id=group.id))
-        db.add(GroupPermission(group_id=group.id, code="training.view", granted=True))
+        seed_admin_access(db, admin)
+        seed_group(db, "Vendedores Joinville", ["JOINVILLE"], ["training.view"], [joi])
         db.commit()
     actor = {"user": admin}
     def user_override(): return actor["user"]
@@ -101,7 +100,8 @@ def test_hidden_favorites_survive_later_saves(env):
     c.put("/api/v1/me/preferences", json={
         "sidebar_pinned": False, "favorites": []})
     with Session(engine) as db:
-        gid = db.scalars(select(StoreGroup.id).where(StoreGroup.store_code == "JOINVILLE")).first()
+        gid = db.scalar(select(AccessGroup.id).where(
+            AccessGroup.name == "Vendedores Joinville"))
         db.add(GroupPermission(group_id=gid, code="training.view", granted=True)); db.commit()
     again = c.get("/api/v1/me/preferences").json()
     assert again["favorites"] == ["training"]  # restaurado
@@ -113,7 +113,8 @@ def test_middle_favorite_keeps_position(env):
     c, actor, engine, admin, joi = env
     actor["user"] = joi
     with Session(engine) as db:
-        gid = db.scalars(select(StoreGroup.id).where(StoreGroup.store_code == "JOINVILLE")).first()
+        gid = db.scalar(select(AccessGroup.id).where(
+            AccessGroup.name == "Vendedores Joinville"))
         for code in ("targets.view", "reviews.view"):
             db.add(GroupPermission(group_id=gid, code=code, granted=True))
         db.commit()
@@ -192,7 +193,8 @@ def test_sales_module_can_be_favorited(env):
     assert r.json()["favorites"] == []
     # Com a permissao: favorita, desfavorita e persiste como os demais modulos.
     with Session(engine) as db:
-        group = db.scalar(select(StoreGroup).where(StoreGroup.store_code == "JOINVILLE"))
+        group = db.scalar(select(AccessGroup).where(
+            AccessGroup.name == "Vendedores Joinville"))
         db.add(GroupPermission(group_id=group.id, code="sales.view", granted=True))
         db.commit()
     r = c.put("/api/v1/me/preferences", json={
