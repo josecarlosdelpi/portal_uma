@@ -77,12 +77,20 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
     useState<"idle" | "loading" | "ready" | "error">("idle");
   const [inheritAll, setInheritAll] = useState(false);
   const [resetResult, setResetResult] = useState<LocalResetPassword | null>(null);
+  const [resetError, setResetError] = useState("");
   const [showEffective, setShowEffective] = useState(false);
   // So a previa correspondente a selecao ATUAL pode habilitar a
   // confirmacao — respostas antigas em voo sao descartadas.
   const previewGate = useRef(new LatestRequest<AccessPreview>());
+  // O refresh da lista recria user.store_scope/overrides com novas
+  // referencias e dispara este efeito — mas a senha provisoria recem-
+  // gerada NAO pode ser apagada: so some ao trocar de usuario ou
+  // clicar em "Ocultar senha".
+  const lastUserId = useRef(user.id);
 
   useEffect(() => {
+    const switchingUser = lastUserId.current !== user.id;
+    lastUserId.current = user.id;
     previewGate.current.invalidate();
     setProfile(user.profile);
     setGroupId(user.group?.id ?? "");
@@ -92,8 +100,11 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
     setPreview(null);
     setPreviewStatus("idle");
     setInheritAll(false);
-    setResetResult(null);
     setShowEffective(false);
+    if (switchingUser) {
+      setResetResult(null);
+      setResetError("");
+    }
   }, [user.id, user.profile, user.group?.id, user.store_scope, user.overrides]);
 
   const selectedGroup = groups.find((g) => g.id === groupId) ?? null;
@@ -288,10 +299,22 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
 
       <div className="local-account-actions">
         {user.username && <button className="btn-secondary" disabled={working}
-          onClick={() => void update(async () => {
-            setResetResult(await api.resetLocalPassword(token, user.id));
-          }, "Nova senha provisória gerada. Entregue somente ao colaborador.")}>
+          onClick={() => {
+            setResetError("");
+            void update(async () => {
+              try {
+                setResetResult(await api.resetLocalPassword(token, user.id));
+              } catch (problem) {
+                setResetResult(null);
+                setResetError(problem instanceof Error
+                  ? problem.message
+                  : "Não foi possível gerar a senha provisória.");
+                throw problem;
+              }
+            }, "Nova senha provisória gerada. Entregue somente ao colaborador.");
+          }}>
           Gerar nova senha provisória</button>}
+        {resetError && <p className="notice notice-error" role="alert">{resetError}</p>}
         <button className="btn-secondary local-delete-action" disabled={working}
           onClick={() => {
             if (!window.confirm(
