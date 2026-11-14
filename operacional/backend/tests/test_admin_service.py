@@ -549,3 +549,134 @@ def test_preview_reassignment_rejects_invalid_target():
     with pytest.raises(AdminError) as error:
         service.preview_reassignment(repo.access_group.id, inactive.id)
     assert error.value.status_code == 422
+
+
+def test_legacy_resolution_rejects_single_multistore_group():
+    """Unico grupo cobrindo a loja, mas de abrangencia ampla (ex.:
+    Administradores): a associacao legada nao e comprovadamente segura
+    para um vendedor — exige group_id explicito."""
+    repo = FakeAdminRepository()
+    repo.access_group.stores = {"JOINVILLE", "ITAJAI", "TUBARAO"}
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.add_user(subject="novo", name="Novo", profile="seller",
+                         store_code="JOINVILLE")
+    assert error.value.status_code == 422
+    assert repo.commits == 0
+
+
+def test_legacy_resolution_rejects_single_group_with_write_grants():
+    """Grupo exclusivo da loja mas com concessoes de escrita: nao e o
+    perfil legado de vendedor — exige escolha explicita."""
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"sales.view", "checklist.edit"}
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.add_user(subject="novo", name="Novo", profile="seller",
+                         store_code="JOINVILLE")
+    assert error.value.status_code == 422
+    assert repo.commits == 0
+
+
+def test_legacy_resolution_rejects_single_finance_group():
+    """finance.view e 'view', mas um grupo Financeiro jamais e resolvido
+    implicitamente para um vendedor."""
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"finance.view"}
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.add_user(subject="novo", name="Novo", profile="seller",
+                         store_code="JOINVILLE")
+    assert error.value.status_code == 422
+    assert repo.commits == 0
+
+
+def test_legacy_resolution_accepts_single_store_view_only_group():
+    """Associacao comprovadamente segura: grupo exclusivo da loja com
+    concessoes somente de consulta operacional."""
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"sales.view", "checklist.view"}
+    service = AdminService(repo, repo.actor)
+    result = service.add_user(subject="novo", name="Novo", profile="seller",
+                              store_code="JOINVILLE")
+    assert result["group"]["id"] == str(repo.access_group.id)
+
+
+# ---------- previa de edicao de grupo com membros ----------
+
+
+def test_preview_group_update_marks_widening(monkeypatch):
+    """Ampliar a abrangencia do grupo: cada membro ganha os acessos por
+    loja, e a previa sinaliza widens=True para confirmacao explicita."""
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"sales.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_group_update(
+        repo.access_group.id, name="Vendedores Joinville", description="",
+        store_codes=["JOINVILLE", "TUBARAO"], permissions=["sales.view"])
+    assert preview["widens"] is True
+    assert preview["member_count"] == 1
+    member = preview["members"][0]
+    assert member["granted"] == [
+        {"code": "sales.view", "stores": ["TUBARAO"]}]
+    assert member["revoked"] == []
+    assert member["stores_after"] == ["JOINVILLE", "TUBARAO"]
+    assert repo.commits == 0  # previa nunca persiste
+
+
+def test_preview_group_update_shows_revocations_only(monkeypatch):
+    """Reduzir o grupo nao e ampliacao: widens=False e a lista de
+    revogacoes por permissao+loja aparece por membro."""
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"sales.view", "checklist.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_group_update(
+        repo.access_group.id, name="Vendedores Joinville", description="",
+        store_codes=["JOINVILLE"], permissions=["sales.view"])
+    assert preview["widens"] is False
+    member = preview["members"][0]
+    assert member["granted"] == []
+    assert member["revoked"] == [
+        {"code": "checklist.view", "stores": ["JOINVILLE"]}]
+
+
+def test_preview_group_update_respects_member_scope(monkeypatch):
+    """Membro com restricao individual nao ganha lojas fora do escopo,
+    mesmo que a abrangencia do grupo seja ampliada."""
+    repo = FakeAdminRepository()
+    repo.access_group.stores = {"JOINVILLE", "TUBARAO"}
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    repo.grant_sets[repo.access_group.id] = {"sales.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_group_update(
+        repo.access_group.id, name="Vendedores Joinville", description="",
+        store_codes=["JOINVILLE", "TUBARAO", "ITAJAI"],
+        permissions=["sales.view"])
+    assert preview["widens"] is False
+    member = preview["members"][0]
+    assert member["stores_after"] == ["JOINVILLE"]
+    assert member["granted"] == [] and member["revoked"] == []
+
+
+def test_preview_group_update_rejects_invalid_payload():
+    repo = FakeAdminRepository()
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.preview_group_update(
+            repo.access_group.id, name="X", description="",
+            store_codes=["JOINVILLE"], permissions=[])
+    assert error.value.status_code == 422
+    with pytest.raises(AdminError) as error:
+        service.preview_group_update(
+            repo.access_group.id, name="Vendedores", description="",
+            store_codes=["JOINVILLE"], permissions=["finance.import"])
+    assert error.value.status_code == 422
+    with pytest.raises(AdminError) as error:
+        service.preview_group_update(
+            repo.access_group.id, name="Vendedores", description="",
+            store_codes=[], permissions=["sales.view"])
+    assert error.value.status_code == 422
+    assert repo.commits == 0

@@ -315,6 +315,58 @@ def test_legacy_store_code_still_works_with_single_covering_group(env):
     assert response.json()["group"]["name"] == "Vendedores TUBARAO"
 
 
+def test_legacy_store_code_rejected_when_single_group_is_unsafe(env):
+    """Unico grupo ativo da loja, porem de abrangencia ampla
+    (Administradores): um grupo assim nunca e atribuido implicitamente
+    a um vendedor — a API exige group_id explicito."""
+    client, _, engine, _, _, _ = env
+    with Session(engine) as db:
+        seed_group(db, "Administradores", ["JOINVILLE", "TUBARAO", "ITAJAI"],
+                   ["sales.view"], [])
+        db.commit()
+    tub = next(g for g in client.get("/api/v1/admin/groups").json()
+               if g["name"] == "Vendedores TUBARAO")
+    off = client.patch(f"/api/v1/admin/groups/{tub['id']}/active",
+                       json={"active": False})
+    assert off.status_code == 200, off.text
+    # Administradores e o unico grupo ativo cobrindo TUBARAO
+    response = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-inseguro", "display_name": "Inseguro",
+        "profile": "seller", "store_code": "TUBARAO"})
+    assert response.status_code == 422, response.text
+    # E cadastro com group_id explicito contina funcionando
+    adm = next(g for g in client.get("/api/v1/admin/groups").json()
+               if g["name"] == "Administradores")
+    explicit = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-inseguro", "display_name": "Inseguro",
+        "profile": "seller", "group_id": adm["id"]})
+    assert explicit.status_code in (200, 201), explicit.text
+
+
+def test_group_update_preview_endpoint_reports_member_impact(env):
+    """A previa de edicao de grupo sinaliza ampliacao e detalha por
+    usuario e loja — sem persistir nada."""
+    client, *_ = env
+    seller = create_seller(client, "impacto")
+    gid = group_id_for(client, "JOINVILLE")
+    response = client.post(
+        f"/api/v1/admin/groups/{gid}/update-preview", json={
+            "name": "Vendedores JOINVILLE", "description": "",
+            "store_codes": ["JOINVILLE", "TUBARAO"],
+            "permissions": ["sales.view", "checklist.view"]})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["widens"] is True
+    member = next(m for m in body["members"] if m["user_id"] == seller["id"])
+    assert {"code": "sales.view", "stores": ["TUBARAO"]} in member["granted"]
+    assert {"code": "checklist.view", "stores": ["JOINVILLE", "TUBARAO"]} \
+        in member["granted"]
+    # o grupo segue intacto ate a confirmacao
+    saved = next(g for g in client.get("/api/v1/admin/groups").json()
+                 if g["id"] == gid)
+    assert saved["stores"] == ["JOINVILLE"]
+
+
 def test_login_wrong_password_then_lock_until_cooldown(env):
     client,*_=env
     row=create_seller(client)

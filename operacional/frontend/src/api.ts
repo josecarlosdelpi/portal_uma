@@ -111,6 +111,14 @@ export type ReassignmentPreview = {
   }>;
 };
 
+export type GroupUpdatePreview = {
+  group: { id: string; name: string };
+  proposed: { stores: string[]; permissions: string[] };
+  member_count: number;
+  widens: boolean;
+  members: ReassignmentPreview["members"];
+};
+
 export type AuditEvent = {
   id: string;
   actor_id: string | null;
@@ -470,6 +478,14 @@ export const api = {
       token, adminPath + "/groups/" + encodeURIComponent(groupId) +
         "/reassignment-preview?reassign_to=" + encodeURIComponent(reassignTo),
     ),
+
+  groupUpdatePreview: (token: string, groupId: string, payload: {
+    name: string; description: string;
+    store_codes: string[]; permissions: string[];
+  }) => request<GroupUpdatePreview>(
+    token, adminPath + "/groups/" + encodeURIComponent(groupId) + "/update-preview",
+    "POST", payload,
+  ),
 
   effectivePermissions: (token: string, userId: string) =>
     request<EffectivePermissions>(

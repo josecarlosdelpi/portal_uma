@@ -262,6 +262,15 @@ def group_detail(group_id: UUID, admin: AdminService = Depends(service)) -> dict
     return http_result(lambda: admin.group_detail(group_id))
 
 
+@router.post("/groups/{group_id}/update-preview")
+def preview_group_update(group_id: UUID, payload: GroupPayload,
+                         admin: AdminService = Depends(service)) -> dict:
+    return http_result(lambda: admin.preview_group_update(
+        group_id, name=payload.name, description=payload.description,
+        store_codes=payload.store_codes, permissions=payload.permissions,
+    ))
+
+
 @router.put("/groups/{group_id}")
 def update_group(group_id: UUID, payload: GroupPayload,
                  admin: AdminService = Depends(service)) -> dict:

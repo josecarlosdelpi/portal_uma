@@ -91,6 +91,18 @@ PERMISSION_CATALOG: list[dict] = [
     ]},
 ]
 
+# Permissoes que um vendedor podia ter sob o modelo legado (um grupo por
+# loja): apenas consulta, nunca financeiro. Usado para aceitar a resolucao
+# implicita por store_code somente quando a associacao e comprovadamente
+# segura — no pior caso, um cadastro legado recebe leitura na propria loja.
+_LEGACY_SAFE_GRANTS = {
+    entry["code"]
+    for module in PERMISSION_CATALOG
+    if module["module"] != "finance"
+    for entry in module["permissions"]
+    if entry["kind"] == "view"
+}
+
 
 class AdminService:
     def __init__(self, repo: AdminRepository, actor: User):
@@ -236,19 +248,27 @@ class AdminService:
                 revoked.append({"code": code, "stores": lost})
         return granted, revoked
 
-    def _simulated(self, user, group: AccessGroup,
+    def _simulated(self, user, *, stores: set[str], grants: set[str],
                    scope_rows: set[str]) -> tuple[Principal, list[str]]:
-        """Principal hipotetico: grupo alvo + escopo individual indicado."""
-        coverage = set(self.repo.group_stores(group.id))
-        stores = coverage & scope_rows if scope_rows else coverage
+        """Principal hipotetico: abrangencia + concessoes + escopo individual."""
+        effective = stores & scope_rows if scope_rows else stores
         principal = Principal(
             user_id=str(user.id), profile=user.profile,
             active=user.active, is_superadmin=user.is_superadmin,
-            store_codes=frozenset(stores & STORE_CODES),
-            group_grants=frozenset(self.repo.grants(group.id)),
+            store_codes=frozenset(effective & STORE_CODES),
+            group_grants=frozenset(grants),
             overrides=self.repo.overrides(user.id),
         )
-        return principal, sorted(stores & STORE_CODES)
+        return principal, sorted(effective & STORE_CODES)
+
+    def _simulated_group(self, user, group: AccessGroup,
+                         scope_rows: set[str]) -> tuple[Principal, list[str]]:
+        return self._simulated(
+            user,
+            stores=set(self.repo.group_stores(group.id)),
+            grants=set(self.repo.grants(group.id)),
+            scope_rows=scope_rows,
+        )
 
     def preview_user_access(self, user_id: UUID, *, group_id: UUID,
                             store_codes: list[str] | None = None) -> dict:
@@ -263,7 +283,7 @@ class AdminService:
                  if store_codes is not None
                  else set(self.repo.user_scope(user_id)))
         before = self._permission_map(load_principal(self.repo.db, user))
-        simulated, stores = self._simulated(user, group, scope)
+        simulated, stores = self._simulated_group(user, group, scope)
         after = self._permission_map(simulated)
         granted, revoked = self._access_diff(before, after)
         return {
@@ -288,7 +308,7 @@ class AdminService:
             # restringe, o acesso efetivo nunca e ampliado pela mudanca.
             scope = set(self.repo.user_scope(member.id))
             before = self._permission_map(load_principal(self.repo.db, member))
-            simulated, stores = self._simulated(member, target, scope)
+            simulated, stores = self._simulated_group(member, target, scope)
             after = self._permission_map(simulated)
             granted, revoked = self._access_diff(before, after)
             members.append({
@@ -302,6 +322,43 @@ class AdminService:
             "group": {"id": str(group.id), "name": group.name},
             "target": {"id": str(target.id), "name": target.name},
             "member_count": len(members), "members": members,
+        }
+
+    def preview_group_update(self, group_id: UUID, *, name: str,
+                             description: str, store_codes: list[str],
+                             permissions: list[str]) -> dict:
+        """Impacto de mudar abrangencia/permissoes de um grupo COM membros:
+        concessoes e revogacoes por usuario e loja, antes de salvar."""
+        group = self.repo.group(group_id)
+        if group is None:
+            raise AdminError(404, "Grupo nao encontrado")
+        _, _, stores, grants = self._validate_group_payload(
+            name, description, store_codes, permissions)
+        members = []
+        widens = False
+        for member in self.repo.members(group_id):
+            scope = set(self.repo.user_scope(member.id))
+            before = self._permission_map(load_principal(self.repo.db, member))
+            simulated, stores_after = self._simulated(
+                member, stores=stores, grants=grants, scope_rows=scope)
+            after = self._permission_map(simulated)
+            granted, revoked = self._access_diff(before, after)
+            if granted:
+                widens = True
+            members.append({
+                "user_id": str(member.id),
+                "display_name": member.display_name,
+                "stores_before": self.repo.user_stores(member.id),
+                "stores_after": stores_after,
+                "granted": granted, "revoked": revoked,
+            })
+        return {
+            "group": {"id": str(group.id), "name": group.name},
+            "proposed": {"stores": sorted(stores),
+                         "permissions": sorted(grants)},
+            "member_count": len(members),
+            "widens": widens,
+            "members": members,
         }
 
     # ---------- grupos de acesso ----------
@@ -538,16 +595,29 @@ class AdminService:
             return self._valid_group(group_id)
         if store_code in STORE_CODES:
             # Compatibilidade legada so vale quando ha exatamente UM grupo
-            # ativo cobrindo a loja. Com dois ou mais, a escolha seria
-            # ambigua (poderia elevar um vendedor a Administradores).
+            # ativo cobrindo a loja E a associacao e comprovadamente segura:
+            # o grupo precisa ser exclusivo daquela loja e conter somente
+            # permissoes de consulta nao-financeiras (o que um vendedor
+            # recebia no modelo antigo). Um grupo amplo como Administradores
+            # ou Financeiro — mesmo sendo o unico da loja — exige group_id.
             candidates = self.repo.groups_covering(store_code)
-            if len(candidates) == 1:
-                return candidates[0]
             if len(candidates) > 1:
                 raise AdminError(
                     422,
                     "Ha mais de um grupo cobrindo esta loja; informe o "
                     "grupo explicitamente (group_id).",
+                )
+            if len(candidates) == 1:
+                group = candidates[0]
+                coverage = set(self.repo.group_stores(group.id))
+                grants = set(self.repo.grants(group.id))
+                if coverage == {store_code} and grants <= _LEGACY_SAFE_GRANTS:
+                    return group
+                raise AdminError(
+                    422,
+                    "O unico grupo desta loja nao e um grupo de vendedores "
+                    "seguro para resolucao automatica; informe o grupo "
+                    "explicitamente (group_id).",
                 )
         raise AdminError(422, "Selecione um grupo de acesso")
 

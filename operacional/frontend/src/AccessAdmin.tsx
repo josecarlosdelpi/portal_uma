@@ -1,11 +1,12 @@
 /** Administracao de usuarios, grupos de acesso e permissoes efetivas.
  *  O backend e a unica autoridade; esta tela apenas reflete as respostas. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api, type AccessGroup, type AccessPreview, type EffectivePermissions,
-  type GroupDetail, type LocalResetPassword, type PortalUser,
-  type ReassignmentPreview,
+  type GroupDetail, type GroupUpdatePreview, type LocalResetPassword,
+  type PortalUser, type ReassignmentPreview,
 } from "./api";
+import { LatestRequest } from "./asyncGate";
 import {
   grantableCodes, labelStore, permissionGroups, permissionName,
 } from "./catalog";
@@ -77,8 +78,12 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
   const [inheritAll, setInheritAll] = useState(false);
   const [resetResult, setResetResult] = useState<LocalResetPassword | null>(null);
   const [showEffective, setShowEffective] = useState(false);
+  // So a previa correspondente a selecao ATUAL pode habilitar a
+  // confirmacao — respostas antigas em voo sao descartadas.
+  const previewGate = useRef(new LatestRequest<AccessPreview>());
 
   useEffect(() => {
+    previewGate.current.invalidate();
     setProfile(user.profile);
     setGroupId(user.group?.id ?? "");
     setScope(user.store_scope);
@@ -109,12 +114,16 @@ export function UserDetailPanel({ token, user, groups, working, update, onDelete
   };
 
   const refreshPreview = (gid: string, codes: string[]) => {
-    if (!gid) { setPreview(null); setPreviewStatus("idle"); return; }
+    if (!gid) {
+      previewGate.current.invalidate();
+      setPreview(null); setPreviewStatus("idle"); return;
+    }
     setPreview(null);
     setPreviewStatus("loading");
-    void api.previewUserAccess(token, user.id, {
+    void previewGate.current.issue(() => api.previewUserAccess(token, user.id, {
       group_id: gid, store_codes: [...codes].sort(),
-    }).then((result) => {
+    })).then((result) => {
+      if (result === null) return;
       setPreview(result);
       setPreviewStatus("ready");
     }).catch(() => {
@@ -349,6 +358,13 @@ export function GroupEditor({ token, groups, working, update }: {
   const [reassignImpact, setReassignImpact] = useState<ReassignmentPreview | null>(null);
   const [reassignStatus, setReassignStatus] =
     useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [updatePreview, setUpdatePreview] = useState<GroupUpdatePreview | null>(null);
+  const [updateStatus, setUpdateStatus] =
+    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [widenConfirmed, setWidenConfirmed] = useState(false);
+  // Gates anti-corrida: so a ultima previa emitida pode atualizar a UI.
+  const reassignGate = useRef(new LatestRequest<ReassignmentPreview>());
+  const updateGate = useRef(new LatestRequest<GroupUpdatePreview>());
 
   const selected = groups.find((g) => g.id === selectedId) ?? null;
 
@@ -369,6 +385,11 @@ export function GroupEditor({ token, groups, working, update }: {
     setReassign("");
     setReassignImpact(null);
     setReassignStatus("idle");
+    setUpdatePreview(null);
+    setUpdateStatus("idle");
+    setWidenConfirmed(false);
+    reassignGate.current.invalidate();
+    updateGate.current.invalidate();
   };
 
   const chooseReassign = (id: string) => {
@@ -376,12 +397,15 @@ export function GroupEditor({ token, groups, working, update }: {
     setReassignImpact(null);
     if (id && selectedId) {
       setReassignStatus("loading");
-      void api.reassignmentPreview(token, selectedId, id)
-        .then((result) => {
-          setReassignImpact(result);
-          setReassignStatus("ready");
-        }).catch(() => setReassignStatus("error"));
+      void reassignGate.current.issue(
+        () => api.reassignmentPreview(token, selectedId, id),
+      ).then((result) => {
+        if (result === null) return;
+        setReassignImpact(result);
+        setReassignStatus("ready");
+      }).catch(() => setReassignStatus("error"));
     } else {
+      reassignGate.current.invalidate();
       setReassignStatus("idle");
     }
   };
@@ -399,6 +423,44 @@ export function GroupEditor({ token, groups, working, update }: {
     name !== selected.name || description !== selected.description ||
     JSON.stringify([...storeSel].sort()) !== JSON.stringify([...selected.stores].sort()) ||
     JSON.stringify([...permSel].sort()) !== JSON.stringify([...selected.permissions].sort()));
+
+  // Mudanca de abrangencia ou de permissoes num grupo COM membros exige
+  // previa de impacto antes de salvar; ampliacao exige confirmacao explicita.
+  const accessFieldsDirty = !!selected && (
+    JSON.stringify([...storeSel].sort()) !== JSON.stringify([...selected.stores].sort()) ||
+    JSON.stringify([...permSel].sort()) !== JSON.stringify([...selected.permissions].sort()));
+  const needsUpdatePreview = accessFieldsDirty &&
+    (selected?.member_count ?? 0) > 0;
+
+  useEffect(() => {
+    if (!needsUpdatePreview || !selected) {
+      updateGate.current.invalidate();
+      setUpdatePreview(null); setUpdateStatus("idle");
+      setWidenConfirmed(false);
+      return;
+    }
+    setUpdatePreview(null); setUpdateStatus("loading");
+    setWidenConfirmed(false);
+    void updateGate.current.issue(() => api.groupUpdatePreview(
+      token, selected.id, {
+        name: name.trim() || selected.name,
+        description: description.trim(),
+        store_codes: [...storeSel].sort(),
+        permissions: [...permSel].sort(),
+      },
+    )).then((result) => {
+      if (result === null) return;
+      setUpdatePreview(result); setUpdateStatus("ready");
+    }).catch(() => setUpdateStatus("error"));
+    // A previa recalcula a cada mudanca de lojas/permissoes; nome e
+    // descricao nao afetam o acesso e nao disparam recalculo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, selected?.id, needsUpdatePreview, storeSel, permSel]);
+
+  const widensAccess = needsUpdatePreview && (updatePreview?.widens ?? false);
+  const saveBlocked = working || !dirty || !storeSel.length ||
+    (needsUpdatePreview && updateStatus !== "ready") ||
+    (widensAccess && !widenConfirmed);
 
   return <div className="columns">
     <section className="panel">
@@ -458,16 +520,56 @@ export function GroupEditor({ token, groups, working, update }: {
         <h3>Permissões do grupo</h3>
         <PermissionMatrix selected={permSel} disabled={working}
           onToggle={(code) => toggle(permSel, code, setPermSel)} />
-        <button className="btn-primary" disabled={working || !dirty || !storeSel.length}
+        {needsUpdatePreview && <div className="access-summary">
+          <h4>Impacto da alteração nos {selected.member_count} usuário(s) do grupo</h4>
+          {updateStatus === "loading" &&
+            <p className="small-note">Calculando o impacto por usuário e loja…</p>}
+          {updateStatus === "error" && <p className="small-note">
+            Não foi possível calcular o impacto — o salvamento fica bloqueado
+            até a prévia carregar.</p>}
+          {updateStatus === "ready" && updatePreview && <>
+            {updatePreview.members.every((m) =>
+              m.granted.length === 0 && m.revoked.length === 0)
+              ? <p className="small-note">Nenhum acesso efetivo muda para os
+                usuários do grupo.</p>
+              : updatePreview.members.map((member) => <p key={member.user_id}
+                className="small-note"><strong>{member.display_name}</strong>:
+                {member.granted.length === 0 && member.revoked.length === 0
+                  ? " sem mudança de acesso"
+                  : " +" + member.granted.length + " / −" + member.revoked.length +
+                    " acesso(s)"}
+                {" · lojas: " + (member.stores_after.map(labelStore).join(", ") || "nenhuma")}
+                {member.granted.length + member.revoked.length > 0 &&
+                  <><br />{"Δ " + [...member.granted.map((d) => "+" + permissionName(d.code) +
+                    " (" + d.stores.map(labelStore).join(",") + ")"),
+                    ...member.revoked.map((d) => "−" + permissionName(d.code) +
+                    " (" + d.stores.map(labelStore).join(",") + ")"),
+                    ].slice(0, 6).join(", ")}</>}
+              </p>)}
+            {updatePreview.widens && <label className="check-line">
+              <input type="checkbox" checked={widenConfirmed} disabled={working}
+                onChange={(e) => setWidenConfirmed(e.target.checked)} />
+              <span>Confirmo que esta alteração <strong>amplia</strong> o acesso
+                de {updatePreview.members.filter((m) => m.granted.length > 0).length}{" "}
+                usuário(s), conforme o impacto exibido acima.</span>
+            </label>}
+          </>}
+        </div>}
+        <button className="btn-primary" disabled={saveBlocked}
           onClick={() => void update(async () => {
             const result = await api.updateGroup(token, selected.id, {
               name: name.trim(), description: description.trim(),
               store_codes: storeSel, permissions: permSel,
             });
+            setUpdatePreview(null); setUpdateStatus("idle");
+            setWidenConfirmed(false);
             window.alert("Grupo atualizado. " + result.members_affected +
               " usuário(s) afetado(s) pela mudança de permissões.");
           }, "Grupo atualizado.")}>
           Salvar alterações ({selected.member_count} usuário{selected.member_count === 1 ? "" : "s"})</button>
+        {needsUpdatePreview && updateStatus !== "ready" &&
+          <p className="small-note">Aguarde a prévia de impacto para confirmar
+            — a alteração afeta os usuários do grupo.</p>}
 
         {detail && <><h3>Usuários vinculados</h3>
           {detail.members.length === 0 ? <p className="empty">Nenhum usuário neste grupo.</p> :
