@@ -14,7 +14,8 @@ from app.local_identity import LocalAuthError, password_matches
 from app.bootstrap_local import provision_initial_local_superadmin
 from app.recover_superadmin import recover_local_superadmin
 from app.main import app
-from app.models import Base, LocalCredential, LocalSession, AuditEvent, Store, StoreGroup, User
+from app.models import Base, LocalCredential, LocalSession, AuditEvent, Store, User
+from tests.access_helpers import seed_group
 
 
 @pytest.fixture
@@ -39,10 +40,8 @@ def env():
         )
         db.add_all([admin, manager])
         db.flush()
-        db.add_all([
-            StoreGroup(id=uuid4(),store_code=code,name=code,active=True)
-            for code in ("JOINVILLE","TUBARAO","ITAJAI")
-        ])
+        for code in ("JOINVILLE", "TUBARAO", "ITAJAI"):
+            seed_group(db, "Vendedores " + code, [code], ["sales.view"], [])
         db.commit()
     acting = {"user": admin}
 
@@ -63,10 +62,17 @@ def env():
         engine.dispose()
 
 
+def group_id_for(client, store="JOINVILLE"):
+    for group in client.get("/api/v1/admin/groups").json():
+        if store in group["stores"]:
+            return group["id"]
+    raise AssertionError("grupo nao encontrado para " + store)
+
+
 def create_seller(client, username="bruno", store="JOINVILLE"):
     response = client.post("/api/v1/admin/local-users",json={
         "username":username,"display_name":"Colaborador Teste",
-        "profile":"seller","store_code":store,
+        "profile":"seller","group_id":group_id_for(client, store),
     })
     assert response.status_code==201, response.text
     return response.json()
@@ -82,7 +88,7 @@ def test_user_creation_requires_no_email_and_password_is_one_time(env):
     assert "email" not in result
     assert client.post("/api/v1/admin/local-users",json={
         "username":"BRUNO","display_name":"Duplicado",
-        "profile":"seller","store_code":"ITAJAI"
+        "profile":"seller","group_id":group_id_for(client,"ITAJAI")
     }).status_code==409
     names=client.get("/api/v1/admin/users").json()
     created=[item for item in names if item["id"]==result["id"]]
@@ -192,10 +198,11 @@ def test_reset_and_delete_revoke_sessions_and_keep_history(env):
 def test_non_superadmin_cannot_create_reset_or_delete(env):
     client, identity, engine, admin, manager, _ = env
     row=create_seller(client)
+    gid=group_id_for(client,"JOINVILLE")
     identity["user"]=manager
     create=client.post("/api/v1/admin/local-users",json={
         "username":"rafael","display_name":"Rafael",
-        "profile":"seller","store_code":"JOINVILLE"
+        "profile":"seller","group_id":gid
     })
     assert create.status_code==403
     assert client.post("/api/v1/admin/users/"+row["id"]+"/reset-password").status_code==403
@@ -206,23 +213,26 @@ def test_non_superadmin_cannot_create_reset_or_delete(env):
 
 def test_invalid_username_and_roles_cannot_be_provisioned(env):
     client,*_=env
+    gid=group_id_for(client,"JOINVILLE")
     for uname in ("ab","com espaço","nome@dominio","admin/1"):
         result=client.post("/api/v1/admin/local-users",json={
             "username":uname,"display_name":"Pessoa Teste",
-            "profile":"seller","store_code":"JOINVILLE"
+            "profile":"seller","group_id":gid
         })
         assert result.status_code==422,result.text
     assert client.post("/api/v1/admin/local-users",json={
         "username":"newowner","display_name":"Outro SuperAdmin",
-        "profile":"superadmin","store_code":None
+        "profile":"superadmin","group_id":gid
     }).status_code==422
+    # grupo obrigatorio: cadastro sem group_id e rejeitado
     assert client.post("/api/v1/admin/local-users",json={
         "username":"jardel","display_name":"Jardel",
-        "profile":"administrator","store_code":"JOINVILLE"
+        "profile":"administrator"
     }).status_code==422
+    # escopo fora da abrangencia do grupo e rejeitado
     assert client.post("/api/v1/admin/local-users",json={
         "username":"rafael","display_name":"Rafael",
-        "profile":"seller","store_code":None
+        "profile":"seller","group_id":gid,"store_codes":["TUBARAO"]
     }).status_code==422
 
 

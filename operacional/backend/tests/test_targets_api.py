@@ -13,9 +13,9 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    AuditEvent, Base, GroupMembership, GroupPermission,
-    Store, StoreGroup, User,
+    AuditEvent, Base, GroupPermission, Store, User,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -37,14 +37,9 @@ def env():
                       profile="seller", active=True, is_superadmin=False)
         db.add_all([admin, seller, denied])
         db.flush()
-        group = StoreGroup(id=uuid4(), store_code="JOINVILLE", name="Joinville", active=True)
-        db.add(group)
-        db.flush()
-        db.add_all([
-            GroupMembership(user_id=seller.id, group_id=group.id),
-            GroupMembership(user_id=denied.id, group_id=group.id),
-            GroupPermission(group_id=group.id, code="targets.view", granted=True),
-        ])
+        seed_admin_access(db, admin)
+        seed_group(db, "Vendedores Joinville", ["JOINVILLE"], ["targets.view"],
+                   [seller, denied])
         db.commit()
 
     active_actor = {"current": admin}

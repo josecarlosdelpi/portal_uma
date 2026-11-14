@@ -10,9 +10,9 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    Base, GroupMembership, GroupPermission, Procedure, ProcedureVersion, Store,
-    StoreGroup, TrainingRecord, User,
+    Base, Procedure, ProcedureVersion, Store, TrainingRecord, User,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -32,12 +32,9 @@ def env():
         tub = User(id=uuid4(), auth_subject="proc-tub", display_name="Vendedor Tub",
                    profile="seller", is_superadmin=False, active=True)
         db.add_all([admin, joi, colega, tub]); db.flush()
+        seed_admin_access(db, admin)
         for code, members in (("JOINVILLE", [joi, colega]), ("TUBARAO", [tub])):
-            group = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
-            db.add(group); db.flush()
-            for member in members:
-                db.add(GroupMembership(user_id=member.id, group_id=group.id))
-            db.add(GroupPermission(group_id=group.id, code="training.view", granted=True))
+            seed_group(db, "Vendedores " + code, [code], ["training.view"], members)
         db.commit()
     actor = {"user": admin}
     def user_override(): return actor["user"]

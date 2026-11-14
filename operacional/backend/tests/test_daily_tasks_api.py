@@ -11,10 +11,8 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import (
-    AuditEvent, Base, DailyTask, GroupMembership, GroupPermission,
-    Store, StoreGroup, User,
-)
+from app.models import AuditEvent, Base, DailyTask, Store, User
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -41,12 +39,9 @@ def env():
         )
         db.add_all([admin, joi, tub])
         db.flush()
+        seed_admin_access(db, admin)
         for code, seller in (("JOINVILLE", joi), ("TUBARAO", tub)):
-            group = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
-            db.add(group)
-            db.flush()
-            db.add(GroupMembership(user_id=seller.id, group_id=group.id))
-            db.add(GroupPermission(group_id=group.id, code="daily_tasks.view", granted=True))
+            seed_group(db, "Vendedores " + code, [code], ["daily_tasks.view"], [seller])
         db.commit()
     actor = {"user": admin}
     app.dependency_overrides[current_user] = lambda: actor["user"]

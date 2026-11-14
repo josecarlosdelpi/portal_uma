@@ -21,7 +21,11 @@ class Store(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("profile IN ('administrator', 'seller')", name="ck_users_profile"),)
+    # Funcao operacional do colaborador (nao concede permissoes):
+    # 'seller' aparece nos cadastros de loja (televendas, treinamentos,
+    # tarefas); 'administrator' e 'staff' nao. Acessos vem do grupo de
+    # acesso e das excecoes individuais.
+    __table_args__ = (CheckConstraint("profile IN ('administrator', 'seller', 'staff')", name="ck_users_profile"),)
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     auth_subject: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
@@ -33,26 +37,49 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class StoreGroup(Base):
-    __tablename__ = "store_groups"
+class AccessGroup(Base):
+    """Grupo de acesso configuravel: nome, abrangencia de lojas e permissoes."""
+    __tablename__ = "access_groups"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
-    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(String(300), nullable=False, default="", server_default="")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class AccessGroupStore(Base):
+    """Abrangencia geografica do grupo: em quais lojas suas permissoes valem."""
+    __tablename__ = "access_group_stores"
+
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+
+
+class UserStoreScope(Base):
+    """Restricao individual de lojas (subconjunto da abrangencia do grupo).
+
+    Sem linhas para o usuario = herda toda a abrangencia do grupo."""
+    __tablename__ = "user_store_scopes"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
 
 
 class GroupMembership(Base):
     __tablename__ = "group_memberships"
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    group_id: Mapped[UUID] = mapped_column(ForeignKey("store_groups.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
 
 
 class GroupPermission(Base):
     __tablename__ = "group_permissions"
 
-    group_id: Mapped[UUID] = mapped_column(ForeignKey("store_groups.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
     code: Mapped[str] = mapped_column(String(100), primary_key=True)
     granted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 

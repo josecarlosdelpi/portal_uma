@@ -10,7 +10,8 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import Base,Store,User,GroupMembership,GroupPermission,StoreGroup,AuditEvent,Procedure,TrainingRecord
+from app.models import AccessGroup,AccessGroupStore,Base,Store,User,AuditEvent,Procedure,TrainingRecord
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -28,11 +29,10 @@ def env():
         tub=User(id=uuid4(),auth_subject="more-tub",display_name="Vendedor Tub",
                  profile="seller",is_superadmin=False,active=True)
         db.add_all([admin,joi,tub]);db.flush()
-        group=StoreGroup(id=uuid4(),store_code="JOINVILLE",name="Joinville",active=True)
-        db.add(group);db.flush()
-        db.add(GroupMembership(user_id=joi.id,group_id=group.id))
-        for permission in ["checklist.view","whatsapp_status.view","instagram.view","training.view"]:
-            db.add(GroupPermission(group_id=group.id,code=permission,granted=True))
+        seed_admin_access(db, admin)
+        seed_group(db,"Vendedores Joinville",["JOINVILLE"],
+                   ["checklist.view","whatsapp_status.view","instagram.view","training.view"],
+                   [joi])
         db.commit()
     actor={"user":admin}
     def user_override():return actor["user"]
@@ -443,11 +443,11 @@ def test_trainings_multi_store_and_filters(env):
     """Endpoint consolidado cruza lojas, colaboradores, procedimentos e datas."""
     c, actor, engine, admin, seller, other = env
     actor["user"] = admin
+    # um grupo principal por usuario: ampliar a abrangencia do grupo atual
     with Session(engine) as db:
+        grp = db.scalar(select(AccessGroup).where(AccessGroup.name == "Vendedores Joinville"))
         for code in ("TUBARAO", "ITAJAI"):
-            grp = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
-            db.add(grp); db.flush()
-            db.add(GroupMembership(user_id=seller.id, group_id=grp.id))
+            db.add(AccessGroupStore(group_id=grp.id, store_code=code))
         db.commit()
     for store, day in [("JOINVILLE", "2026-10-20T09:00:00"),
                        ("TUBARAO", "2026-10-22T09:00:00"),

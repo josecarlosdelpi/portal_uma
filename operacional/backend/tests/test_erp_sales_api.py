@@ -15,8 +15,9 @@ from app.erp_csv import parse_erp_csv
 from app.main import app
 from app.models import (
     Base, ErpImportBatch, ErpReturnRow, ErpSaleRow, ErpSourceFile,
-    GroupMembership, GroupPermission, Store, StoreGroup, User,
+    Store, User,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 HEADER = ("data;loja;loja_descricao;vendedor;cnpj_cliente;razao_cliente;"
           "produto;quantidade;valor_unitario;valor_total\n")
@@ -57,17 +58,12 @@ def env():
                       profile="seller", active=True, is_superadmin=False)
         db.add_all([admin, seller, viewer])
         db.flush()
-        group = StoreGroup(id=uuid4(), store_code="JOINVILLE", name="Joinville", active=True)
-        db.add(group)
-        db.flush()
-        db.add_all([
-            GroupMembership(user_id=seller.id, group_id=group.id),
-            GroupMembership(user_id=viewer.id, group_id=group.id),
-            GroupPermission(group_id=group.id, code="sales.view", granted=True),
-            GroupPermission(group_id=group.id, code="sales.revenue.view", granted=True),
-            GroupPermission(group_id=group.id, code="overview.view", granted=True),
-            GroupPermission(group_id=group.id, code="targets.view", granted=True),
-        ])
+        seed_admin_access(db, admin)
+        seed_group(
+            db, "Vendedores Joinville", ["JOINVILLE"],
+            ["sales.view", "sales.revenue.view", "overview.view", "targets.view"],
+            [seller, viewer],
+        )
         db.commit()
 
     active_actor = {"current": admin}

@@ -6,13 +6,14 @@ Seller accounts remain read-only as approved for operational v1.
 from datetime import date, datetime, time
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditEvent, ContactAttempt, ContactClient, GoogleReviewMonth, GroupMembership,
-    StoreGroup, SupplyMaterial, SupplyMovement, SupplyStock, User,
+    AccessGroup, AccessGroupStore, AuditEvent, ContactAttempt, ContactClient,
+    GoogleReviewMonth, GroupMembership, SupplyMaterial, SupplyMovement,
+    SupplyStock, User, UserStoreScope,
 )
 from app.policy import STORE_CODES, can_access, visible_stores
 from app.repositories import load_principal
@@ -303,6 +304,32 @@ class OperationsService:
         self.commit()
         return self._client(row)
 
+    @staticmethod
+    def _seller_store_filter(store: str):
+        """Colaboradores com funcao de vendedor autorizados na loja pelo grupo.
+
+        O escopo individual (user_store_scopes) restringe a abrangencia do
+        grupo: vazio herda todas as lojas do grupo; preenchido, a loja
+        precisa constar no escopo do usuario."""
+        covered = (
+            select(AccessGroupStore.group_id)
+            .where(AccessGroupStore.store_code == store)
+        )
+        any_scope = select(UserStoreScope.user_id).where(
+            UserStoreScope.user_id == User.id
+        ).exists()
+        store_scoped = select(UserStoreScope.user_id).where(
+            UserStoreScope.user_id == User.id,
+            UserStoreScope.store_code == store,
+        ).exists()
+        return (
+            User.profile == "seller",
+            User.active.is_(True),
+            AccessGroup.active.is_(True),
+            GroupMembership.group_id.in_(covered),
+            or_(~any_scope, store_scoped),
+        )
+
     def sellers(self, store: str) -> list[dict]:
         if not (can_access(self.principal, "telemarketing.view", store)
                 or can_access(self.principal, "training.edit", store)):
@@ -310,24 +337,17 @@ class OperationsService:
         rows = self.db.execute(
             select(User.id, User.display_name)
             .join(GroupMembership, GroupMembership.user_id == User.id)
-            .join(StoreGroup, StoreGroup.id == GroupMembership.group_id)
-            .where(
-                StoreGroup.store_code == store,
-                StoreGroup.active.is_(True),
-                User.active.is_(True),
-                User.profile == "seller",
-            ).distinct().order_by(User.display_name)
+            .join(AccessGroup, AccessGroup.id == GroupMembership.group_id)
+            .where(*self._seller_store_filter(store))
+            .distinct().order_by(User.display_name)
         ).all()
         return [{"id": str(id), "name": name} for id, name in rows]
 
     def _seller_in_store(self, store: str, seller_id: UUID) -> bool:
         return self.db.scalar(
             select(User.id).join(GroupMembership, GroupMembership.user_id == User.id)
-            .join(StoreGroup, StoreGroup.id == GroupMembership.group_id)
-            .where(
-                User.id == seller_id, User.profile == "seller", User.active.is_(True),
-                StoreGroup.store_code == store, StoreGroup.active.is_(True),
-            )
+            .join(AccessGroup, AccessGroup.id == GroupMembership.group_id)
+            .where(User.id == seller_id, *self._seller_store_filter(store))
         ) is not None
 
     def calls(self, store: str, year: int, month: int) -> dict:

@@ -58,10 +58,7 @@ class TargetService:
         target = row.amount if row else None
         daily_base = preview_distribution(target, days)
         first, last = month_bounds(year, month)
-        can_revenue = (
-            self.principal.is_superadmin or self.principal.profile == "administrator"
-            or can_access(self.principal, "sales.revenue.view", store_code)
-        )
+        can_revenue = can_access(self.principal, "sales.revenue.view", store_code)
         sales_by_date = (
             sales_by_date_for_store(self.repo.session, store_code, first, last)
             if can_revenue else {}

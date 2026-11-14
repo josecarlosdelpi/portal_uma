@@ -30,14 +30,11 @@ class ClosingService:
         self.principal = load_principal(db, user)
 
     def require(self, permission: str) -> None:
-        # Consolidated report discloses all three stores: seller login never
-        # receives it even when one store grants a monthly_closing permission.
-        if (
-            not self.principal.active
-            or (not self.principal.is_superadmin and self.principal.profile != "administrator")
-            or not can_access(self.principal, permission)
-        ):
-            raise ClosingError(403, "Fechamento consolidado restrito aos administradores")
+        # Fechamento consolida as tres lojas: permissoes monthly_closing sao
+        # de escopo completo — can_access so concede quando o grupo autoriza
+        # e o usuario cobre todas as lojas.
+        if not can_access(self.principal, permission):
+            raise ClosingError(403, "Fechamento consolidado exige autorizacao de escopo completo")
 
     @staticmethod
     def _validate_month(year: int, month: int) -> None:
