@@ -84,6 +84,31 @@ export type EffectivePermissions = {
   }>;
 };
 
+export type AccessPreview = {
+  user_id: string;
+  group: { id: string; name: string } | null;
+  stores: string[];
+  store_scope: string[];
+  before: Record<string, string[]>;
+  after: Record<string, string[]>;
+  granted: string[];
+  revoked: string[];
+};
+
+export type ReassignmentPreview = {
+  group: { id: string; name: string };
+  target: { id: string; name: string };
+  member_count: number;
+  members: Array<{
+    user_id: string;
+    display_name: string;
+    stores_before: string[];
+    stores_after: string[];
+    granted: string[];
+    revoked: string[];
+  }>;
+};
+
 export type AuditEvent = {
   id: string;
   actor_id: string | null;
@@ -430,6 +455,19 @@ export const api = {
     token, adminPath + "/users/" + encodeURIComponent(userId) + "/access",
     "PUT", payload,
   ),
+
+  previewUserAccess: (token: string, userId: string, payload: {
+    group_id: string; store_codes?: string[];
+  }) => request<AccessPreview>(
+    token, adminPath + "/users/" + encodeURIComponent(userId) + "/access-preview",
+    "POST", payload,
+  ),
+
+  reassignmentPreview: (token: string, groupId: string, reassignTo: string) =>
+    request<ReassignmentPreview>(
+      token, adminPath + "/groups/" + encodeURIComponent(groupId) +
+        "/reassignment-preview?reassign_to=" + encodeURIComponent(reassignTo),
+    ),
 
   effectivePermissions: (token: string, userId: string) =>
     request<EffectivePermissions>(

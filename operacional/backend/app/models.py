@@ -70,7 +70,14 @@ class UserStoreScope(Base):
 
 
 class GroupMembership(Base):
+    """Vinculo usuario <-> grupo de acesso.
+
+    Um usuario comum pertence a exatamente UM grupo principal: a restricao
+    de unicidade em user_id impede multiplos vinculos mesmo fora do ORM."""
     __tablename__ = "group_memberships"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_group_memberships_user"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)

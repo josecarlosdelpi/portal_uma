@@ -82,6 +82,16 @@ class AdminRepository:
             select(AccessGroup).where(func.lower(AccessGroup.name) == name_key)
         )
 
+    def groups_covering(self, store_code: str) -> list[AccessGroup]:
+        """Grupos ativos cuja abrangencia inclui a loja (ordem deterministica)."""
+        return list(self.db.scalars(
+            select(AccessGroup)
+            .join(AccessGroupStore, AccessGroupStore.group_id == AccessGroup.id)
+            .where(AccessGroupStore.store_code == store_code,
+                   AccessGroup.active.is_(True))
+            .order_by(AccessGroup.name, AccessGroup.id)
+        ))
+
     def create_group(self, *, name: str, description: str) -> AccessGroup:
         group = AccessGroup(id=uuid4(), name=name, description=description, active=True)
         self.db.add(group)

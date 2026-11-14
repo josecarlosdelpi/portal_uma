@@ -13,6 +13,21 @@ Revises: 0019
   sua loja; usuarios 'administrator' (nao superadmin) entram no novo grupo
   'Administradores' com todas as permissoes operacionais nas tres lojas —
   exatamente o acesso que tinham de forma implicita.
+
+Limitacoes conhecidas do downgrade (dados pos-upgrade nao mapeaveis ao
+esquema antigo):
+- user_store_scopes e descartada: restricoes individuais de loja criadas
+  apos o upgrade se perdem.
+- Grupos com abrangencia multi-loja recuperam apenas a menor store_code;
+  as demais lojas da abrangencia nao sao representaveis no esquema antigo.
+- O grupo 'Administradores' e suas memberships sao removidos: admins
+  voltam ao acesso implicito por perfil do esquema anterior.
+- Excecoes (user_permission_overrides) sao preservadas, mas o esquema
+  antigo so honrava 'granted=true'; valores 'false' ficam sem efeito.
+
+Backup/restauracao: antes de aplicar ou reverter, capture
+  pg_dump -U <usuario> -d <banco> -F c -f backup_pre_0020.dump
+e valide o rollback numa copia restaurada, nunca na base ativa.
 """
 from uuid import uuid4
 

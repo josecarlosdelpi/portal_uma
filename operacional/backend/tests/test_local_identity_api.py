@@ -236,6 +236,40 @@ def test_invalid_username_and_roles_cannot_be_provisioned(env):
     }).status_code==422
 
 
+def test_legacy_store_code_rejected_when_store_has_multiple_groups(env):
+    """Cadastro legado (so store_code) e ambiguo quando dois grupos ativos
+    cobrem a loja — antes, o primeiro nome alfabetico (Administradores)
+    seria escolhido para um vendedor. Agora exige group_id explicito."""
+    client, _, engine, _, _, _ = env
+    with Session(engine) as db:
+        # Segundo grupo ativo cobrindo JOINVILLE, alem de "Vendedores JOINVILLE"
+        seed_group(db, "Administradores", ["JOINVILLE", "TUBARAO", "ITAJAI"],
+                   ["sales.view"], [])
+        db.commit()
+    ambiguous = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-ambiguo", "display_name": "Ambiguo",
+        "profile": "seller", "store_code": "JOINVILLE"})
+    assert ambiguous.status_code == 422, ambiguous.text
+    # Com group_id explicito o cadastro segue normalmente
+    gid = next(g["id"] for g in client.get("/api/v1/admin/groups").json()
+               if g["name"] == "Vendedores JOINVILLE")
+    explicit = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-ambiguo", "display_name": "Ambiguo",
+        "profile": "seller", "group_id": gid})
+    assert explicit.status_code in (200, 201), explicit.text
+    assert explicit.json()["group"]["name"] == "Vendedores JOINVILLE"
+
+
+def test_legacy_store_code_still_works_with_single_covering_group(env):
+    """Fluxo legado preservado quando so um grupo ativo cobre a loja."""
+    client, *_ = env
+    response = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-legado", "display_name": "Legado",
+        "profile": "seller", "store_code": "TUBARAO"})
+    assert response.status_code in (200, 201), response.text
+    assert response.json()["group"]["name"] == "Vendedores TUBARAO"
+
+
 def test_login_wrong_password_then_lock_until_cooldown(env):
     client,*_=env
     row=create_seller(client)

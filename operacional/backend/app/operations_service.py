@@ -54,6 +54,16 @@ class OperationsService:
         if not can_access(self.principal, permission, store):
             raise OperationError(403, "Acesso negado")
 
+    def require_global(self, permission: str) -> None:
+        """Recurso global da UMA (nao pertence a uma loja especifica).
+
+        Basta a concessao efetiva da permissao em qualquer loja autorizada.
+        Usado pelo calendario unico de WhatsApp: exigir uma loja fixa criaria
+        uma dependencia artificial de abrangencia geografica."""
+        if not any(can_access(self.principal, permission, store)
+                   for store in STORE_CODES):
+            raise OperationError(403, "Acesso negado")
+
     def allowed(self, permission: str) -> list[str]:
         return sorted(
             store for store in visible_stores(self.principal)

@@ -216,7 +216,7 @@ class RoutinesService(OperationsService):
                 "has_evidence_file":"evidence" in attached}
 
     def delete_marketing(self, when: date, expected: int) -> dict:
-        self.require("JOINVILLE", "whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         row = self.db.scalar(
             select(WhatsAppPost).where(
                 WhatsAppPost.post_date == start_of(when)
@@ -240,7 +240,7 @@ class RoutinesService(OperationsService):
 
     def save_marketing(self,when:date,code:str,category:str,note:str,
                        status:str,expected:int)->dict:
-        self.require("JOINVILLE","whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         if when.weekday()>=5:
             raise OperationError(422,"O calendário está programado de segunda a sexta")
         if self.db.get(WhatsAppDayOff,start_of(when)):
@@ -282,7 +282,7 @@ class RoutinesService(OperationsService):
         return self._post(row)
 
     def set_day_off(self,when:date,off:bool,reason:str)->dict:
-        self.require("JOINVILLE","whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         if when.weekday()>=5:
             raise OperationError(422,"Sábados e domingos não possuem postagens programadas")
         key=start_of(when)

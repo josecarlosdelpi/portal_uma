@@ -7,14 +7,13 @@ ERP financial import) to groups or users.
 from uuid import UUID
 import re
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.admin_repository import AdminRepository
-from app.models import AccessGroupStore, AccessInvitation, AccessGroup, User
+from app.models import AccessInvitation, AccessGroup, User
 from app.policy import (
     FULL_SCOPE_PERMISSIONS, GRANTABLE_PERMISSIONS, STORE_CODES, USER_PROFILES,
-    can_access,
+    Principal, can_access,
 )
 from app.repositories import load_principal
 
@@ -203,6 +202,91 @@ class AdminService:
                       if group is not None and group.active else None),
             "stores": stores if not user.is_superadmin else sorted(STORE_CODES),
             "items": items,
+        }
+
+    # ---------- previa de acesso efetivo ----------
+
+    @staticmethod
+    def _permission_map(principal) -> dict[str, list[str]]:
+        """Permissoes efetivas: codigo -> lojas onde vale."""
+        result = {}
+        for module in PERMISSION_CATALOG:
+            for entry in module["permissions"]:
+                code = entry["code"]
+                stores = [
+                    store for store in sorted(STORE_CODES)
+                    if can_access(principal, code, store)
+                ]
+                if stores:
+                    result[code] = stores
+        return result
+
+    def _simulated(self, user, group: AccessGroup,
+                   scope_rows: set[str]) -> tuple[Principal, list[str]]:
+        """Principal hipotetico: grupo alvo + escopo individual indicado."""
+        coverage = set(self.repo.group_stores(group.id))
+        stores = coverage & scope_rows if scope_rows else coverage
+        principal = Principal(
+            user_id=str(user.id), profile=user.profile,
+            active=user.active, is_superadmin=user.is_superadmin,
+            store_codes=frozenset(stores & STORE_CODES),
+            group_grants=frozenset(self.repo.grants(group.id)),
+            overrides=self.repo.overrides(user.id),
+        )
+        return principal, sorted(stores & STORE_CODES)
+
+    def preview_user_access(self, user_id: UUID, *, group_id: UUID,
+                            store_codes: list[str] | None = None) -> dict:
+        """Simula acesso efetivo antes de transferir o usuario de grupo."""
+        user = self.repo.user(user_id)
+        if user is None or getattr(user, "deleted_at", None) is not None:
+            raise AdminError(404, "User not found")
+        if user.is_superadmin:
+            raise AdminError(403, "A conta SuperAdmin nao pode ser alterada aqui")
+        group = self._valid_group(group_id)
+        scope = (self._valid_scope(group, store_codes)
+                 if store_codes is not None
+                 else set(self.repo.user_scope(user_id)))
+        before = self._permission_map(load_principal(self.repo.db, user))
+        simulated, stores = self._simulated(user, group, scope)
+        after = self._permission_map(simulated)
+        return {
+            "user_id": str(user_id),
+            "group": {"id": str(group.id), "name": group.name},
+            "stores": stores, "store_scope": sorted(scope),
+            "before": before, "after": after,
+            "granted": sorted(set(after) - set(before)),
+            "revoked": sorted(set(before) - set(after)),
+        }
+
+    def preview_reassignment(self, group_id: UUID, reassign_to: UUID) -> dict:
+        """Impacto de mover os membros do grupo para outro grupo."""
+        group = self.repo.group(group_id)
+        if group is None:
+            raise AdminError(404, "Grupo nao encontrado")
+        target = self.repo.group(reassign_to)
+        if target is None or not target.active or target.id == group_id:
+            raise AdminError(422, "Grupo de reatribuicao invalido ou inativo")
+        members = []
+        for member in self.repo.members(group_id):
+            # O escopo individual e preservado na transferencia: como ele so
+            # restringe, o acesso efetivo nunca e ampliado pela mudanca.
+            scope = set(self.repo.user_scope(member.id))
+            before = self._permission_map(load_principal(self.repo.db, member))
+            simulated, stores = self._simulated(member, target, scope)
+            after = self._permission_map(simulated)
+            members.append({
+                "user_id": str(member.id),
+                "display_name": member.display_name,
+                "stores_before": self.repo.user_stores(member.id),
+                "stores_after": stores,
+                "granted": sorted(set(after) - set(before)),
+                "revoked": sorted(set(before) - set(after)),
+            })
+        return {
+            "group": {"id": str(group.id), "name": group.name},
+            "target": {"id": str(target.id), "name": target.name},
+            "member_count": len(members), "members": members,
         }
 
     # ---------- grupos de acesso ----------
@@ -438,15 +522,18 @@ class AdminService:
         if group_id is not None:
             return self._valid_group(group_id)
         if store_code in STORE_CODES:
-            group = self.repo.db.scalar(
-                select(AccessGroup)
-                .join(AccessGroupStore, AccessGroupStore.group_id == AccessGroup.id)
-                .where(AccessGroupStore.store_code == store_code,
-                       AccessGroup.active.is_(True))
-                .order_by(AccessGroup.name).limit(1)
-            )
-            if group is not None:
-                return group
+            # Compatibilidade legada so vale quando ha exatamente UM grupo
+            # ativo cobrindo a loja. Com dois ou mais, a escolha seria
+            # ambigua (poderia elevar um vendedor a Administradores).
+            candidates = self.repo.groups_covering(store_code)
+            if len(candidates) == 1:
+                return candidates[0]
+            if len(candidates) > 1:
+                raise AdminError(
+                    422,
+                    "Ha mais de um grupo cobrindo esta loja; informe o "
+                    "grupo explicitamente (group_id).",
+                )
         raise AdminError(422, "Selecione um grupo de acesso")
 
     def update_user_access(self, user_id: UUID, *, profile: str | None = None,
@@ -462,7 +549,10 @@ class AdminService:
         group = self._valid_group(group_id) if group_id is not None else self.repo.group_of(user_id)
         if group is None or not group.active:
             raise AdminError(422, "O usuario precisa pertencer a um grupo ativo")
-        scope = self._valid_scope(group, store_codes)
+        # store_codes omitido: preserva o escopo individual atual — uma
+        # atualizacao parcial nunca amplia o acesso do usuario. Lista vazia
+        # enviada explicitamente = herdar toda a abrangencia do grupo.
+        scope = self._valid_scope(group, store_codes) if store_codes is not None else None
 
         previous = {
             "profile": user.profile,
@@ -473,17 +563,19 @@ class AdminService:
         if profile is not None:
             user.profile = profile
         self.repo.set_membership(user_id, group.id)
-        self.repo.replace_user_scope(user_id, scope)
+        if scope is not None:
+            self.repo.replace_user_scope(user_id, scope)
         current_stores = self.repo.user_stores(user_id)
+        current_scope = self.repo.user_scope(user_id)
         self.repo.audit(self.actor, "user.access.changed", "user", str(user_id),
                         {"previous": previous,
                          "current": {"profile": user.profile, "group": group.name,
                                      "stores": current_stores,
-                                     "store_scope": sorted(scope)}})
+                                     "store_scope": current_scope}})
         self._save()
         return {"user_id": str(user_id), "profile": user.profile,
                 "group": {"id": str(group.id), "name": group.name},
-                "stores": current_stores, "store_scope": sorted(scope)}
+                "stores": current_stores, "store_scope": current_scope}
 
     def replace_user_overrides(self, user_id: UUID, permissions: dict[str, bool | None]) -> dict:
         user = self.repo.user(user_id)

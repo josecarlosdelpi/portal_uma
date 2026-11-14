@@ -365,7 +365,8 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
           <button role="tab" aria-selected={tab === "grupos"} className={tab === "grupos" ? "tab active" : "tab"} onClick={() => setTab("grupos")}>Grupos e permissões</button>
           <button role="tab" aria-selected={tab === "auditoria"} className={tab === "auditoria" ? "tab active" : "tab"} onClick={() => {setAuditOffset(0); setTab("auditoria");}}>Auditoria</button>
         </div>}
-        {isSuperAdmin && tab === "usuarios" && <AccountsManager token={token} groups={groups} onCreated={refresh}/>}
+        {isSuperAdmin && tab === "usuarios" && <AccountsManager token={token} groups={groups}
+          onCreated={async (userId) => { await refresh(); setSelectedUser(userId); }}/>}
         {isSuperAdmin && tab === "usuarios" && <div className="columns">
           <section className="panel"><div className="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione um colaborador para administrar seu acesso.</p></div><span className="count">{users.length} contas</span></div>
             {users.length === 0 ? <p className="empty">Nenhum usuário cadastrado.</p> :

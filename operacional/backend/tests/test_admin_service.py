@@ -4,8 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
+import app.admin_service as admin_module
 from app.admin_service import AdminError, AdminService, require_superadmin
-from app.policy import STORE_CODES
+from app.policy import STORE_CODES, Principal
 
 
 def fake_user(*, superadmin=False, active=True, profile="administrator"):
@@ -24,6 +25,8 @@ def fake_group(*, stores=("JOINVILLE",), name="Vendedores Joinville", active=Tru
 
 
 class FakeAdminRepository:
+    db = None  # load_principal e stubado nos testes de previa
+
     def __init__(self):
         self.actor = fake_user(superadmin=True)
         self.target = fake_user(profile="seller")
@@ -31,6 +34,7 @@ class FakeAdminRepository:
         self.groups = {self.access_group.id: self.access_group}
         self.membership = {self.target.id: self.access_group.id}
         self.scopes = {}
+        self.grant_sets = {}
         self.changes = []
         self.events = []
         self.commits = 0
@@ -58,6 +62,13 @@ class FakeAdminRepository:
         group = self.groups.get(group_id)
         return sorted(group.stores) if group else []
 
+    def groups_covering(self, store_code):
+        return sorted(
+            (group for group in self.groups.values()
+             if group.active and store_code in group.stores),
+            key=lambda group: group.name,
+        )
+
     def member_count(self, group_id):
         return sum(1 for gid in self.membership.values() if gid == group_id)
 
@@ -65,7 +76,7 @@ class FakeAdminRepository:
         return [self.target] if self.membership.get(self.target.id) == group_id else []
 
     def grants(self, group_id):
-        return ["sales.view"]
+        return sorted(self.grant_sets.get(group_id, ["sales.view"]))
 
     def overrides(self, user_id):
         return {}
@@ -118,6 +129,7 @@ class FakeAdminRepository:
         self.groups[group_id].stores = set(stores)
 
     def replace_grants(self, group_id, allowed):
+        self.grant_sets[group_id] = set(allowed)
         self.changes.append(("grants", allowed))
 
     def replace_overrides(self, user_id, updates):
@@ -292,3 +304,166 @@ def test_account_status_changes_are_audited():
     assert result["active"] is False
     assert repo.events[0][0] == "user.status.changed"
     assert repo.commits == 1
+
+
+# ---------- resolucao inequivococa de grupo (cadastro legado) ----------
+
+
+def test_legacy_store_code_resolution_with_ambiguous_groups_rejected():
+    """Dois grupos ativos cobrindo a mesma loja: store_code nao escolhe."""
+    repo = FakeAdminRepository()
+    repo.groups[repo.access_group.id] = repo.access_group
+    admin_group = fake_group(stores=("JOINVILLE", "ITAJAI", "TUBARAO"),
+                             name="Administradores")
+    repo.groups[admin_group.id] = admin_group
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.add_user(subject="novo", name="Novo", profile="seller",
+                         store_code="JOINVILLE")
+    assert error.value.status_code == 422
+    assert repo.commits == 0
+
+
+def test_legacy_store_code_resolution_unique_group_still_works():
+    repo = FakeAdminRepository()
+    service = AdminService(repo, repo.actor)
+    result = service.add_user(subject="novo", name="Novo", profile="seller",
+                              store_code="JOINVILLE")
+    assert result["group"]["id"] == str(repo.access_group.id)
+
+
+def test_legacy_store_code_resolution_ignores_inactive_groups():
+    repo = FakeAdminRepository()
+    extra = fake_group(stores=("JOINVILLE",), name="Inativo", active=False)
+    repo.groups[extra.id] = extra
+    service = AdminService(repo, repo.actor)
+    result = service.add_user(subject="novo", name="Novo", profile="seller",
+                              store_code="JOINVILLE")
+    assert result["group"]["id"] == str(repo.access_group.id)
+
+
+# ---------- preservacao de escopo ----------
+
+
+def test_update_user_access_preserves_scope_when_not_sent():
+    """Mudar so a funcao nao pode ampliar lojas nem apagar o escopo."""
+    repo = FakeAdminRepository()
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    service = AdminService(repo, repo.actor)
+    result = service.update_user_access(repo.target.id, profile="staff")
+    assert result["profile"] == "staff"
+    assert result["store_scope"] == ["JOINVILLE"]
+    assert repo.scopes[repo.target.id] == {"JOINVILLE"}
+
+
+def test_update_user_access_explicit_empty_scope_inherits_group():
+    repo = FakeAdminRepository()
+    repo.access_group.stores = {"JOINVILLE", "TUBARAO"}
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    service = AdminService(repo, repo.actor)
+    result = service.update_user_access(repo.target.id, store_codes=[])
+    assert result["store_scope"] == []
+    assert result["stores"] == ["JOINVILLE", "TUBARAO"]
+
+
+def test_group_change_keeps_restrictive_scope_rows():
+    """Escopo preservado ao trocar de grupo: nunca amplia, so restringe."""
+    repo = FakeAdminRepository()
+    repo.access_group.stores = {"JOINVILLE", "TUBARAO"}
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    narrower = fake_group(stores=("JOINVILLE",), name="Restrito")
+    repo.groups[narrower.id] = narrower
+    service = AdminService(repo, repo.actor)
+    result = service.update_user_access(repo.target.id, group_id=narrower.id)
+    assert result["store_scope"] == ["JOINVILLE"]
+    assert result["stores"] == ["JOINVILLE"]
+
+
+def test_scope_outside_group_coverage_rejected():
+    repo = FakeAdminRepository()
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.update_user_access(repo.target.id, store_codes=["TUBARAO"])
+    assert error.value.status_code == 422
+    assert repo.commits == 0
+
+
+# ---------- previas de acesso efetivo ----------
+
+
+def _stub_principal(repo):
+    def _load(_db, user):
+        group = repo.group_of(user.id)
+        return Principal(
+            user_id=str(user.id), profile=user.profile, active=user.active,
+            is_superadmin=user.is_superadmin,
+            store_codes=frozenset(repo.user_stores(user.id)),
+            group_grants=frozenset(repo.grants(group.id)) if group else frozenset(),
+            overrides=repo.overrides(user.id),
+        )
+    return _load
+
+
+def test_preview_user_access_shows_grants_and_revocations(monkeypatch):
+    repo = FakeAdminRepository()
+    repo.grant_sets[repo.access_group.id] = {"sales.view", "checklist.edit"}
+    richer = fake_group(stores=("JOINVILLE", "TUBARAO"), name="Gerencia")
+    repo.groups[richer.id] = richer
+    repo.grant_sets[richer.id] = {"sales.view", "targets.view", "targets.edit"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_user_access(repo.target.id, group_id=richer.id)
+    assert set(preview["granted"]) == {"targets.edit", "targets.view"}
+    assert preview["revoked"] == ["checklist.edit"]
+    assert preview["before"]["checklist.edit"] == ["JOINVILLE"]
+    assert preview["stores"] == ["JOINVILLE", "TUBARAO"]
+    assert repo.commits == 0  # previa nunca persiste
+
+
+def test_preview_user_access_respects_scope_intersection(monkeypatch):
+    repo = FakeAdminRepository()
+    wider = fake_group(stores=("JOINVILLE", "TUBARAO"), name="Duas lojas")
+    repo.groups[wider.id] = wider
+    repo.grant_sets[wider.id] = {"sales.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_user_access(
+        repo.target.id, group_id=wider.id, store_codes=["TUBARAO"])
+    assert preview["stores"] == ["TUBARAO"]
+    with pytest.raises(AdminError) as error:
+        service.preview_user_access(
+            repo.target.id, group_id=wider.id, store_codes=["ITAJAI"])
+    assert error.value.status_code == 422
+
+
+def test_preview_reassignment_reports_per_member_impact(monkeypatch):
+    repo = FakeAdminRepository()
+    repo.scopes[repo.target.id] = {"JOINVILLE"}
+    repo.access_group.stores = {"JOINVILLE", "TUBARAO"}
+    repo.grant_sets[repo.access_group.id] = {"sales.view", "checklist.edit"}
+    target_group = fake_group(stores=("TUBARAO",), name="Estoque")
+    repo.groups[target_group.id] = target_group
+    repo.grant_sets[target_group.id] = {"supplies.view"}
+    monkeypatch.setattr(admin_module, "load_principal", _stub_principal(repo))
+    service = AdminService(repo, repo.actor)
+    preview = service.preview_reassignment(repo.access_group.id, target_group.id)
+    assert preview["member_count"] == 1
+    member = preview["members"][0]
+    # Escopo individual preservado: usuario continua limitado a JOINVILLE,
+    # que o grupo de destino nao cobre -> acesso efetivo cai para zero.
+    assert member["stores_after"] == []
+    assert member["stores_before"] == ["JOINVILLE"]
+    assert set(member["revoked"]) == {"sales.view", "checklist.edit"}
+
+
+def test_preview_reassignment_rejects_invalid_target():
+    repo = FakeAdminRepository()
+    service = AdminService(repo, repo.actor)
+    with pytest.raises(AdminError) as error:
+        service.preview_reassignment(repo.access_group.id, repo.access_group.id)
+    assert error.value.status_code == 422
+    inactive = fake_group(name="Inativo", active=False)
+    repo.groups[inactive.id] = inactive
+    with pytest.raises(AdminError) as error:
+        service.preview_reassignment(repo.access_group.id, inactive.id)
+    assert error.value.status_code == 422

@@ -70,6 +70,13 @@ class UserAccessUpdate(BaseModel):
     store_codes: list[str] | None = Field(default=None, max_length=3)
 
 
+class AccessPreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    group_id: UUID
+    store_codes: list[str] | None = Field(default=None, max_length=3)
+
+
 class StoreAssignmentUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -188,6 +195,14 @@ def user_effective_permissions(user_id: UUID,
     return http_result(lambda: admin.effective_permissions(user_id))
 
 
+@router.post("/users/{user_id}/access-preview")
+def preview_user_access(user_id: UUID, payload: AccessPreview,
+                        admin: AdminService = Depends(service)) -> dict:
+    return http_result(lambda: admin.preview_user_access(
+        user_id, group_id=payload.group_id, store_codes=payload.store_codes,
+    ))
+
+
 @router.post("/users", status_code=201)
 def create_user(payload: CreateUser, admin: AdminService = Depends(service)) -> dict:
     return http_result(lambda: admin.add_user(
@@ -266,6 +281,13 @@ def duplicate_group(group_id: UUID, payload: GroupDuplicate,
 def set_group_active(group_id: UUID, payload: GroupStatusUpdate,
                      admin: AdminService = Depends(service)) -> dict:
     return http_result(lambda: admin.set_group_active(group_id, payload.active))
+
+
+@router.get("/groups/{group_id}/reassignment-preview")
+def reassignment_preview(group_id: UUID,
+                         reassign_to: UUID = Query(...),
+                         admin: AdminService = Depends(service)) -> dict:
+    return http_result(lambda: admin.preview_reassignment(group_id, reassign_to))
 
 
 @router.delete("/groups/{group_id}")

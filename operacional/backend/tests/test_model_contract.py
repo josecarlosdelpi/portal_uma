@@ -38,3 +38,10 @@ def test_group_store_coverage_and_user_scope_are_composite_keys():
     assert {c.name for c in scope.primary_key.columns} == {"user_id", "store_code"}
     memberships = Base.metadata.tables["group_memberships"]
     assert {c.name for c in memberships.primary_key.columns} == {"user_id", "group_id"}
+    # Um usuario comum tem exatamente um grupo principal, garantido pelo banco.
+    unique_cols = {
+        tuple(c.name for c in constraint.columns)
+        for constraint in memberships.constraints
+        if constraint.__class__.__name__ == "UniqueConstraint"
+    }
+    assert ("user_id",) in unique_cols

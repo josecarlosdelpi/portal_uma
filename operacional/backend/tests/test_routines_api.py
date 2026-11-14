@@ -152,6 +152,45 @@ def test_whatsapp_plan_can_be_removed_before_day_off_with_audit(env):
         assert "whatsapp.plan.deleted" in changes
 
 
+def test_whatsapp_global_edit_uses_any_store_grant_not_joinville(env):
+    """O calendario de WhatsApp e global da UMA: a edicao vale com
+    whatsapp_status.edit efetivo em QUALQUER loja autorizada. Uma concessao
+    restrita a TUBARAO nao pode depender de abrangencia em JOINVILLE."""
+    c,actor,engine,_,seller,tub=env
+    with Session(engine) as db:
+        seed_group(db,"Marketing Tubarao",["TUBARAO"],
+                   ["whatsapp_status.view","whatsapp_status.edit"],[tub])
+        db.commit()
+    route="/api/v1/routines/whatsapp/2026-10-20"
+    actor["user"]=tub
+    # tub so tem concessao em TUBARAO — e edita o calendario global
+    assert c.put(route,json={
+        "product_code":"Global Tub","status":"planejado","expected_revision":0
+    }).status_code==200
+    # usuario so com visualizacao nao edita
+    actor["user"]=seller
+    assert c.put("/api/v1/routines/whatsapp/2026-10-21",json={
+        "product_code":"Nao pode","status":"planejado","expected_revision":0
+    }).status_code==403
+    # consulta do mes permanece autorizada nas duas contas
+    assert c.get("/api/v1/routines/whatsapp/2026/10").status_code==200
+    actor["user"]=tub
+    assert c.get("/api/v1/routines/whatsapp/2026/10").status_code==200
+    actor["user"]=env[3]
+
+
+def test_whatsapp_edit_denied_without_any_grant(env):
+    """Sem nenhuma concessao de whatsapp_status.edit, a edicao global e 403."""
+    c,actor,engine,_,_,tub=env
+    actor["user"]=tub  # tub nao tem grupo neste fixture
+    assert c.put("/api/v1/routines/whatsapp/2026-10-20",json={
+        "product_code":"Sem permissao","status":"planejado","expected_revision":0
+    }).status_code==403
+    assert c.put("/api/v1/routines/whatsapp/2026-10-20/day-off",json={
+        "off":True,"reason":"x"}).status_code==403
+    actor["user"]=env[3]
+
+
 def test_instagram_is_manual_and_store_bound(env):
     c,actor,_,_,seller,_=env
     initial=c.get("/api/v1/routines/instagram/2026/10").json()

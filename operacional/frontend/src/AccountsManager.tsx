@@ -35,7 +35,7 @@ export function TemporaryPasswordNotice({username,password,onClose}:{
 }
 
 export function AccountsManager({token,groups,onCreated}:{
-  token:string;groups:AccessGroup[];onCreated:()=>Promise<void>
+  token:string;groups:AccessGroup[];onCreated:(userId:string)=>Promise<void>
 }){
   const [show,setShow]=useState(false);
   const [name,setName]=useState("");
@@ -68,7 +68,7 @@ export function AccountsManager({token,groups,onCreated}:{
         group_id:group.id,...(scope.length?{store_codes:scope}:{})
       });
       setResult(row);setShow(false);setName("");setUsername("");setGroupId("");setScope([]);
-      await onCreated();
+      await onCreated(row.id);
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao cadastrar.");}
     finally{setBusy(false);}
   }
