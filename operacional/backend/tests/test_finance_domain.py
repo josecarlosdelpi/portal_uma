@@ -78,6 +78,48 @@ def test_cabecalho_fora_do_contrato():
         parse_despesas(b"a;b;c\n1;2;3\n")
 
 
+HEADER_V2 = (
+    "loja;loja_descricao;nr_documento;nr_parcela;cnpj_fornecedor;"
+    "nome_fornecedor;dt_emissao;dt_vencimento;dt_pagamento;valor_original;"
+    "acrescimos;descontos;valor_liquido;categoria;nr_conta;"
+    "descricao_conta;situacao\n"
+)
+VALID_V2 = HEADER_V2 + (
+    "2;Tubarao;42;1;11111111000100;FORNECEDOR ALFA;01/08/2026;05/08/2026;"
+    "05/08/2026;1350;10;5;1355;Despesa;27;Alugueis;Pago\n"
+    "1;Joinville;100344;2;;GUIA IMPOSTO FICTICIO;02/09/2026;10/09/2026;;"
+    "200;0;0;200;Despesa;36;Impostos;Aberto\n"
+)
+
+
+def test_layout_v2_17_colunas_campos_extras():
+    parsed = parse_despesas(VALID_V2.encode(), today=date(2026, 11, 11))
+    assert len(parsed.rows) == 2
+    first = parsed.rows[0]
+    assert first.amount == Decimal("1355.00")  # valor_liquido vira o amount
+    assert first.store_code == "TUBARAO"
+    assert first.status == "pago" and first.paid_at == date(2026, 8, 5)
+    assert first.document_number == "42" and first.installment_number == "1"
+    assert first.issued_at == date(2026, 8, 1)
+    assert first.original_amount == Decimal("1350.00")
+    assert first.additions == Decimal("10.00")
+    assert first.discounts == Decimal("5.00")
+    assert first.account_code == "27" and first.account_description == "Alugueis"
+    second = parsed.rows[1]
+    assert second.status == "aberto" and second.paid_at is None
+    assert second.supplier_doc is None
+
+
+def test_layout_v2_flag_valor_liquido_divergente():
+    content = HEADER_V2 + (
+        "2;Tubarao;42;1;11111111000100;FORNECEDOR ALFA;01/08/2026;05/08/2026;"
+        "05/08/2026;1350;10;5;2000;Despesa;27;Alugueis;Pago\n"
+    )
+    parsed = parse_despesas(content.encode(), today=date(2026, 11, 11))
+    codes = {flag.code for flag in parsed.flags}
+    assert "valor_liquido_divergente" in codes
+
+
 def test_arquivo_sem_dados():
     with pytest.raises(ImportFormatError):
         parse_despesas(HEADER.encode())

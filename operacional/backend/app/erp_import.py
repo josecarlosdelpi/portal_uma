@@ -81,7 +81,7 @@ def import_erp_file(
         db.commit()
         return batch
 
-    parsed = parse_erp_csv(content)
+    parsed = parse_erp_csv(content, kind)
     batch.rows_total = parsed.total_lines
     batch.rows_rejected = parsed.total_lines - len(parsed.rows)
     if parsed.errors or not parsed.rows:
@@ -113,6 +113,9 @@ def import_erp_file(
             customer_cnpj=row.customer_cnpj, customer_name=row.customer_name,
             product_code=row.product_code, quantity=row.quantity,
             unit_price=row.unit_price, total=row.total, row_hash=row.row_hash,
+            seller_name=row.seller_name,
+            product_description=row.product_description,
+            product_unit=row.product_unit, unit_cost=row.unit_cost,
         )
         for row in parsed.rows
     )

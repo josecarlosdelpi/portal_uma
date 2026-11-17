@@ -68,6 +68,12 @@ def apply_despesas_file(
             supplier_doc=row.supplier_doc, supplier_name=row.supplier_name,
             amount=row.amount, due_date=row.due_date, paid_at=row.paid_at,
             category=row.category, store_code=row.store_code, status=row.status,
+            document_number=row.document_number,
+            installment_number=row.installment_number,
+            issued_at=row.issued_at, original_amount=row.original_amount,
+            additions=row.additions, discounts=row.discounts,
+            account_code=row.account_code,
+            account_description=row.account_description,
         )
         for row in parsed.rows
     )

@@ -643,6 +643,10 @@ class ErpSaleRow(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    seller_name: Mapped[str | None] = mapped_column(String(150))
+    product_description: Mapped[str | None] = mapped_column(String(200))
+    product_unit: Mapped[str | None] = mapped_column(String(10))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -666,6 +670,10 @@ class ErpReturnRow(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    seller_name: Mapped[str | None] = mapped_column(String(150))
+    product_description: Mapped[str | None] = mapped_column(String(200))
+    product_unit: Mapped[str | None] = mapped_column(String(10))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -717,6 +725,14 @@ class FinancialObligation(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     due_date: Mapped[date] = mapped_column(Date(), nullable=False)
     paid_at: Mapped[date | None] = mapped_column(Date())
+    document_number: Mapped[str | None] = mapped_column(String(30))
+    installment_number: Mapped[str | None] = mapped_column(String(10))
+    issued_at: Mapped[date | None] = mapped_column(Date())
+    original_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    additions: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    discounts: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    account_code: Mapped[str | None] = mapped_column(String(20))
+    account_description: Mapped[str | None] = mapped_column(String(150))
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
     status: Mapped[str] = mapped_column(String(10), nullable=False)

@@ -37,6 +37,28 @@ DEVOLUCOES_CSV = (
     + "09/11/2026;1;Joinville;0;98765432000111;CLIENTE TESTE B;P200;1;88;88\n"
 ).encode("ascii")
 
+HEADER_V2_VENDAS = (
+    "data;loja;loja_descricao;id_vendedor;nome_vendedor;cnpj_cliente;"
+    "razao_cliente;id_produto;produto_descricao;produto_unidade;"
+    "quantidade;valor_unitario;valor_total;custo_unitario\n"
+)
+HEADER_V2_DEVOLUCOES = (
+    "data;loja;loja_descricao;cnpj_cliente;razao_cliente;id_produto;"
+    "produto_descricao;produto_unidade;quantidade;valor_unitario;valor_total\n"
+)
+LINE_V2_JOI = ("15/01/2026;1;Joinville;7;MARIA VENDEDORA;00000000000;"
+               "CONSUMIDOR;P100;MANGA ROSA;KG;2;50;100;30")
+LINE_V2_TUB = ("20/02/2026;2;Tubarao;4;JOAO VENDEDOR;12345678000199;"
+               "CLIENTE TESTE A;P300;MANGA TOMMY;PC;3;10;30;7")
+
+
+def vendas_v2_csv(*lines: str) -> bytes:
+    return (HEADER_V2_VENDAS + "\n".join(lines) + "\n").encode("ascii")
+
+
+def devolucoes_v2_csv(*lines: str, sep: str = "\n") -> bytes:
+    return (HEADER_V2_DEVOLUCOES + sep.join(lines) + sep).encode("ascii")
+
 
 @pytest.fixture
 def env():
@@ -105,6 +127,77 @@ def test_parser_brazilian_format():
     assert first.store_code == "JOINVILLE"
     assert first.customer_cnpj == "00000000000"  # texto, espacos removidos
     assert first.total == Decimal("100")
+
+
+def test_parser_layout_v2_campos_extras():
+    parsed = parse_erp_csv(vendas_v2_csv(LINE_V2_JOI, LINE_V2_TUB), "VENDAS")
+    assert parsed.errors == []
+    assert len(parsed.rows) == 2
+    first = parsed.rows[0]
+    assert first.seller_code == "7" and first.seller_name == "MARIA VENDEDORA"
+    assert first.product_code == "P100"
+    assert first.product_description == "MANGA ROSA"
+    assert first.product_unit == "KG"
+    assert first.unit_cost == Decimal("30")
+    assert first.total == Decimal("100")
+
+
+def test_parser_layout_v2_devolucoes_sem_vendedor():
+    parsed = parse_erp_csv(
+        devolucoes_v2_csv(
+            "08/01/2026;1;Joinville;42684925000149;CLIENTE A;13419;MANG.MOLD.;PC;1;255;255",
+        ),
+        "DEVOLUCOES",
+    )
+    assert parsed.errors == []
+    assert parsed.rows[0].seller_code == "0"
+    assert parsed.rows[0].product_description == "MANG.MOLD."
+    assert parsed.rows[0].product_unit == "PC"
+
+
+def test_parser_aceita_cr_solitario_como_quebra_de_linha():
+    # O ERP ja exportou Devolucoes.csv com CR solitario em vez de CRLF.
+    parsed = parse_erp_csv(
+        devolucoes_v2_csv(
+            "08/01/2026;1;Joinville;42684925000149;CLIENTE A;13419;MANG.MOLD.;PC;1;255;255",
+            "09/01/2026;2;Tubarao;12345678000199;CLIENTE B;20000;MANGA KG;KG;2;100;200",
+            sep="\r",
+        ),
+        "DEVOLUCOES",
+    )
+    assert parsed.errors == []
+    assert len(parsed.rows) == 2
+    assert parsed.rows[0].store_code == "JOINVILLE"
+    assert parsed.rows[1].store_code == "TUBARAO"
+
+
+def test_importacao_v2_persiste_campos_extras(env):
+    client, _, engine, *_ = env
+    response = upload(client, "vendas", vendas_v2_csv(LINE_V2_JOI, LINE_V2_TUB))
+    assert response.status_code == 200
+    assert response.json()["batch"]["rows_applied"] == 2
+    with Session(engine) as db:
+        rows = db.scalars(select(ErpSaleRow)).all()
+        joi = [r for r in rows if r.store_code == "JOINVILLE"][0]
+        assert joi.seller_name == "MARIA VENDEDORA"
+        assert joi.product_description == "MANGA ROSA"
+        assert joi.product_unit == "KG"
+        assert joi.unit_cost == Decimal("30")
+        assert sum(r.total for r in rows) == Decimal("130")
+
+
+def test_importacao_v2_devolucoes_preserva_fora_da_janela(env):
+    client, _, engine, *_ = env
+    upload(client, "devolucoes", DEVOLUCOES_CSV)  # v1: out/nov-2026
+    upload(client, "devolucoes", devolucoes_v2_csv(
+        "08/01/2026;1;Joinville;42684925000149;CLIENTE A;13419;MANG.;PC;1;255;255",
+    ))
+    with Session(engine) as db:
+        rows = db.scalars(select(ErpReturnRow)).all()
+        # Janela do v2 (jan) nao toca nas linhas v1 de out/nov.
+        assert len(rows) == 3
+        v2 = [r for r in rows if r.product_description is not None]
+        assert len(v2) == 1 and v2[0].product_unit == "PC"
 
 
 def test_parser_rejects_bad_header_and_lines():
