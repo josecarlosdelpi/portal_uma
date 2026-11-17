@@ -331,6 +331,19 @@ export function SalesPage({token, profile}: Props) {
         </select></div>}
     </div>
 
+    {summary && summary.data_state && summary.data_state !== "current" &&
+      <div className="notice notice-amber" role="status">
+        {summary.data_state === "missing" &&
+          "Sem dados vigentes neste período."}
+        {summary.data_state === "stale" &&
+          "Período com dados de exportação anterior — são preservados, mas não refletem o arquivo vigente."}
+        {summary.data_state === "partial" &&
+          "Os dados exibidos são do arquivo vigente, que não cobre o período inteiro."}
+        {summary.source?.data_through &&
+          " O arquivo Vendas.csv vigente cobre até " +
+          new Date(summary.source.data_through + "T12:00:00").toLocaleDateString("pt-BR") + "."}
+      </div>}
+
     {summary && <>
       <div className="overview-kpis">
         <div className="panel overview-kpi"><span>Faturamento do período</span>
@@ -339,7 +352,8 @@ export function SalesPage({token, profile}: Props) {
         {orderedStores.map(item => <div className="panel overview-kpi" key={item.code}>
           <span>{labelStore(item.code)}</span>
           <strong>{item.revenue_visibility === "restricted" ? "Restrito" : money(item.revenue)}</strong>
-          <small>{qty(item.quantity)} itens · {money(item.returns_revenue)} em devoluções</small></div>)}
+          <small>{qty(item.quantity)} itens · {money(item.returns_revenue)} em devoluções
+            {item.data_state === "stale" ? " · exportação anterior" : ""}</small></div>)}
         <div className="panel overview-kpi"><span>Devoluções registradas</span>
           <strong>{money(summary.totals.returns_revenue)}</strong>
           <small>{summary.totals.returns_rows} linha(s) · exibidas separadamente</small></div>

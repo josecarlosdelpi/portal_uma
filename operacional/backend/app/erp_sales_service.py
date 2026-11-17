@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Iterable
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -56,6 +56,7 @@ def store_totals(
             model.store_code.in_(codes),
             model.sale_date >= first,
             model.sale_date <= last,
+            model.superseded_at.is_(None),
         )
         .group_by(model.store_code)
     ).all()
@@ -81,6 +82,7 @@ def daily_totals(
             model.store_code.in_(codes),
             model.sale_date >= first,
             model.sale_date <= last,
+            model.superseded_at.is_(None),
         )
         .group_by(model.sale_date, model.store_code)
     ).all()
@@ -104,13 +106,109 @@ def pilot_sales_status(db: Session) -> dict:
         return {
             "status": "awaiting_erp_integration",
             "sales_updated_at": None,
+            "data_through": None,
+            "has_stale_data": False,
             "message": "Faturamento oficial ainda não importado.",
         }
+    coverage = batch.coverage or []
+    data_through = max(
+        (span["last_date"] for span in coverage), default=None
+    )
+    stale = any(
+        db.scalar(
+            select(func.count()).select_from(ErpSaleRow).where(
+                ErpSaleRow.store_code == span["store_code"],
+                or_(
+                    ErpSaleRow.sale_date > date.fromisoformat(span["last_date"]),
+                    ErpSaleRow.sale_date < date.fromisoformat(span["first_date"]),
+                ),
+                ErpSaleRow.superseded_at.is_(None),
+            )
+        )
+        for span in coverage
+    )
     return {
         "status": "pilot_unverified",
         "sales_updated_at": batch.applied_at.isoformat() if batch.applied_at else None,
+        "data_through": data_through,
+        "has_stale_data": stale,
         "message": "Dados do ERP em fase de testes — conferir com os relatórios oficiais.",
     }
+
+
+def latest_coverage(db: Session, kind: str) -> dict[str, tuple[date, date]]:
+    """Janelas (loja x datas) cobertas pelo lote vigente do arquivo."""
+    batch = latest_applied(db, kind)
+    windows: dict[str, tuple[date, date]] = {}
+    for span in (batch.coverage or []) if batch else []:
+        windows[span["store_code"]] = (
+            date.fromisoformat(span["first_date"]),
+            date.fromisoformat(span["last_date"]),
+        )
+    return windows
+
+
+def period_states(
+    db: Session, codes: list[str], first: date, last: date,
+) -> tuple[dict[str, str], str]:
+    """Estado dos dados por loja no período consultado.
+
+    current: linhas do período dentro da cobertura e período ate o fim da
+             janela do arquivo vigente;
+    partial: linhas todas do arquivo vigente, mas o período se estende
+             alem do fim da cobertura (arquivo termina no meio do período);
+    stale:   existem linhas fora da cobertura do arquivo vigente —
+             pertencem a uma exportacao anterior;
+    missing: sem linhas vigentes no período.
+    O estado geral prioriza a maior ressalva: stale > partial > missing.
+    """
+    coverage = latest_coverage(db, KIND_VENDAS)
+    counts = dict(
+        db.execute(
+            select(ErpSaleRow.store_code, func.count())
+            .where(
+                ErpSaleRow.store_code.in_(codes),
+                ErpSaleRow.sale_date >= first,
+                ErpSaleRow.sale_date <= last,
+                ErpSaleRow.superseded_at.is_(None),
+            )
+            .group_by(ErpSaleRow.store_code)
+        ).all()
+    ) if codes else {}
+    states: dict[str, str] = {}
+    for code in codes:
+        if not counts.get(code):
+            states[code] = "missing"
+            continue
+        win = coverage.get(code)
+        if win is None:
+            states[code] = "stale"
+            continue
+        outside = db.scalar(
+            select(func.count()).select_from(ErpSaleRow).where(
+                ErpSaleRow.store_code == code,
+                ErpSaleRow.sale_date >= first,
+                ErpSaleRow.sale_date <= last,
+                ErpSaleRow.superseded_at.is_(None),
+                or_(
+                    ErpSaleRow.sale_date < win[0],
+                    ErpSaleRow.sale_date > win[1],
+                ),
+            )
+        )
+        states[code] = (
+            "stale" if outside else ("current" if last <= win[1] else "partial")
+        )
+    unique = set(states.values())
+    if unique == {"current"}:
+        overall = "current"
+    elif "stale" in unique:
+        overall = "stale"
+    elif unique == {"missing"}:
+        overall = "missing"
+    else:
+        overall = "partial"
+    return states, overall
 
 
 def sales_by_date_for_store(
@@ -122,6 +220,7 @@ def sales_by_date_for_store(
             ErpSaleRow.store_code == store_code,
             ErpSaleRow.sale_date >= first,
             ErpSaleRow.sale_date <= last,
+            ErpSaleRow.superseded_at.is_(None),
         )
         .group_by(ErpSaleRow.sale_date)
     ).all()
@@ -215,8 +314,24 @@ class SalesService:
     def status(self) -> dict:
         self._scope(None)
         kinds = []
+        row_model = {KIND_VENDAS: ErpSaleRow, KIND_DEVOLUCOES: ErpReturnRow}
         for kind in (KIND_VENDAS, KIND_DEVOLUCOES):
             batch = latest_applied(self.db, kind)
+            coverage = (batch.coverage or []) if batch else []
+            model = row_model[kind]
+            stale_rows = sum(
+                self.db.scalar(
+                    select(func.count()).select_from(model).where(
+                        model.store_code == span["store_code"],
+                        or_(
+                            model.sale_date > date.fromisoformat(span["last_date"]),
+                            model.sale_date < date.fromisoformat(span["first_date"]),
+                        ),
+                        model.superseded_at.is_(None),
+                    )
+                ) or 0
+                for span in coverage
+            )
             kinds.append({
                 "kind": kind,
                 "last_applied_at": batch.applied_at.isoformat() if batch and batch.applied_at else None,
@@ -224,6 +339,8 @@ class SalesService:
                 "rows_applied": batch.rows_applied if batch else 0,
                 "period_start": batch.period_start.isoformat() if batch and batch.period_start else None,
                 "period_end": batch.period_end.isoformat() if batch and batch.period_end else None,
+                "coverage": coverage,
+                "rows_beyond_coverage": stale_rows,
             })
         sources = self.db.scalars(select(ErpSourceFile)).all()
         settings = get_settings()
@@ -282,6 +399,7 @@ class SalesService:
         revenue_ok = self._revenue_map(codes)
         sales = store_totals(self.db, ErpSaleRow, codes, first, last)
         returns = store_totals(self.db, ErpReturnRow, codes, first, last)
+        states, overall = period_states(self.db, codes, first, last)
         stores = []
         totals = {"revenue": Decimal("0"), "quantity": Decimal("0"), "rows": 0,
                   "returns_revenue": Decimal("0"), "returns_quantity": Decimal("0"), "returns_rows": 0}
@@ -291,6 +409,7 @@ class SalesService:
             can_revenue = revenue_ok[code]
             stores.append({
                 "code": code,
+                "data_state": states[code],
                 "revenue": str(sale["revenue"]) if can_revenue else None,
                 "revenue_visibility": "allowed" if can_revenue else "restricted",
                 "quantity": str(sale["quantity"]),
@@ -308,6 +427,8 @@ class SalesService:
         return {
             "from": first.isoformat(), "to": last.isoformat(), "stores": stores,
             "totals": {key: str(value) for key, value in totals.items()},
+            "data_state": overall,
+            "source": pilot_sales_status(self.db),
         }
 
     def daily(self, first: date, last: date, store_code: str | None) -> dict:
@@ -335,9 +456,11 @@ class SalesService:
             if revenue_ok[code]:
                 entry["returns_revenue"] = str(ret["revenue"])
             entry["returns_quantity"] = str(ret["quantity"])
+        _, overall = period_states(self.db, codes, first, last)
         return {
             "from": first.isoformat(), "to": last.isoformat(),
             "days": [days[key] for key in sorted(days)],
+            "data_state": overall,
         }
 
     def top(
@@ -377,6 +500,7 @@ class SalesService:
                 ErpSaleRow.store_code.in_(codes),
                 ErpSaleRow.sale_date >= first,
                 ErpSaleRow.sale_date <= last,
+                ErpSaleRow.superseded_at.is_(None),
             )
             .group_by(group_col, ErpSaleRow.store_code)
         ).all()
@@ -406,6 +530,7 @@ class SalesService:
                     ErpSaleRow.store_code.in_(codes),
                     ErpSaleRow.sale_date >= first,
                     ErpSaleRow.sale_date <= last,
+                    ErpSaleRow.superseded_at.is_(None),
                 )
                 .distinct()
             ).all()
@@ -418,9 +543,11 @@ class SalesService:
         items = sorted(
             merged.values(), key=lambda item: (item[sort], item["revenue"]), reverse=True
         )[:limit]
+        _, overall = period_states(self.db, codes, first, last)
         return {
             "dimension": dimension,
             "from": first.isoformat(), "to": last.isoformat(),
+            "data_state": overall,
             "items": [
                 {
                     "key": item["key"],

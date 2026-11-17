@@ -4,7 +4,9 @@ from decimal import Decimal
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
-from app.erp_sales_service import month_bounds, sales_by_date_for_store
+from app.erp_sales_service import (
+    month_bounds, period_states, sales_by_date_for_store,
+)
 from app.models import User
 from app.policy import STORE_CODES, can_access
 from app.repositories import load_principal
@@ -65,6 +67,10 @@ class TargetService:
         )
         monthly_revenue = sum(sales_by_date.values(), Decimal("0"))
         has_sales = bool(sales_by_date)
+        states, _overall = period_states(
+            self.repo.session, [store_code], first, last
+        )
+        data_state = states[store_code]
         minimum = settings.minimum_daily if settings else None
         plan = (
             dynamic_plan(target, days, sales_by_date, minimum)
@@ -92,6 +98,7 @@ class TargetService:
             "base_plan": daily_base,
             "sales": {
                 "status": "pilot_unverified" if has_sales else "awaiting_official_import",
+                "data_state": data_state,
                 "monthly_revenue": str(monthly_revenue) if has_sales else None,
                 "attainment_percent": str(attainment) if attainment is not None else None,
                 "dynamic_day_plan": (

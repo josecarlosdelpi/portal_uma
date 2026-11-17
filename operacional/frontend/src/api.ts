@@ -151,6 +151,7 @@ export type TargetSnapshot = {
   base_plan: DailyBase[];
   sales: {
     status: "awaiting_official_import" | "pilot_unverified";
+    data_state?: "current" | "stale" | "missing" | "partial";
     monthly_revenue: string | null;
     attainment_percent: string | null;
     dynamic_day_plan: DynamicDayPlan[] | null;
@@ -168,6 +169,7 @@ export type OverviewStore = {
   attainment_percent: string | null;
   previous_month_change_percent: string | null;
   previous_year_change_percent: string | null;
+  data_state?: "current" | "stale" | "missing" | "partial";
 };
 
 export type OverviewSnapshot = {
@@ -182,7 +184,10 @@ export type OverviewSnapshot = {
     previous_month_change_percent: string | null;
     previous_year_change_percent: string | null;
   };
-  source: { sales_status: string; sales_updated_at: string | null; message: string };
+  source: {
+    sales_status: string; sales_updated_at: string | null; message: string;
+    data_through?: string | null; has_stale_data?: boolean;
+  };
 };
 
 export type ClosingPriority = {
@@ -257,6 +262,8 @@ export type SalesSyncStatus = {
     kind: "VENDAS" | "DEVOLUCOES"; last_applied_at: string | null;
     file_name: string | null; rows_applied: number;
     period_start: string | null; period_end: string | null;
+    coverage?: Array<{store_code: string; first_date: string; last_date: string}>;
+    rows_beyond_coverage?: number;
   }>;
   drive: {
     enabled: boolean; interval_seconds: number;
@@ -269,10 +276,18 @@ export type SalesSyncStatus = {
   };
 };
 
+export type SalesDataState = "current" | "stale" | "missing" | "partial";
+
 export type SalesStoreSummary = {
   code: string; revenue: string | null; revenue_visibility: "allowed" | "restricted";
   quantity: string; rows: number;
   returns_revenue: string | null; returns_quantity: string; returns_rows: number;
+  data_state?: SalesDataState;
+};
+
+export type SalesSource = {
+  status: string; sales_updated_at: string | null;
+  data_through: string | null; has_stale_data: boolean; message: string;
 };
 
 export type SalesSummary = {
@@ -282,6 +297,8 @@ export type SalesSummary = {
     revenue: string; quantity: string; rows: number;
     returns_revenue: string; returns_quantity: string; returns_rows: number;
   };
+  data_state?: SalesDataState;
+  source?: SalesSource;
 };
 
 export type SalesDailyRow = {
@@ -298,6 +315,7 @@ export type SalesTopItem = {
 export type SalesTopResult = {
   dimension: "products" | "sellers" | "customers";
   from: string; to: string; items: SalesTopItem[];
+  data_state?: SalesDataState;
 };
 
 export class ApiError extends Error {
@@ -554,7 +572,7 @@ export const api = {
       (store ? "&store=" + encodeURIComponent(store) : "")),
 
   salesDaily: (token: string, from: string, to: string, store?: string) =>
-    request<{from: string; to: string; days: SalesDailyRow[]}>(
+    request<{from: string; to: string; days: SalesDailyRow[]; data_state?: SalesDataState}>(
       token, "/api/v1/sales/daily?from=" + from + "&to=" + to +
       (store ? "&store=" + encodeURIComponent(store) : "")),
 

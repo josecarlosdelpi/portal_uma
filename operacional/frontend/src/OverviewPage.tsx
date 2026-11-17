@@ -51,9 +51,13 @@ export function OverviewPage({token, profile}: Props) {
         <input id="overview-period" type="month" min="2020-01" max="2100-12"
           value={period} onChange={(event) => setPeriod(event.target.value)}/></div>
       <span className="chip">{pilot
-        ? "Fonte comercial: ERP (piloto) · " + (snapshot?.source.sales_updated_at
-          ? "atualizado em " + new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR")
-          : "sem registro")
+        ? "Fonte comercial: ERP (piloto)" +
+          (snapshot?.source.data_through
+            ? " · dados até " + new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR")
+            : "") +
+          (snapshot?.source.sales_updated_at
+            ? " · sincronizado em " + new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR")
+            : " · sem registro")
         : "Fonte comercial: integração pendente"}</span>
     </div>
     {awaiting && <div className="notice notice-amber" role="status">
@@ -64,6 +68,14 @@ export function OverviewPage({token, profile}: Props) {
       Dados do ERP em fase de testes — conferir com os relatórios oficiais antes de decisões.
       As metas exibidas são as cadastradas no Portal UMA.
     </div>}
+    {pilot && snapshot && snapshot.stores.some((s) => s.data_state === "stale") &&
+      <div className="notice notice-amber" role="status">
+        Período com dados de exportação anterior — o arquivo Vendas.csv vigente cobre até{" "}
+        {snapshot.source.data_through
+          ? new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR")
+          : "data desconhecida"}.
+        Estes números são preservados, mas não refletem a exportação mais recente.
+      </div>}
     {loading && <p role="status">Carregando indicadores…</p>}
     {error && <div className="notice notice-error" role="alert">{error}</div>}
     {snapshot && <>
@@ -77,10 +89,13 @@ export function OverviewPage({token, profile}: Props) {
         <div className="panel overview-kpi"><span>Atingimento da meta</span>
           <strong>{percent(snapshot.summary.attainment_percent)}</strong>
           <small>{pilot ? "Faturamento ÷ meta do período" : "Depende das vendas oficiais"}</small></div>
-        <div className="panel overview-kpi"><span>Última atualização de vendas</span>
-          <strong>{snapshot.source.sales_updated_at
-            ? new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR") : "Não disponível"}</strong>
-          <small>{pilot ? "Sincronização do arquivo Vendas.csv" : "Os dados ainda não foram importados"}</small></div>
+        <div className="panel overview-kpi"><span>Última venda no arquivo</span>
+          <strong>{snapshot.source.data_through
+            ? new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR") : "Não disponível"}</strong>
+          <small>{pilot
+            ? "Sincronizado em " + (snapshot.source.sales_updated_at
+              ? new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR") : "—")
+            : "Os dados ainda não foram importados"}</small></div>
       </div>
       <section className="panel">
         <div className="panel-head"><div><h2>{snapshot.scope==="consolidated"?
@@ -93,7 +108,12 @@ export function OverviewPage({token, profile}: Props) {
             <h3>{store.name}</h3>
             <div><span>Meta mensal</span><strong>{store.target_visibility==="restricted"?
               "Restrito" : currency(store.target)}</strong></div>
-            <div><span>Faturamento</span><strong>{currency(store.revenue)}</strong></div>
+            <div><span>Faturamento</span><strong>{currency(store.revenue)}</strong>
+              {store.data_state === "stale" &&
+                <small className="erp-data-state">exportação anterior</small>}
+              {store.data_state === "missing" &&
+                <small className="erp-data-state">sem dados no arquivo vigente</small>}
+            </div>
             <div><span>Atingimento</span><strong>{percent(store.attainment_percent)}</strong></div>
             {store.attainment_percent !== null &&
               <div className="store-progress"><i style={{

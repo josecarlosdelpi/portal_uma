@@ -8,7 +8,9 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.erp_sales_service import month_bounds, pilot_sales_status, store_totals
+from app.erp_sales_service import (
+    month_bounds, period_states, pilot_sales_status, store_totals,
+)
 from app.models import ErpSaleRow, MonthlySalesTarget, User
 from app.policy import STORE_CODES, can_access, visible_stores
 from app.repositories import load_principal
@@ -56,6 +58,7 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
                                          month - 1 if month > 1 else 12)
     revenue = store_totals(db, ErpSaleRow, stores, first, last)
     previous = store_totals(db, ErpSaleRow, stores, prev_first, prev_last)
+    states, _overall = period_states(db, stores, first, last)
     result = []
     for code in stores:
         # Permissao do modulo nao autoriza automaticamente os indicadores.
@@ -82,6 +85,7 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
         result.append({
             "code": code,
             "name": STORE_NAMES[code],
+            "data_state": states[code],
             "target": amounts[code] if can_target else None,
             "target_visibility": "allowed" if can_target else "restricted",
             "revenue": str(store_revenue) if store_revenue is not None else None,
@@ -121,6 +125,8 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
         "source": {
             "sales_status": status["status"],
             "sales_updated_at": status["sales_updated_at"],
+            "data_through": status["data_through"],
+            "has_stale_data": status["has_stale_data"],
             "message": status["message"],
         },
     }
@@ -132,6 +138,7 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
     all_goals = all(amounts[code] is not None for code in STORE_CODES)
     first, last = month_bounds(year, month)
     revenue = store_totals(db, ErpSaleRow, STORE_CODES, first, last)
+    states, _overall = period_states(db, STORE_CODES, first, last)
     status = pilot_sales_status(db)
     stores = []
     total_revenue = Decimal("0")
@@ -148,6 +155,7 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
             has_revenue = True
         stores.append({
             "code": code, "name": STORE_NAMES[code], "target": amounts[code],
+            "data_state": states[code],
             "revenue": str(store_revenue) if store_revenue is not None else None,
             "attainment_percent": str(attainment) if attainment is not None else None,
             "change_percent": None,
@@ -166,5 +174,10 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
         ),
         "previous_month_change_percent": None,
         "previous_year_change_percent": None,
-        "source": {"status": status["status"], "sales_updated_at": status["sales_updated_at"]},
+        "source": {
+            "status": status["status"],
+            "sales_updated_at": status["sales_updated_at"],
+            "data_through": status["data_through"],
+            "has_stale_data": status["has_stale_data"],
+        },
     }

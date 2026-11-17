@@ -4,12 +4,18 @@ Sem identificadores transacionais no ERP: o arquivo representa o estado da
 janela que cobre. A substituicao ocorre por cobertura (loja x intervalo de
 datas), dentro de uma unica transacao, preservando linhas fora da janela.
 Linhas integralmente iguais sao mantidas — cardinalidade nunca e reduzida.
+
+Protecao de historico: linhas substituidas recebem superseded_at (soft-
+delete recuperavel) em vez de serem apagadas. Se dentro da janela coberta
+existir um mes com dados vigentes mas sem nenhum registro no arquivo novo,
+o lote inteiro e rejeitado — uma exportacao incompleta nao apaga dados
+validos.
 """
 import hashlib
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.erp_csv import KIND_DEVOLUCOES, KIND_VENDAS, KINDS, ParsedRow, parse_erp_csv
@@ -30,6 +36,47 @@ class ErpImportError(Exception):
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _months_between(first: date, last: date) -> list[tuple[int, int]]:
+    year, month = first.year, first.month
+    months = []
+    while (year, month) <= (last.year, last.month):
+        months.append((year, month))
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return months
+
+
+def _coverage_gaps(
+    db: Session, model, rows: list[ParsedRow], coverage: list[dict],
+) -> list[dict]:
+    """Meses da janela com dados vigentes ausentes no arquivo novo."""
+    new_months = {
+        (row.store_code, row.sale_date.year, row.sale_date.month) for row in rows
+    }
+    gaps: list[dict] = []
+    for span in coverage:
+        store = span["store_code"]
+        first = date.fromisoformat(span["first_date"])
+        last = date.fromisoformat(span["last_date"])
+        existing = {
+            (int(year), int(month))
+            for year, month in db.execute(
+                select(
+                    func.extract("year", model.sale_date),
+                    func.extract("month", model.sale_date),
+                ).where(
+                    model.store_code == store,
+                    model.sale_date >= first,
+                    model.sale_date <= last,
+                    model.superseded_at.is_(None),
+                ).distinct()
+            ).all()
+        }
+        for year, month in _months_between(first, last):
+            if (year, month) in existing and (store, year, month) not in new_months:
+                gaps.append({"store_code": store, "month": f"{year}-{month:02d}"})
+    return gaps
 
 
 def _coverage(rows: list[ParsedRow]) -> list[dict]:
@@ -98,14 +145,34 @@ def import_erp_file(
     period_start = min(span["first_date"] for span in coverage)
     period_end = max(span["last_date"] for span in coverage)
 
+    gaps = _coverage_gaps(db, model, parsed.rows, coverage)
+    if gaps:
+        batch.status = "FAILED"
+        batch.error_summary = {
+            "errors": [
+                "Arquivo incompleto dentro da janela coberta: "
+                + ", ".join(f"{g['store_code']} {g['month']}" for g in gaps[:10])
+                + ". Dados vigentes preservados."
+            ],
+            "warnings": parsed.warnings[:30],
+            "coverage_gaps": gaps,
+        }
+        db.commit()
+        return batch
+
+    superseded = 0
     for span in coverage:
-        db.execute(
-            delete(model).where(
+        result = db.execute(
+            update(model)
+            .where(
                 model.store_code == span["store_code"],
                 model.sale_date >= date.fromisoformat(span["first_date"]),
                 model.sale_date <= date.fromisoformat(span["last_date"]),
+                model.superseded_at.is_(None),
             )
+            .values(superseded_at=_utcnow())
         )
+        superseded += result.rowcount or 0
     db.add_all(
         model(
             id=uuid4(), batch_id=batch.id, sale_date=row.sale_date,
@@ -137,6 +204,7 @@ def import_erp_file(
             "kind": kind, "source": source, "file": batch.file_name,
             "sha256": digest[:16], "rows_applied": len(parsed.rows),
             "rows_rejected": batch.rows_rejected,
+            "rows_superseded": superseded,
             "period": f"{period_start}/{period_end}",
         },
     ))

@@ -681,6 +681,7 @@ class ErpSaleRow(Base):
     product_description: Mapped[str | None] = mapped_column(String(200))
     product_unit: Mapped[str | None] = mapped_column(String(10))
     unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -708,6 +709,7 @@ class ErpReturnRow(Base):
     product_description: Mapped[str | None] = mapped_column(String(200))
     product_unit: Mapped[str | None] = mapped_column(String(10))
     unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
