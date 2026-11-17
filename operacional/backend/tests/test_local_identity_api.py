@@ -14,7 +14,8 @@ from app.local_identity import LocalAuthError, password_matches
 from app.bootstrap_local import provision_initial_local_superadmin
 from app.recover_superadmin import recover_local_superadmin
 from app.main import app
-from app.models import Base, LocalCredential, LocalSession, AuditEvent, Store, StoreGroup, User
+from app.models import Base, LocalCredential, LocalSession, AuditEvent, Store, User
+from tests.access_helpers import seed_group
 
 
 @pytest.fixture
@@ -39,10 +40,8 @@ def env():
         )
         db.add_all([admin, manager])
         db.flush()
-        db.add_all([
-            StoreGroup(id=uuid4(),store_code=code,name=code,active=True)
-            for code in ("JOINVILLE","TUBARAO","ITAJAI")
-        ])
+        for code in ("JOINVILLE", "TUBARAO", "ITAJAI"):
+            seed_group(db, "Vendedores " + code, [code], ["sales.view"], [])
         db.commit()
     acting = {"user": admin}
 
@@ -63,10 +62,17 @@ def env():
         engine.dispose()
 
 
+def group_id_for(client, store="JOINVILLE"):
+    for group in client.get("/api/v1/admin/groups").json():
+        if store in group["stores"]:
+            return group["id"]
+    raise AssertionError("grupo nao encontrado para " + store)
+
+
 def create_seller(client, username="bruno", store="JOINVILLE"):
     response = client.post("/api/v1/admin/local-users",json={
         "username":username,"display_name":"Colaborador Teste",
-        "profile":"seller","store_code":store,
+        "profile":"seller","group_id":group_id_for(client, store),
     })
     assert response.status_code==201, response.text
     return response.json()
@@ -82,7 +88,7 @@ def test_user_creation_requires_no_email_and_password_is_one_time(env):
     assert "email" not in result
     assert client.post("/api/v1/admin/local-users",json={
         "username":"BRUNO","display_name":"Duplicado",
-        "profile":"seller","store_code":"ITAJAI"
+        "profile":"seller","group_id":group_id_for(client,"ITAJAI")
     }).status_code==409
     names=client.get("/api/v1/admin/users").json()
     created=[item for item in names if item["id"]==result["id"]]
@@ -192,10 +198,11 @@ def test_reset_and_delete_revoke_sessions_and_keep_history(env):
 def test_non_superadmin_cannot_create_reset_or_delete(env):
     client, identity, engine, admin, manager, _ = env
     row=create_seller(client)
+    gid=group_id_for(client,"JOINVILLE")
     identity["user"]=manager
     create=client.post("/api/v1/admin/local-users",json={
         "username":"rafael","display_name":"Rafael",
-        "profile":"seller","store_code":"JOINVILLE"
+        "profile":"seller","group_id":gid
     })
     assert create.status_code==403
     assert client.post("/api/v1/admin/users/"+row["id"]+"/reset-password").status_code==403
@@ -206,24 +213,158 @@ def test_non_superadmin_cannot_create_reset_or_delete(env):
 
 def test_invalid_username_and_roles_cannot_be_provisioned(env):
     client,*_=env
+    gid=group_id_for(client,"JOINVILLE")
     for uname in ("ab","com espaço","nome@dominio","admin/1"):
         result=client.post("/api/v1/admin/local-users",json={
             "username":uname,"display_name":"Pessoa Teste",
-            "profile":"seller","store_code":"JOINVILLE"
+            "profile":"seller","group_id":gid
         })
         assert result.status_code==422,result.text
     assert client.post("/api/v1/admin/local-users",json={
         "username":"newowner","display_name":"Outro SuperAdmin",
-        "profile":"superadmin","store_code":None
+        "profile":"superadmin","group_id":gid
     }).status_code==422
+    # grupo obrigatorio: cadastro sem group_id e rejeitado
     assert client.post("/api/v1/admin/local-users",json={
         "username":"jardel","display_name":"Jardel",
-        "profile":"administrator","store_code":"JOINVILLE"
+        "profile":"administrator"
     }).status_code==422
+    # escopo fora da abrangencia do grupo e rejeitado
     assert client.post("/api/v1/admin/local-users",json={
         "username":"rafael","display_name":"Rafael",
-        "profile":"seller","store_code":None
+        "profile":"seller","group_id":gid,"store_codes":["TUBARAO"]
     }).status_code==422
+
+
+def test_legacy_store_code_rejected_when_store_has_multiple_groups(env):
+    """Cadastro legado (so store_code) e ambiguo quando dois grupos ativos
+    cobrem a loja — antes, o primeiro nome alfabetico (Administradores)
+    seria escolhido para um vendedor. Agora exige group_id explicito."""
+    client, _, engine, _, _, _ = env
+    with Session(engine) as db:
+        # Segundo grupo ativo cobrindo JOINVILLE, alem de "Vendedores JOINVILLE"
+        seed_group(db, "Administradores", ["JOINVILLE", "TUBARAO", "ITAJAI"],
+                   ["sales.view"], [])
+        db.commit()
+    ambiguous = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-ambiguo", "display_name": "Ambiguo",
+        "profile": "seller", "store_code": "JOINVILLE"})
+    assert ambiguous.status_code == 422, ambiguous.text
+    # Com group_id explicito o cadastro segue normalmente
+    gid = next(g["id"] for g in client.get("/api/v1/admin/groups").json()
+               if g["name"] == "Vendedores JOINVILLE")
+    explicit = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-ambiguo", "display_name": "Ambiguo",
+        "profile": "seller", "group_id": gid})
+    assert explicit.status_code in (200, 201), explicit.text
+    assert explicit.json()["group"]["name"] == "Vendedores JOINVILLE"
+
+
+def test_transfer_with_incompatible_scope_requires_explicit_choice(env):
+    """Vendedor restrito a JOINVILLE transferido para grupo so de TUBARAO:
+    omitir o escopo nao pode virar 'herdar tudo' — a API exige definicao."""
+    client, *_ = env
+    seller = create_seller(client, "restrito")
+    gid_joi = group_id_for(client, "JOINVILLE")
+    # restricao individual explicita a JOINVILLE
+    scoped = client.put(f"/api/v1/admin/users/{seller['id']}/access", json={
+        "store_codes": ["JOINVILLE"]})
+    assert scoped.status_code == 200, scoped.text
+    assert scoped.json()["store_scope"] == ["JOINVILLE"]
+    # grupo novo so de Tubarao
+    tub_group = client.post("/api/v1/admin/groups", json={
+        "name": "Estoque Tubarao", "description": "",
+        "store_codes": ["TUBARAO"], "permissions": ["supplies.view"]})
+    assert tub_group.status_code == 201, tub_group.text
+    gid_tub = tub_group.json()["id"]
+    # transferencia sem escopo explicito -> 422 (nunca herda tudo sozinho)
+    rejected = client.put(f"/api/v1/admin/users/{seller['id']}/access", json={
+        "group_id": gid_tub})
+    assert rejected.status_code == 422, rejected.text
+    # escopo explicito decide conscientemente
+    accepted = client.put(f"/api/v1/admin/users/{seller['id']}/access", json={
+        "group_id": gid_tub, "store_codes": ["TUBARAO"]})
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["stores"] == ["TUBARAO"]
+
+
+def test_access_preview_endpoint_shows_store_level_diff(env):
+    """A previa de acesso compara permissao + loja: ampliar a abrangencia
+    lista as lojas acrescentadas em cada permissao."""
+    client, *_ = env
+    seller = create_seller(client, "preview")
+    wide = client.post("/api/v1/admin/groups", json={
+        "name": "Amplo", "description": "",
+        "store_codes": ["JOINVILLE", "TUBARAO"], "permissions": ["sales.view"]})
+    assert wide.status_code == 201, wide.text
+    response = client.post(
+        f"/api/v1/admin/users/{seller['id']}/access-preview", json={
+            "group_id": wide.json()["id"]})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert {"code": "sales.view", "stores": ["TUBARAO"]} in body["granted"]
+
+
+def test_legacy_store_code_still_works_with_single_covering_group(env):
+    """Fluxo legado preservado quando so um grupo ativo cobre a loja."""
+    client, *_ = env
+    response = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-legado", "display_name": "Legado",
+        "profile": "seller", "store_code": "TUBARAO"})
+    assert response.status_code in (200, 201), response.text
+    assert response.json()["group"]["name"] == "Vendedores TUBARAO"
+
+
+def test_legacy_store_code_rejected_when_single_group_is_unsafe(env):
+    """Unico grupo ativo da loja, porem de abrangencia ampla
+    (Administradores): um grupo assim nunca e atribuido implicitamente
+    a um vendedor — a API exige group_id explicito."""
+    client, _, engine, _, _, _ = env
+    with Session(engine) as db:
+        seed_group(db, "Administradores", ["JOINVILLE", "TUBARAO", "ITAJAI"],
+                   ["sales.view"], [])
+        db.commit()
+    tub = next(g for g in client.get("/api/v1/admin/groups").json()
+               if g["name"] == "Vendedores TUBARAO")
+    off = client.patch(f"/api/v1/admin/groups/{tub['id']}/active",
+                       json={"active": False})
+    assert off.status_code == 200, off.text
+    # Administradores e o unico grupo ativo cobrindo TUBARAO
+    response = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-inseguro", "display_name": "Inseguro",
+        "profile": "seller", "store_code": "TUBARAO"})
+    assert response.status_code == 422, response.text
+    # E cadastro com group_id explicito contina funcionando
+    adm = next(g for g in client.get("/api/v1/admin/groups").json()
+               if g["name"] == "Administradores")
+    explicit = client.post("/api/v1/admin/users", json={
+        "auth_subject": "oidc-inseguro", "display_name": "Inseguro",
+        "profile": "seller", "group_id": adm["id"]})
+    assert explicit.status_code in (200, 201), explicit.text
+
+
+def test_group_update_preview_endpoint_reports_member_impact(env):
+    """A previa de edicao de grupo sinaliza ampliacao e detalha por
+    usuario e loja — sem persistir nada."""
+    client, *_ = env
+    seller = create_seller(client, "impacto")
+    gid = group_id_for(client, "JOINVILLE")
+    response = client.post(
+        f"/api/v1/admin/groups/{gid}/update-preview", json={
+            "name": "Vendedores JOINVILLE", "description": "",
+            "store_codes": ["JOINVILLE", "TUBARAO"],
+            "permissions": ["sales.view", "checklist.view"]})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["widens"] is True
+    member = next(m for m in body["members"] if m["user_id"] == seller["id"])
+    assert {"code": "sales.view", "stores": ["TUBARAO"]} in member["granted"]
+    assert {"code": "checklist.view", "stores": ["JOINVILLE", "TUBARAO"]} \
+        in member["granted"]
+    # o grupo segue intacto ate a confirmacao
+    saved = next(g for g in client.get("/api/v1/admin/groups").json()
+                 if g["id"] == gid)
+    assert saved["stores"] == ["JOINVILLE"]
 
 
 def test_login_wrong_password_then_lock_until_cooldown(env):

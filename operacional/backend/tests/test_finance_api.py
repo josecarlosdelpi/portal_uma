@@ -14,9 +14,10 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    Base, ErpImportBatch, FinancialObligation, GroupMembership,
-    GroupPermission, Store, StoreGroup, User, UserPermissionOverride,
+    Base, ErpImportBatch, FinancialObligation, GroupPermission,
+    Store, User, UserPermissionOverride,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 HEADER = ("cnpj_fornecedor;nome_fornecedor;valor;dt_vencimento;dt_pagamento;"
           "categoria;loja;loja_descricao;situacao\n")
@@ -63,11 +64,9 @@ def env():
             profile="seller", is_superadmin=False, active=True)
         db.add_all([superadmin, admin, seller])
         db.flush()
-        group = StoreGroup(id=uuid4(), store_code="JOINVILLE", name="Joinville", active=True)
-        db.add(group)
-        db.flush()
-        db.add(GroupMembership(user_id=seller.id, group_id=group.id))
-        db.add(GroupPermission(group_id=group.id, code="daily_tasks.view", granted=True))
+        seed_admin_access(db, admin)
+        group = seed_group(
+            db, "Vendedores Joinville", ["JOINVILLE"], ["daily_tasks.view"], [seller])
         db.commit()
         group_id = group.id
     actor = {"user": superadmin}

@@ -1,9 +1,13 @@
 """Politica de autorizacao pura: nenhuma regra de acesso depende do frontend.
 
-Perfis:
+Modelo de acesso:
 - superadministrador: controle total (continua exigindo identidade autenticada);
-- administrator: leitura/escrita operacional nas tres lojas, sem governanca;
-- seller: apenas leitura, na unica loja autorizada, filtrada por permissao.
+- demais usuarios: acesso vem exclusivamente do grupo de acesso (permissoes +
+  abrangencia de lojas), refinado pelas lojas autorizadas do proprio usuario
+  e pelas excecoes individuais (herdar/permitir/bloquear).
+
+O campo users.profile indica apenas a FUNCAO do colaborador (vendedor,
+administrador ou equipe interna) e nao concede nenhuma permissao.
 """
 from dataclasses import dataclass, field
 from typing import Mapping
@@ -30,7 +34,7 @@ READ_PERMISSIONS = frozenset({
     "instagram.view",
 })
 
-# Esta permissao divulga dados consolidados das tres lojas e nao pode ser herdada por vendedores.
+# Fechamento mensal consolida as tres lojas: ver FULL_SCOPE_PERMISSIONS.
 MANAGEMENT_READ_PERMISSIONS = frozenset({"monthly_closing.view"})
 
 WRITE_PERMISSIONS = frozenset({
@@ -48,6 +52,8 @@ WRITE_PERMISSIONS = frozenset({
     "instagram.edit",
 })
 
+# Governanca nunca e delegavel: somente o SuperAdmin administra contas,
+# grupos, seguranca e auditoria.
 GOVERNANCE_PERMISSIONS = frozenset({
     "users.manage",
     "permissions.manage",
@@ -55,13 +61,32 @@ GOVERNANCE_PERMISSIONS = frozenset({
     "security.manage",
 })
 OPERATIONAL_PERMISSIONS = READ_PERMISSIONS | MANAGEMENT_READ_PERMISSIONS | WRITE_PERMISSIONS
-# Financeiro nunca e herdado por perfil: somente SuperAdmin ou concessao
-# explicita (grupo da loja para vendedor, override por usuario). Nesta etapa
-# o Financeiro esta restrito ao SuperAdmin; 'finance.import' nao e concedivel.
+# Financeiro nunca e herdado por funcao: somente SuperAdmin ou concessao
+# explicita via grupo/excecao. 'finance.import' permanece exclusivo do
+# SuperAdmin e nao pode ser concedido a grupos.
 FINANCIAL_READ_PERMISSIONS = frozenset({"finance.view"})
 FINANCIAL_PERMISSIONS = FINANCIAL_READ_PERMISSIONS | frozenset({"finance.import"})
 
 KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS | FINANCIAL_PERMISSIONS
+
+# Permissoes que expoem ou alteram dados consolidados das tres lojas.
+# Alem da concessao explicita, exigem abrangencia completa: grupo + usuario
+# precisam estar autorizados em TODAS as lojas. Uma excecao individual
+# nunca contorna esse limite geografico.
+FULL_SCOPE_PERMISSIONS = frozenset({
+    "monthly_closing.view",
+    "monthly_closing.edit",
+    "monthly_closing.archive",
+    "sales.import",
+})
+
+# Concediveis a grupos/usuarios; governanca e importacao financeira ficam
+# restritas ao SuperAdmin independentemente de concessoes.
+GRANTABLE_PERMISSIONS = (
+    OPERATIONAL_PERMISSIONS | FINANCIAL_READ_PERMISSIONS
+)
+
+USER_PROFILES = frozenset({"administrator", "seller", "staff"})
 
 
 @dataclass(frozen=True)
@@ -76,7 +101,7 @@ class Principal:
 
 
 def can_access(principal: Principal, permission: str, store_code: str | None = None) -> bool:
-    """Negar por padrao; a permissao nunca ignora o limite de loja do vendedor."""
+    """Negar por padrao; permissao nunca ignora o limite de lojas autorizadas."""
     if not principal.active or permission not in KNOWN_PERMISSIONS:
         return False
     if store_code is not None and store_code not in STORE_CODES:
@@ -85,22 +110,17 @@ def can_access(principal: Principal, permission: str, store_code: str | None = N
     if principal.is_superadmin:
         return True
 
-    if permission in FINANCIAL_PERMISSIONS:
-        return _financial_access(principal, permission, store_code)
-
-    if principal.profile == "administrator":
-        return permission in OPERATIONAL_PERMISSIONS
-
-    if principal.profile != "seller":
+    if permission in GOVERNANCE_PERMISSIONS or permission == "finance.import":
         return False
 
-    # Vendedor somente leitura e vinculado a EXATAMENTE uma loja.
-    if len(principal.store_codes) != 1 or store_code not in principal.store_codes:
-        return False
-    if permission not in READ_PERMISSIONS:
+    if permission in FULL_SCOPE_PERMISSIONS:
+        # Dados/escrita consolidados: exige cobertura das tres lojas.
+        if not STORE_CODES <= principal.store_codes:
+            return False
+    elif store_code is None or store_code not in principal.store_codes:
         return False
 
-    # Ausencia de override = herdar. True concede, False retira.
+    # Ausencia de override = herdar o grupo. True concede, False retira.
     inherited = permission in principal.group_grants
     return principal.overrides.get(permission, inherited)
 
@@ -108,22 +128,6 @@ def can_access(principal: Principal, permission: str, store_code: str | None = N
 def visible_stores(principal: Principal) -> frozenset[str]:
     if not principal.active:
         return frozenset()
-    if principal.is_superadmin or principal.profile == "administrator":
+    if principal.is_superadmin:
         return STORE_CODES
-    if principal.profile == "seller" and len(principal.store_codes) == 1:
-        return principal.store_codes & STORE_CODES
-    return frozenset()
-
-
-def _financial_access(principal: Principal, permission: str, store_code: str | None) -> bool:
-    """Financeiro exige concessao explicita; importacao e exclusiva do SuperAdmin."""
-    if permission == "finance.import":
-        return False
-    if principal.profile == "seller":
-        if len(principal.store_codes) != 1 or store_code not in principal.store_codes:
-            return False
-        inherited = permission in principal.group_grants
-        return principal.overrides.get(permission, inherited)
-    if principal.profile == "administrator":
-        return principal.overrides.get(permission, False)
-    return False
+    return principal.store_codes & STORE_CODES

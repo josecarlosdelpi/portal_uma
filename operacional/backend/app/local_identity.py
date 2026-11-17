@@ -15,8 +15,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.admin_repository import AdminRepository
+from app.admin_service import AdminError, AdminService
 from app.models import AuditEvent, LocalCredential, LocalSession, User
-from app.policy import STORE_CODES
+from app.policy import USER_PROFILES
 
 PASSWORD_HASHER = PasswordHasher(
     time_cost=2, memory_cost=19456, parallelism=1,
@@ -145,29 +146,32 @@ class LocalIdentityService:
             raise LocalAuthError(409, "Nome de usuario indisponivel") from error
 
     def create_account(self, actor: User, *, username: str, name: str,
-                       profile: str, store_code: str | None) -> dict:
+                       profile: str, group_id: UUID,
+                       store_codes: list[str] | None = None) -> dict:
         self.require_admin(actor)
         key = username_key(username)
         name = " ".join(name.strip().split())
         if not 2 <= len(name) <= 150:
             raise LocalAuthError(422, "Informe o nome do colaborador")
-        if profile not in {"administrator", "seller"}:
-            raise LocalAuthError(422, "Perfil invalido")
-        if profile == "seller":
-            if store_code not in STORE_CODES or self.repo.group_for_store(store_code) is None:
-                raise LocalAuthError(422, "Vendedor precisa pertencer a uma loja valida")
-        elif store_code is not None:
-            raise LocalAuthError(422, "Administrador tem acesso as tres lojas")
+        if profile not in USER_PROFILES:
+            raise LocalAuthError(422, "Funcao invalida")
         if self.db.scalar(select(LocalCredential.user_id).where(LocalCredential.username_key == key)):
             raise LocalAuthError(409, "Nome de usuario indisponivel")
+        try:
+            admin = AdminService(self.repo, actor)
+            group = admin._valid_group(group_id)
+            scope = admin._valid_scope(group, store_codes)
+        except AdminError as error:
+            raise LocalAuthError(error.status_code, error.message) from error
 
         temporary = generate_temporary_password()
         user = self.repo.create_user(
             subject="local:" + uuid4().hex, name=name, profile=profile
         )
-        group = self.repo.group_for_store(store_code) if profile == "seller" else None
-        if group is not None:
-            self.repo.assign_store(user.id, group.id)
+        self.repo.set_membership(user.id, group.id)
+        if scope:
+            self.repo.replace_user_scope(user.id, scope)
+        stores = self.repo.user_stores(user.id)
         self.db.add(LocalCredential(
             user_id=user.id, username_key=key,
             password_hash=password_digest(temporary),
@@ -176,14 +180,16 @@ class LocalIdentityService:
             failed_attempts=0,
         ))
         self._audit(actor, "user.local_created", user, {
-            "username": key, "profile": profile, "store": store_code,
+            "username": key, "profile": profile, "group": group.name,
+            "stores": stores,
             "temporary_password": "not_logged",
         })
         self._commit()
         return {
             "id": str(user.id), "display_name": user.display_name,
             "username": key, "profile": profile,
-            "stores": [store_code] if store_code else [],
+            "group": {"id": str(group.id), "name": group.name},
+            "stores": stores,
             "active": True,
             "must_change_password": True,
             "temporary_password": temporary,

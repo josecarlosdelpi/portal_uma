@@ -1,12 +1,12 @@
 """Persistence for access administration. No HTTP or role decisions here."""
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AccessInvitation, AuditEvent, GroupMembership, GroupPermission, StoreGroup, User, LocalCredential,
-    UserPermissionOverride,
+    AccessGroup, AccessGroupStore, AccessInvitation, AuditEvent, GroupMembership,
+    GroupPermission, User, LocalCredential, UserPermissionOverride, UserStoreScope,
 )
 
 
@@ -67,23 +67,128 @@ class AdminRepository:
     def local_credential(self, user_id: UUID) -> LocalCredential | None:
         return self.db.get(LocalCredential, user_id)
 
-    def groups(self) -> list[StoreGroup]:
-        return list(self.db.scalars(select(StoreGroup).order_by(StoreGroup.store_code)))
+    # ---- grupos de acesso ----
 
-    def group(self, group_id: UUID) -> StoreGroup | None:
-        return self.db.get(StoreGroup, group_id)
+    def groups(self) -> list[AccessGroup]:
+        return list(self.db.scalars(
+            select(AccessGroup).order_by(AccessGroup.name, AccessGroup.id)
+        ))
 
-    def group_for_store(self, store_code: str) -> StoreGroup | None:
+    def group(self, group_id: UUID) -> AccessGroup | None:
+        return self.db.get(AccessGroup, group_id)
+
+    def group_by_name(self, name_key: str) -> AccessGroup | None:
         return self.db.scalar(
-            select(StoreGroup).where(StoreGroup.store_code == store_code, StoreGroup.active.is_(True))
+            select(AccessGroup).where(func.lower(AccessGroup.name) == name_key)
         )
 
-    def user_stores(self, user_id: UUID) -> list[str]:
+    def groups_covering(self, store_code: str) -> list[AccessGroup]:
+        """Grupos ativos cuja abrangencia inclui a loja (ordem deterministica)."""
         return list(self.db.scalars(
-            select(StoreGroup.store_code).join(GroupMembership, GroupMembership.group_id == StoreGroup.id)
-            .where(GroupMembership.user_id == user_id)
-            .order_by(StoreGroup.store_code)
+            select(AccessGroup)
+            .join(AccessGroupStore, AccessGroupStore.group_id == AccessGroup.id)
+            .where(AccessGroupStore.store_code == store_code,
+                   AccessGroup.active.is_(True))
+            .order_by(AccessGroup.name, AccessGroup.id)
         ))
+
+    def create_group(self, *, name: str, description: str) -> AccessGroup:
+        group = AccessGroup(id=uuid4(), name=name, description=description, active=True)
+        self.db.add(group)
+        self.db.flush()
+        return group
+
+    def delete_group(self, group: AccessGroup) -> None:
+        self.db.delete(group)
+        self.db.flush()
+
+    def group_stores(self, group_id: UUID) -> list[str]:
+        return list(self.db.scalars(
+            select(AccessGroupStore.store_code)
+            .where(AccessGroupStore.group_id == group_id)
+            .order_by(AccessGroupStore.store_code)
+        ))
+
+    def replace_group_stores(self, group_id: UUID, stores: set[str]) -> None:
+        self.db.execute(delete(AccessGroupStore).where(AccessGroupStore.group_id == group_id))
+        self.db.add_all(
+            AccessGroupStore(group_id=group_id, store_code=code)
+            for code in sorted(stores)
+        )
+        self.db.flush()
+
+    def members(self, group_id: UUID) -> list[User]:
+        return list(self.db.scalars(
+            select(User)
+            .join(GroupMembership, GroupMembership.user_id == User.id)
+            .where(GroupMembership.group_id == group_id, User.deleted_at.is_(None))
+            .order_by(User.display_name, User.id)
+        ))
+
+    def member_count(self, group_id: UUID) -> int:
+        return int(self.db.scalar(
+            select(func.count(GroupMembership.user_id))
+            .join(User, User.id == GroupMembership.user_id)
+            .where(GroupMembership.group_id == group_id, User.deleted_at.is_(None))
+        ) or 0)
+
+    def group_of(self, user_id: UUID) -> AccessGroup | None:
+        return self.db.scalar(
+            select(AccessGroup)
+            .join(GroupMembership, GroupMembership.group_id == AccessGroup.id)
+            .where(GroupMembership.user_id == user_id)
+            .order_by(AccessGroup.name)
+            .limit(1)
+        )
+
+    def set_membership(self, user_id: UUID, group_id: UUID | None) -> None:
+        self.db.execute(delete(GroupMembership).where(GroupMembership.user_id == user_id))
+        if group_id is not None:
+            self.db.add(GroupMembership(user_id=user_id, group_id=group_id))
+        self.db.flush()
+
+    def move_members(self, from_group: UUID, to_group: UUID) -> int:
+        user_ids = list(self.db.scalars(
+            select(GroupMembership.user_id).where(GroupMembership.group_id == from_group)
+        ))
+        for user_id in user_ids:
+            self.set_membership(user_id, to_group)
+        return len(user_ids)
+
+    # ---- lojas autorizadas por usuario ----
+
+    def user_scope(self, user_id: UUID) -> list[str]:
+        return list(self.db.scalars(
+            select(UserStoreScope.store_code)
+            .where(UserStoreScope.user_id == user_id)
+            .order_by(UserStoreScope.store_code)
+        ))
+
+    def replace_user_scope(self, user_id: UUID, stores: set[str]) -> None:
+        self.db.execute(delete(UserStoreScope).where(UserStoreScope.user_id == user_id))
+        self.db.add_all(
+            UserStoreScope(user_id=user_id, store_code=code)
+            for code in sorted(stores)
+        )
+        self.db.flush()
+
+    def user_stores(self, user_id: UUID) -> list[str]:
+        """Lojas efetivas: abrangencia do grupo intersectada com o escopo individual."""
+        group_ids = list(self.db.scalars(
+            select(GroupMembership.group_id)
+            .join(AccessGroup, AccessGroup.id == GroupMembership.group_id)
+            .where(GroupMembership.user_id == user_id, AccessGroup.active.is_(True))
+        ))
+        if not group_ids:
+            return []
+        stores = set(self.db.scalars(
+            select(AccessGroupStore.store_code)
+            .where(AccessGroupStore.group_id.in_(group_ids))
+        ).all())
+        scoped = set(self.user_scope(user_id))
+        if scoped:
+            stores &= scoped
+        return sorted(stores)
 
     def grants(self, group_id: UUID) -> list[str]:
         return list(self.db.scalars(
@@ -99,9 +204,8 @@ class AdminRepository:
         ).all())
 
     def assign_store(self, user_id: UUID, group_id: UUID) -> None:
-        self.db.execute(delete(GroupMembership).where(GroupMembership.user_id == user_id))
-        self.db.add(GroupMembership(user_id=user_id, group_id=group_id))
-        self.db.flush()
+        """Compatibilidade: vincula o usuario ao grupo (membrosip unica)."""
+        self.set_membership(user_id, group_id)
 
     def replace_grants(self, group_id: UUID, allowed: set[str]) -> None:
         self.db.execute(delete(GroupPermission).where(GroupPermission.group_id == group_id))

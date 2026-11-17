@@ -18,7 +18,7 @@ from app.erp_import import import_erp_file
 from app.models import (
     ErpImportBatch, ErpReturnRow, ErpSaleRow, ErpSourceFile, User,
 )
-from app.policy import can_access, visible_stores
+from app.policy import STORE_CODES, can_access, visible_stores
 from app.repositories import load_principal
 
 MAX_RANGE_DAYS = 400
@@ -350,7 +350,12 @@ class SalesService:
         limit = max(1, min(limit, TOP_LIMIT))
         if sort not in ("revenue", "quantity"):
             raise SalesError(422, "Ordenação desconhecida.")
-        is_admin = self.principal.is_superadmin or self.principal.profile == "administrator"
+        # Documento fiscal do cliente so aparece para quem visualiza o
+        # faturamento das tres lojas (gestao consolidada ou SuperAdmin).
+        is_admin = self.principal.is_superadmin or all(
+            can_access(self.principal, "sales.revenue.view", code)
+            for code in STORE_CODES
+        )
 
         if dimension == "products":
             group_col = ErpSaleRow.product_code

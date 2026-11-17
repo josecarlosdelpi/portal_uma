@@ -54,9 +54,7 @@ def _allowed_modules(db: Session, user: User) -> set[str]:
         allowed.add("whatsapp")
     if principal.is_superadmin:
         allowed.add("access")
-    if can_access(principal, "monthly_closing.view") and (
-        principal.is_superadmin or principal.profile == "administrator"
-    ):
+    if can_access(principal, "monthly_closing.view"):
         allowed.add("closing")
     return allowed
 

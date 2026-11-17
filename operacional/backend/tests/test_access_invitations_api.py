@@ -10,7 +10,8 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import AccessInvitation, AuditEvent, Base, Store, StoreGroup, User
+from app.models import AccessInvitation, AuditEvent, Base, Store, User
+from tests.access_helpers import seed_group
 
 
 @pytest.fixture
@@ -35,10 +36,8 @@ def env():
         )
         db.add_all([superadmin, normal])
         db.flush()
-        db.add_all([
-            StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
-            for code in ("JOINVILLE", "TUBARAO", "ITAJAI")
-        ])
+        for code in ("JOINVILLE", "TUBARAO", "ITAJAI"):
+            seed_group(db, "Vendedores " + code, [code], [], [])
         db.commit()
     identity = {"user": superadmin}
 
