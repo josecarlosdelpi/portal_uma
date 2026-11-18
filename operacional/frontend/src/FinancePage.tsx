@@ -3,9 +3,10 @@ import type {MyProfile} from "./api";
 import {labelStore} from "./catalog";
 import {financeApi,type FinanceBatch,type FinanceOverview,type FinanceSyncStatus,
   type ObligationItem,type ObligationPage,type PaymentsPage,type PurchasesView} from "./financeApi";
+import {DrePanel} from "./DrePanel";
 
 type Props={token:string;profile:MyProfile};
-type FinTab="overview"|"payables"|"payments"|"purchases";
+type FinTab="overview"|"payables"|"payments"|"purchases"|"dre";
 
 const brl=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
 const fmt=(v?:string|null)=>v==null||v===""?"—":brl.format(Number(v));
@@ -299,6 +300,9 @@ export function FinancePage({token,profile}:Props){
         onClick={()=>setTab("payments")}>Pagamentos</button>
       <button role="tab" aria-selected={tab==="purchases"} className={"tab"+(tab==="purchases"?" active":"")}
         onClick={()=>setTab("purchases")}>Compras p/ revenda</button>
+      {profile.features.dre&&<button role="tab" aria-selected={tab==="dre"}
+        className={"tab"+(tab==="dre"?" active":"")}
+        onClick={()=>setTab("dre")}>DRE Gerencial — Prévia</button>}
     </div>
 
     {tab==="overview"&&<>
@@ -494,6 +498,8 @@ export function FinancePage({token,profile}:Props){
       </>}
       </>}
     </>}
+
+    {tab==="dre"&&profile.features.dre&&<DrePanel token={token} profile={profile}/>}
   </section>;
 }
 

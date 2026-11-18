@@ -522,3 +522,45 @@
 @media(max-width:700px){.fin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fin-bar-row{grid-template-columns:1fr;gap:4px}.fin-bar-value{text-align:left}.fin-batch{flex-direction:column}.fin-batch-side{flex-direction:row;align-items:center}}
 @media(max-width:480px){.fin-kpis{grid-template-columns:1fr}}
 .erp-data-state{display:block;font-size:10px;color:#a8791f;margin-top:2px}
+
+/* ---- DRE Gerencial — Previa ---- */
+.dre-disclaimer{background:#fff8e9;border:1px solid #f3e5cb;color:#795b30;
+  border-radius:10px;padding:12px 16px;font-size:12px;font-weight:750;
+  letter-spacing:.3px;margin-bottom:14px}
+.dre-sources{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}
+.dre-source{display:flex;flex-direction:column;gap:2px;border:1px solid #e5ecef;
+  border-radius:10px;background:#fff;padding:10px 14px;font-size:12px;min-width:200px}
+.dre-source strong{color:#1a3841;font-size:11px;letter-spacing:.4px}
+.dre-source span{color:#187a58;font-weight:700}
+.dre-source small{color:#82939d;font-size:11px}
+.dre-source-warn{border-color:#f3e5cb;background:#fffcf4}
+.dre-source-warn span{color:#a4551c}
+.dre-warnings{list-style:none;margin:0 0 14px;padding:0;display:flex;
+  flex-direction:column;gap:6px}
+.dre-warnings li{background:#fff8e9;border:1px solid #f3e5cb;color:#795b30;
+  border-radius:8px;padding:8px 12px;font-size:12px}
+.dre-basis{font-size:11px;color:#82939d;margin:0 0 14px}
+.dre-table{font-size:12px}
+.dre-table th.fin-num{text-align:right}
+.dre-table td.fin-num{text-align:right;white-space:nowrap}
+.dre-row-subtotal td{font-weight:800;background:#f4f9f9;border-top:2px solid #dbe5e9}
+.dre-row-memo td{color:#6d838c;font-style:italic}
+.dre-row-warn td{background:#fffcf4}
+.dre-value{font-variant-numeric:tabular-nums}
+.dre-pct{display:block;color:#8a9aa2;font-size:10px;font-weight:400}
+.dre-cell-empty{color:#a7b6bd}
+.dre-note{display:block;color:#8a9aa2;font-size:10px;font-weight:400;margin-top:2px}
+.dre-note-warn{color:#a4551c}
+.dre-doc{display:block;color:#8a9aa2;font-size:10px;font-weight:400}
+.dre-expand{border:0;background:transparent;color:inherit;font:inherit;
+  font-weight:inherit;text-align:left;padding:0;cursor:pointer}
+.dre-expand:hover{color:#027c81}
+.dre-drill td{background:#f8fafb;padding:0 0 0 24px}
+.dre-drill-box{padding:10px 14px;border-left:3px solid #c6e4e2}
+.dre-drill-table{width:100%;border-collapse:collapse;font-size:11px}
+.dre-drill-table th{background:transparent;color:#6d838c;text-align:left;
+  font-size:10px;padding:6px 8px;border-bottom:1px solid #e5ecef}
+.dre-drill-table td{padding:7px 8px;border-bottom:1px solid #eef2f4;color:#354f59}
+.dre-drill-table td.fin-num{text-align:right;white-space:nowrap}
+.dre-excluded{margin-top:20px}
+.dre-shared-memo{margin:12px 0 0}
