@@ -200,6 +200,8 @@ def test_evolucao_mensal_do_periodo(env):
     assert nov_row["entries"] is None
     assert nov_row["exits"] == "900.00"
     assert nov_row["balance"] is None
+    assert oct_row["balance_state"] == "partial"
+    assert nov_row["balance_state"] == "unavailable"
 
 
 def test_periodo_sem_vendas_nao_vira_zero(env):
@@ -224,6 +226,64 @@ def test_devolucoes_informativas_sem_abater(env):
     # entradas e saldo inalterados pela devolucao
     assert data["summary"]["entries"]["UMA"] == "210.00"
     assert data["summary"]["balance"]["UMA"] == "-6720.00"
+
+
+def test_saldo_parcial_quando_vendas_nao_cobrem_mes(env):
+    """Vendas so ate 17/10 -> o periodo de outubro e parcial; a diferenca
+    continua visivel, mas nunca marcada como saldo de mes completo."""
+    c, *_ = env
+    seed_all(c)
+    data = c.get(f"/api/v1/cashflow/preview?{OUT}").json()
+    st = data["summary"]["balance_state"]
+    assert st["JOINVILLE"] == "partial"
+    assert st["TUBARAO"] == "partial"
+    assert st["ITAJAI"] == "unavailable"        # sem vendas
+    assert st["COMPARTILHADO"] == "partial"     # sem entradas proprias
+    assert st["UMA"] == "partial"               # consolidado nunca "completo"
+    # numeros permanecem consultaveis
+    assert data["summary"]["balance"]["UMA"] == "-6720.00"
+
+
+def test_trimestre_com_mes_ausente_nao_e_saldo_completo(env):
+    c, *_ = env
+    seed_all(c)
+    data = c.get("/api/v1/cashflow/preview?"
+                 "date_from=2026-10-01&date_to=2026-12-31").json()
+    assert data["summary"]["balance_state"]["UMA"] == "partial"
+    states = {m["month"]: m["balance_state"] for m in data["monthly"]}
+    assert states["2026-10"] == "partial"
+    assert states["2026-11"] == "unavailable"
+    assert states["2026-12"] == "unavailable"
+    nov = next(m for m in data["monthly"] if m["month"] == "2026-11")
+    assert nov["balance"] is None               # nunca inventa saldo do mes
+
+
+def test_consolidado_com_loja_sem_dados(env):
+    """Itajai sem cobertura de vendas: o consolidado mostra a soma das
+    demais, mas identificada como parcial — nunca 'UMA completo'."""
+    c, *_ = env
+    seed_all(c)
+    data = c.get(f"/api/v1/cashflow/preview?{OUT}").json()
+    st = data["summary"]["balance_state"]
+    assert data["summary"]["entries"]["ITAJAI"] is None
+    assert st["ITAJAI"] == "unavailable"
+    assert data["summary"]["balance"]["ITAJAI"] is None
+    assert st["UMA"] == "partial"
+    # loja unica tambem e identificada
+    single = c.get(f"/api/v1/cashflow/preview?{OUT}&store=ITAJAI").json()
+    assert single["summary"]["balance_state"]["ITAJAI"] == "unavailable"
+    assert single["summary"]["balance"]["ITAJAI"] is None
+
+
+def test_cobertura_pagamentos_indicativa_nao_confirmacao(env):
+    """A janela do Despesas.csv e por vencimentos: nao confirma que todos
+    os paid_at do periodo estejam cobertos — qualidade sempre indicativa."""
+    c, *_ = env
+    seed_all(c)
+    data = c.get(f"/api/v1/cashflow/preview?{OUT}").json()
+    assert data["payments_coverage"] == "indicative"
+    assert any("vencimentos" in m and "confirma" in m
+               for m in data["methodology"])
 
 
 def test_intervalo_personalizado_recorta_datas(env):

@@ -3,10 +3,13 @@ import type { DreSource, DreLinesPage } from "./dreApi";
 
 export type { DreSource, DreLinesPage };
 
+export type CfBalanceState = "complete" | "partial" | "unavailable";
+
 export type CfSummary = {
   entries: Record<string, string | null>;
   exits: Record<string, string | null>;
   balance: Record<string, string | null>;
+  balance_state: Record<string, CfBalanceState>;
 };
 
 export type CfMonthly = {
@@ -14,6 +17,7 @@ export type CfMonthly = {
   entries: string | null;
   exits: string | null;
   balance: string | null;
+  balance_state: CfBalanceState;
   vendas_state: string;
   sales_rows: number;
   payment_rows: number;
@@ -43,6 +47,7 @@ export type CfPreview = {
   monthly: CfMonthly[];
   payments: CfPaymentGroup[];
   returns: { state: string; columns: Record<string, string>; count: number };
+  payments_coverage: string;
   shared_memo: { amount: string; count: number } | null;
   warnings: { code: string; message: string }[];
   sources: { vendas: DreSource; devolucoes: DreSource; despesas: DreSource };

@@ -58,6 +58,9 @@ METHODOLOGY = [
     "recebimento efetivo; prazos de cartão e datas bancárias não são presumidos.",
     "Saídas = lançamentos do Despesas.csv vigente com situação 'Pago' e data "
     "efetiva no período — todas as naturezas, valor líquido do pagamento.",
+    "A cobertura declarada do Despesas.csv usa vencimentos e NÃO confirma que "
+    "todos os pagamentos do período estejam no arquivo — saídas são sempre "
+    "indicativas dos registros vigentes.",
     "Pagamentos seguem a atribuição de loja do ERP: a UMA centraliza parte "
     "das operações em Joinville, então saídas por loja não representam "
     "necessariamente o consumo econômico de cada unidade.",
@@ -384,6 +387,34 @@ class CashflowService:
                 if summary_entries[total_key] is not None
                 and summary_exits[total_key] is not None else None)
 
+        # ---- confiabilidade do saldo por coluna ----
+        # complete: entradas+saidas apuradas e vendas cobrem o periodo todo;
+        # partial:  computavel, mas com ressalvas (vendas parciais, coluna
+        #           compartilhada sem entradas proprias ou consolidado com
+        #           membro incompleto) — numeros visiveis, jamais "completo";
+        # unavailable: sem base para a diferenca (sem vendas ou fonte falha).
+        balance_state: dict[str, str] = {}
+        for c in columns:
+            if c == total_key:
+                continue
+            if summary_balance.get(c) is None:
+                balance_state[c] = "unavailable"
+            elif c == SHARED_COLUMN:
+                balance_state[c] = "partial"
+            else:
+                st = sales_meta["states"].get(c)
+                balance_state[c] = (
+                    "unavailable" if st in ("missing", "unavailable")
+                    else "partial" if st == "partial" else "complete")
+        if total_key in columns:
+            members = [balance_state[c] for c in columns if c != total_key]
+            if all(s == "unavailable" for s in members):
+                balance_state[total_key] = "unavailable"
+            elif any(s != "complete" for s in members):
+                balance_state[total_key] = "partial"
+            else:
+                balance_state[total_key] = "complete"
+
         # ---- evolucao mensal (escopo agregado) ----
         monthly = []
         for y, m, m_first, m_last in _months_in(first, last):
@@ -411,6 +442,10 @@ class CashflowService:
                 "exits": money(s_val) if s_val is not None else None,
                 "balance": (money(e_val - s_val)
                             if e_val is not None and s_val is not None else None),
+                "balance_state": (
+                    "unavailable" if e_val is None or s_val is None
+                    else "partial" if m_meta["overall"] != "current"
+                    else "complete"),
                 "vendas_state": m_meta["overall"],
                 "sales_rows": sum(v["rows"] for v in m_entries.values()),
                 "payment_rows": p_rows,
@@ -475,7 +510,11 @@ class CashflowService:
                           for c, v in summary_exits.items()},
                 "balance": {c: money(v) if v is not None else None
                             for c, v in summary_balance.items()},
+                "balance_state": balance_state,
             },
+            # paid_at e real, mas a janela do arquivo usa vencimentos — a
+            # integralidade dos pagamentos do periodo nao pode ser confirmada.
+            "payments_coverage": "indicative",
             "sales_rows": sum(v["rows"] for v in entries.values()),
             "payment_rows": payment_rows,
             "monthly": monthly,

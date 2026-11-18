@@ -57,6 +57,10 @@ const STATE_LABEL: Record<string, string> = {
   current: "completo", partial: "parcial", missing: "sem dados",
   unavailable: "fonte indisponível",
 };
+const BALANCE_STATE_LABEL: Record<string, string> = {
+  complete: "", partial: "parcial — somente registros disponíveis",
+  unavailable: "não apurável",
+};
 
 const PERIOD_KIND_LABEL: Record<PeriodKind, string> = {
   month: "Mês", quarter: "Trimestre", semester: "Semestre",
@@ -184,14 +188,23 @@ export function CashflowPanel({ token, profile }: Props) {
   const entriesV = sum("entries");
   const exitsV = sum("exits");
   const balanceV = sum("balance");
+  const saldoState = data?.summary.balance_state?.[totalCol] ?? "unavailable";
 
   const summaryRow = (key: "entries" | "exits" | "balance", label: string, note?: string) =>
     <tr className={key === "balance" ? "dre-row-subtotal" : ""}>
       <td>{label}{note && <small className="dre-note">{note}</small>}</td>
       {columns.map(col => {
         const v = data?.summary[key][col];
+        const st = key === "balance" ? data?.summary.balance_state?.[col] : undefined;
         return <td key={col} className={"fin-num" + (v == null ? " dre-cell-empty" : "")}>
-          <span className="dre-value">{fmt(v)}</span></td>;
+          <span className="dre-value">{fmt(v)}</span>
+          {key === "entries" && v == null &&
+            <small className="dre-note dre-note-warn">sem dados de vendas</small>}
+          {key === "exits" && v == null &&
+            <small className="dre-note dre-note-warn">fonte indisponível</small>}
+          {st && st !== "complete" &&
+            <small className="dre-note dre-note-warn">{BALANCE_STATE_LABEL[st]}</small>}
+        </td>;
       })}
     </tr>;
 
@@ -257,7 +270,12 @@ export function CashflowPanel({ token, profile }: Props) {
         <div className={"panel dre-kpi" + (balanceV != null && balanceV < 0 ? " dre-kpi-neg" : "")}>
           <span>Saldo Financeiro Estimado</span>
           <strong className={balanceV == null ? "dre-kpi-na" : ""}>{fmtNum(balanceV)}</strong>
-          <small>abertura R$ 0,00 — não é saldo bancário</small></div>
+          <small className={saldoState !== "complete" ? "cf-warn" : ""}>
+            {saldoState === "unavailable"
+              ? "não apurável — dados insuficientes"
+              : saldoState === "partial"
+                ? "parcial — somente registros disponíveis · abertura R$ 0,00"
+                : "abertura R$ 0,00 — não é saldo bancário"}</small></div>
       </div>
       <p className="dre-kpi-note">
         {data.entries_source.label} — indicadores da coluna “{colLabel(totalCol)}”,
@@ -315,7 +333,9 @@ export function CashflowPanel({ token, profile }: Props) {
                 {m.payment_rows > 0 && <small className="dre-pct">{m.payment_rows} pagamento(s)</small>}</td>
               <td className={"fin-num" + (m.balance == null ? " dre-cell-empty" : "")}>
                 <strong>{fmt(m.balance)}</strong>
-                {m.balance == null && <small className="dre-note dre-note-warn">não apurável</small>}</td>
+                {m.balance_state !== "complete" &&
+                  <small className="dre-note dre-note-warn">
+                    {m.balance_state === "unavailable" ? "não apurável" : "parcial"}</small>}</td>
               <td>{STATE_LABEL[m.vendas_state] ?? m.vendas_state}
                 {m.vendas_state !== "current" &&
                   <small className="dre-note dre-note-warn">período não comparável a um mês completo</small>}</td>

@@ -548,6 +548,7 @@
 .cf-methodology{margin:14px 0 2px;padding-left:18px;font-size:11px;color:#6d838c;
   display:flex;flex-direction:column;gap:5px}
 .cf-methodology strong{color:#4a636d}
+.cf-warn{color:#a4551c!important}
 @media(max-width:900px){.dre-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.dre-kpis{grid-template-columns:1fr}}
 .dre-sources{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}
