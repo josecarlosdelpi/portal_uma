@@ -334,29 +334,39 @@ export function SalesPage({token, profile}: Props) {
     {summary && summary.data_state && summary.data_state !== "current" &&
       <div className="notice notice-amber" role="status">
         {summary.data_state === "missing" &&
-          "Sem dados vigentes neste período."}
-        {summary.data_state === "stale" &&
-          "Período com dados de exportação anterior — são preservados, mas não refletem o arquivo vigente."}
+          "Sem dados no arquivo atual neste período."}
+        {summary.data_state === "unavailable" &&
+          "Dados de vendas indisponíveis até recebermos um arquivo válido do ERP."}
         {summary.data_state === "partial" &&
           "Os dados exibidos são do arquivo vigente, que não cobre o período inteiro."}
         {summary.source?.data_through &&
           " O arquivo Vendas.csv vigente cobre até " +
           new Date(summary.source.data_through + "T12:00:00").toLocaleDateString("pt-BR") + "."}
       </div>}
+    {summary && summary.returns_state === "unavailable" &&
+      <div className="notice notice-amber" role="status">
+        Devoluções indisponíveis até recebermos um arquivo válido do ERP.
+      </div>}
 
     {summary && <>
       <div className="overview-kpis">
         <div className="panel overview-kpi"><span>Faturamento do período</span>
           <strong>{money(summary.totals.revenue)}</strong>
-          <small>{qty(summary.totals.quantity)} itens em {summary.totals.rows} linhas</small></div>
+          <small>{summary.totals.quantity === null
+            ? "Sem dados no arquivo atual"
+            : qty(summary.totals.quantity) + " itens em " + summary.totals.rows + " linhas"}</small></div>
         {orderedStores.map(item => <div className="panel overview-kpi" key={item.code}>
           <span>{labelStore(item.code)}</span>
           <strong>{item.revenue_visibility === "restricted" ? "Restrito" : money(item.revenue)}</strong>
-          <small>{qty(item.quantity)} itens · {money(item.returns_revenue)} em devoluções
-            {item.data_state === "stale" ? " · exportação anterior" : ""}</small></div>)}
+          <small>{item.quantity === null
+            ? (item.data_state === "unavailable" ? "Dados indisponíveis" : "Sem dados no arquivo atual")
+            : qty(item.quantity) + " itens · " + money(item.returns_revenue) + " em devoluções"}</small></div>)}
         <div className="panel overview-kpi"><span>Devoluções registradas</span>
-          <strong>{money(summary.totals.returns_revenue)}</strong>
-          <small>{summary.totals.returns_rows} linha(s) · exibidas separadamente</small></div>
+          <strong>{summary.returns_state === "unavailable"
+            ? "Indisponível" : money(summary.totals.returns_revenue)}</strong>
+          <small>{summary.returns_state === "unavailable"
+            ? "Aguardando arquivo válido do ERP"
+            : (summary.totals.returns_rows ?? 0) + " linha(s) · exibidas separadamente"}</small></div>
       </div>
 
       <section className="panel">

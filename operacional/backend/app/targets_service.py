@@ -65,12 +65,15 @@ class TargetService:
             sales_by_date_for_store(self.repo.session, store_code, first, last)
             if can_revenue else {}
         )
-        monthly_revenue = sum(sales_by_date.values(), Decimal("0"))
-        has_sales = bool(sales_by_date)
         states, _overall = period_states(
             self.repo.session, [store_code], first, last
         )
         data_state = states[store_code]
+        # Fonte indisponivel: dados vigentes nao representam o arquivo atual.
+        if data_state == "unavailable":
+            sales_by_date = {}
+        monthly_revenue = sum(sales_by_date.values(), Decimal("0"))
+        has_sales = bool(sales_by_date)
         minimum = settings.minimum_daily if settings else None
         plan = (
             dynamic_plan(target, days, sales_by_date, minimum)
@@ -97,7 +100,11 @@ class TargetService:
             "working_day_count": len(days),
             "base_plan": daily_base,
             "sales": {
-                "status": "pilot_unverified" if has_sales else "awaiting_official_import",
+                "status": (
+                    "unavailable" if data_state == "unavailable"
+                    else "pilot_unverified" if has_sales
+                    else "awaiting_official_import"
+                ),
                 "data_state": data_state,
                 "monthly_revenue": str(monthly_revenue) if has_sales else None,
                 "attainment_percent": str(attainment) if attainment is not None else None,

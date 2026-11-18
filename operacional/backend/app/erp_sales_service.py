@@ -7,14 +7,14 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Iterable
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.erp_csv import KIND_DESPESAS, KIND_DEVOLUCOES, KIND_VENDAS
 from app.erp_expenses_import import expenses_handlers
 from app.erp_drive import EXPECTED_FILES, DriveClient, DriveError, load_service_account, sync_sources
-from app.erp_import import import_erp_file
+from app.erp_import import import_erp_file, kind_availability
 from app.models import (
     ErpImportBatch, ErpReturnRow, ErpSaleRow, ErpSourceFile, User,
 )
@@ -101,6 +101,17 @@ def latest_applied(db: Session, kind: str) -> ErpImportBatch | None:
 
 def pilot_sales_status(db: Session) -> dict:
     """Origem oficial em fase de testes: sempre identificada como piloto."""
+    if kind_availability(db, KIND_VENDAS) == "unavailable":
+        return {
+            "status": "source_unavailable",
+            "sales_updated_at": None,
+            "data_through": None,
+            "has_stale_data": False,
+            "message": (
+                "Dados de vendas indisponíveis até recebermos um arquivo "
+                "válido do ERP."
+            ),
+        }
     batch = latest_applied(db, KIND_VENDAS)
     if batch is None:
         return {
@@ -114,24 +125,11 @@ def pilot_sales_status(db: Session) -> dict:
     data_through = max(
         (span["last_date"] for span in coverage), default=None
     )
-    stale = any(
-        db.scalar(
-            select(func.count()).select_from(ErpSaleRow).where(
-                ErpSaleRow.store_code == span["store_code"],
-                or_(
-                    ErpSaleRow.sale_date > date.fromisoformat(span["last_date"]),
-                    ErpSaleRow.sale_date < date.fromisoformat(span["first_date"]),
-                ),
-                ErpSaleRow.superseded_at.is_(None),
-            )
-        )
-        for span in coverage
-    )
     return {
         "status": "pilot_unverified",
         "sales_updated_at": batch.applied_at.isoformat() if batch.applied_at else None,
         "data_through": data_through,
-        "has_stale_data": stale,
+        "has_stale_data": False,
         "message": "Dados do ERP em fase de testes — conferir com os relatórios oficiais.",
     }
 
@@ -153,15 +151,19 @@ def period_states(
 ) -> tuple[dict[str, str], str]:
     """Estado dos dados por loja no período consultado.
 
-    current: linhas do período dentro da cobertura e período ate o fim da
-             janela do arquivo vigente;
-    partial: linhas todas do arquivo vigente, mas o período se estende
-             alem do fim da cobertura (arquivo termina no meio do período);
-    stale:   existem linhas fora da cobertura do arquivo vigente —
-             pertencem a uma exportacao anterior;
-    missing: sem linhas vigentes no período.
-    O estado geral prioriza a maior ressalva: stale > partial > missing.
+    unavailable: arquivo mais recente de vendas falhou na validacao —
+             dados vigentes nao representam o arquivo atual;
+    current: linhas do período vindas do arquivo vigente e período ate o
+             fim da cobertura declarada;
+    partial: o período se estende alem do fim da cobertura do arquivo
+             vigente (ex.: arquivo termina no meio do mes);
+    missing: sem linhas vigentes no período — "sem dados no arquivo atual".
+    O estado geral prioriza a maior ressalva:
+    unavailable > partial > missing > current.
     """
+    if kind_availability(db, KIND_VENDAS) == "unavailable":
+        states = {code: "unavailable" for code in codes}
+        return states, ("unavailable" if codes else "missing")
     coverage = latest_coverage(db, KIND_VENDAS)
     counts = dict(
         db.execute(
@@ -181,29 +183,12 @@ def period_states(
             states[code] = "missing"
             continue
         win = coverage.get(code)
-        if win is None:
-            states[code] = "stale"
-            continue
-        outside = db.scalar(
-            select(func.count()).select_from(ErpSaleRow).where(
-                ErpSaleRow.store_code == code,
-                ErpSaleRow.sale_date >= first,
-                ErpSaleRow.sale_date <= last,
-                ErpSaleRow.superseded_at.is_(None),
-                or_(
-                    ErpSaleRow.sale_date < win[0],
-                    ErpSaleRow.sale_date > win[1],
-                ),
-            )
-        )
         states[code] = (
-            "stale" if outside else ("current" if last <= win[1] else "partial")
+            "current" if win is None or last <= win[1] else "partial"
         )
     unique = set(states.values())
     if unique == {"current"}:
         overall = "current"
-    elif "stale" in unique:
-        overall = "stale"
     elif unique == {"missing"}:
         overall = "missing"
     else:
@@ -314,33 +299,18 @@ class SalesService:
     def status(self) -> dict:
         self._scope(None)
         kinds = []
-        row_model = {KIND_VENDAS: ErpSaleRow, KIND_DEVOLUCOES: ErpReturnRow}
         for kind in (KIND_VENDAS, KIND_DEVOLUCOES):
             batch = latest_applied(self.db, kind)
             coverage = (batch.coverage or []) if batch else []
-            model = row_model[kind]
-            stale_rows = sum(
-                self.db.scalar(
-                    select(func.count()).select_from(model).where(
-                        model.store_code == span["store_code"],
-                        or_(
-                            model.sale_date > date.fromisoformat(span["last_date"]),
-                            model.sale_date < date.fromisoformat(span["first_date"]),
-                        ),
-                        model.superseded_at.is_(None),
-                    )
-                ) or 0
-                for span in coverage
-            )
             kinds.append({
                 "kind": kind,
+                "availability": kind_availability(self.db, kind),
                 "last_applied_at": batch.applied_at.isoformat() if batch and batch.applied_at else None,
                 "file_name": batch.file_name if batch else None,
                 "rows_applied": batch.rows_applied if batch else 0,
                 "period_start": batch.period_start.isoformat() if batch and batch.period_start else None,
                 "period_end": batch.period_end.isoformat() if batch and batch.period_end else None,
                 "coverage": coverage,
-                "rows_beyond_coverage": stale_rows,
             })
         sources = self.db.scalars(select(ErpSourceFile)).all()
         settings = get_settings()
@@ -397,37 +367,74 @@ class SalesService:
         self._range(first, last)
         codes = self._scope(store_code)
         revenue_ok = self._revenue_map(codes)
-        sales = store_totals(self.db, ErpSaleRow, codes, first, last)
-        returns = store_totals(self.db, ErpReturnRow, codes, first, last)
         states, overall = period_states(self.db, codes, first, last)
+        devol_state = kind_availability(self.db, KIND_DEVOLUCOES)
+        returns_state = "missing" if devol_state == "never_imported" else devol_state
+        # Fonte indisponivel ou periodo sem dados: os paineis nao exibem
+        # numeros de versoes anteriores nem zero automatico.
+        sales_visible = overall not in ("unavailable",)
+        sales = (
+            store_totals(self.db, ErpSaleRow, codes, first, last)
+            if sales_visible else {}
+        )
+        returns = (
+            store_totals(self.db, ErpReturnRow, codes, first, last)
+            if devol_state == "current" else {}
+        )
         stores = []
         totals = {"revenue": Decimal("0"), "quantity": Decimal("0"), "rows": 0,
                   "returns_revenue": Decimal("0"), "returns_quantity": Decimal("0"), "returns_rows": 0}
         for code in codes:
+            state = states[code]
+            has_rows = state in ("current", "partial")
             sale = sales.get(code, {"revenue": Decimal(0), "quantity": Decimal(0), "rows": 0})
             ret = returns.get(code, {"revenue": Decimal(0), "quantity": Decimal(0), "rows": 0})
-            can_revenue = revenue_ok[code]
+            can_revenue = revenue_ok[code] and has_rows
             stores.append({
                 "code": code,
-                "data_state": states[code],
+                "data_state": state,
                 "revenue": str(sale["revenue"]) if can_revenue else None,
-                "revenue_visibility": "allowed" if can_revenue else "restricted",
-                "quantity": str(sale["quantity"]),
-                "rows": sale["rows"],
-                "returns_revenue": str(ret["revenue"]) if can_revenue else None,
-                "returns_quantity": str(ret["quantity"]),
-                "returns_rows": ret["rows"],
+                "revenue_visibility": "allowed" if revenue_ok[code] else "restricted",
+                "quantity": str(sale["quantity"]) if has_rows else None,
+                "rows": sale["rows"] if has_rows else None,
+                "returns_revenue": (
+                    str(ret["revenue"]) if can_revenue and ret["rows"] else None
+                ),
+                "returns_quantity": (
+                    str(ret["quantity"]) if devol_state == "current" and ret["rows"]
+                    else None
+                ),
+                "returns_rows": ret["rows"] if devol_state == "current" else None,
             })
-            totals["revenue"] += sale["revenue"] if can_revenue else Decimal(0)
-            totals["quantity"] += sale["quantity"]
-            totals["rows"] += sale["rows"]
-            totals["returns_revenue"] += ret["revenue"] if can_revenue else Decimal(0)
-            totals["returns_quantity"] += ret["quantity"]
-            totals["returns_rows"] += ret["rows"]
+            if has_rows:
+                totals["revenue"] += sale["revenue"] if can_revenue else Decimal(0)
+                totals["quantity"] += sale["quantity"]
+                totals["rows"] += sale["rows"]
+            if devol_state == "current":
+                totals["returns_revenue"] += ret["revenue"] if can_revenue else Decimal(0)
+                totals["returns_quantity"] += ret["quantity"]
+                totals["returns_rows"] += ret["rows"]
+        has_sales = any(s in ("current", "partial") for s in states.values())
         return {
             "from": first.isoformat(), "to": last.isoformat(), "stores": stores,
-            "totals": {key: str(value) for key, value in totals.items()},
+            "totals": {
+                "revenue": str(totals["revenue"]) if has_sales else None,
+                "quantity": str(totals["quantity"]) if has_sales else None,
+                "rows": totals["rows"] if has_sales else None,
+                "returns_revenue": (
+                    str(totals["returns_revenue"])
+                    if devol_state == "current" else None
+                ),
+                "returns_quantity": (
+                    str(totals["returns_quantity"])
+                    if devol_state == "current" else None
+                ),
+                "returns_rows": (
+                    totals["returns_rows"] if devol_state == "current" else None
+                ),
+            },
             "data_state": overall,
+            "returns_state": returns_state,
             "source": pilot_sales_status(self.db),
         }
 
@@ -435,8 +442,16 @@ class SalesService:
         self._range(first, last)
         codes = self._scope(store_code)
         revenue_ok = self._revenue_map(codes)
-        sales = daily_totals(self.db, ErpSaleRow, codes, first, last)
-        returns = daily_totals(self.db, ErpReturnRow, codes, first, last)
+        _, overall = period_states(self.db, codes, first, last)
+        devol_state = kind_availability(self.db, KIND_DEVOLUCOES)
+        sales = (
+            daily_totals(self.db, ErpSaleRow, codes, first, last)
+            if overall != "unavailable" else {}
+        )
+        returns = (
+            daily_totals(self.db, ErpReturnRow, codes, first, last)
+            if devol_state == "current" else {}
+        )
         days: dict[tuple[str, str], dict] = {}
         for (code, day), sale in sales.items():
             entry = days.setdefault((day.isoformat(), code), {
@@ -456,11 +471,13 @@ class SalesService:
             if revenue_ok[code]:
                 entry["returns_revenue"] = str(ret["revenue"])
             entry["returns_quantity"] = str(ret["quantity"])
-        _, overall = period_states(self.db, codes, first, last)
         return {
             "from": first.isoformat(), "to": last.isoformat(),
             "days": [days[key] for key in sorted(days)],
             "data_state": overall,
+            "returns_state": (
+                "missing" if devol_state == "never_imported" else devol_state
+            ),
         }
 
     def top(
@@ -473,6 +490,14 @@ class SalesService:
         limit = max(1, min(limit, TOP_LIMIT))
         if sort not in ("revenue", "quantity"):
             raise SalesError(422, "Ordenação desconhecida.")
+        _, overall = period_states(self.db, codes, first, last)
+        if overall == "unavailable":
+            return {
+                "dimension": dimension,
+                "from": first.isoformat(), "to": last.isoformat(),
+                "data_state": "unavailable",
+                "items": [],
+            }
         # Documento fiscal do cliente so aparece para quem visualiza o
         # faturamento das tres lojas (gestao consolidada ou SuperAdmin).
         is_admin = self.principal.is_superadmin or all(
@@ -543,7 +568,6 @@ class SalesService:
         items = sorted(
             merged.values(), key=lambda item: (item[sort], item["revenue"]), reverse=True
         )[:limit]
-        _, overall = period_states(self.db, codes, first, last)
         return {
             "dimension": dimension,
             "from": first.isoformat(), "to": last.isoformat(),

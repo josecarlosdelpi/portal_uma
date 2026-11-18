@@ -42,6 +42,7 @@ def apply_despesas_file(
         id=uuid4(), kind=KIND_DESPESAS, source=source, status="RECEIVED",
         file_name=(file_name or "Despesas.csv")[:150], file_sha256=digest,
         drive_file_id=drive_file_id, imported_by=actor.id if actor else None,
+        created_at=_utcnow(),
     )
     db.add(batch)
 

@@ -161,6 +161,35 @@ def test_importacao_invalida_registra_falha_sem_alterar_dados(env):
     assert len(current) == 1
 
 
+def test_arquivo_invalido_torna_dados_indisponiveis_nos_paineis(env):
+    """Versao mais recente invalida: paineis informam indisponibilidade em
+    vez de exibir o snapshot anterior como se fosse atual."""
+    c, _, engine, *_ = env
+    assert upload(c).status_code == 200
+    assert upload(c, INVALID, "quebrado.csv").status_code == 422
+
+    overview = c.get("/api/v1/finance/overview?month=2026-10")
+    assert overview.status_code == 200
+    assert overview.json()["has_data"] is False
+    assert overview.json()["data_state"] == "unavailable"
+    for route in ("obligations", "payments", "purchases"):
+        out = c.get(f"/api/v1/finance/{route}")
+        assert out.status_code == 200
+        assert out.json()["has_data"] is False
+        assert out.json()["data_state"] == "unavailable"
+    status = c.get("/api/v1/finance/sync")
+    assert status.json()["data_state"] == "unavailable"
+
+    # Arquivo valido seguinte restaura a disponibilidade por completo.
+    assert upload(c, SNAPSHOT_2).status_code == 200
+    restored = c.get("/api/v1/finance/overview?month=2026-10")
+    assert restored.json()["has_data"] is True
+    assert restored.json()["data_state"] == "current"
+    with Session(engine) as db:
+        # lotes antigos permanecem para auditoria (5 + 6 linhas)
+        assert len(db.scalars(select(FinancialObligation)).all()) == 11
+
+
 def test_contas_a_pagar_filtros_ordenacao_e_paginacao(env):
     c, *_ = env
     assert upload(c).status_code == 200

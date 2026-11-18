@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.erp_csv import KIND_DESPESAS
 from app.erp_expenses_import import apply_despesas_file
-from app.erp_import import _latest_applied
+from app.erp_import import _latest_applied, kind_availability
 from app.models import ErpImportBatch, ErpSourceFile, FinancialObligation, User
 from app.operations_service import OperationError
 from app.policy import STORE_CODES, can_access
@@ -165,6 +165,12 @@ class FinanceService:
     def _current_batch(self) -> ErpImportBatch | None:
         return _latest_applied(self.db, KIND_DESPESAS)
 
+    def _availability(self) -> str:
+        """current | unavailable | never_imported — arquivo mais recente
+        invalido torna os dados indisponiveis para os paineis."""
+        state = kind_availability(self.db, KIND_DESPESAS)
+        return "missing" if state == "never_imported" else state
+
     STATUS_PUBLIC = {"APPLIED": "imported", "FAILED": "failed",
                      "DUPLICATE": "imported", "RECEIVED": "imported"}
 
@@ -241,6 +247,7 @@ class FinanceService:
         applied = self._current_batch()
         return {
             "file_key": KIND_DESPESAS,
+            "data_state": self._availability(),
             "last_status": state.last_status if state else None,
             "last_check_at": state.last_check_at.isoformat()
                 if state and state.last_check_at else None,
@@ -294,12 +301,14 @@ class FinanceService:
         stores = self._store_scope(store)
         batch = self._current_batch()
 
+        availability = self._availability()
         empty = {
             "as_of": today.isoformat(), "month": f"{year:04d}-{month_num:02d}",
-            "has_data": False, "last_import": self._last_import_public(batch),
+            "has_data": False, "data_state": availability,
+            "last_import": self._last_import_public(batch),
             "kpis": {}, "monthly_due": [], "by_store": [], "by_category": {},
         }
-        if batch is None:
+        if batch is None or availability != "current":
             return empty
 
         open_rows = self.db.execute(
@@ -363,6 +372,7 @@ class FinanceService:
             "as_of": today.isoformat(),
             "month": f"{year:04d}-{month_num:02d}",
             "has_data": True,
+            "data_state": "current",
             "last_import": self._last_import_public(batch),
             "kpis": {
                 "open_amount": money(open_amount), "open_count": len(open_rows),
@@ -387,9 +397,11 @@ class FinanceService:
         stores = self._store_scope(store)
         page, page_size = self._page(page, page_size)
         batch = self._current_batch()
-        if batch is None:
+        availability = self._availability()
+        if batch is None or availability != "current":
             return {"items": [], "total": 0, "sum_amount": "0.00", "page": page,
-                    "page_size": page_size, "has_data": False, "by_month": []}
+                    "page_size": page_size, "has_data": False, "by_month": [],
+                    "data_state": availability}
 
         start = parse_day(due_from, "due_from")
         end = parse_day(due_to, "due_to")
@@ -418,6 +430,7 @@ class FinanceService:
             "total": total, "sum_amount": money(sum_amount),
             "page": page, "page_size": page_size, "has_data": True,
             "by_month": bucket_months(list(pairs)),
+            "data_state": "current",
             "last_import": self._last_import_public(batch),
         }
 
@@ -427,10 +440,12 @@ class FinanceService:
         stores = self._store_scope(store)
         page, page_size = self._page(page, page_size)
         batch = self._current_batch()
-        if batch is None:
+        availability = self._availability()
+        if batch is None or availability != "current":
             return {"items": [], "total": 0, "sum_amount": "0.00", "page": page,
                     "page_size": page_size, "has_data": False,
-                    "by_month": [], "by_store": [], "by_category": {}}
+                    "by_month": [], "by_store": [], "by_category": {},
+                    "data_state": availability}
 
         start = parse_day(paid_from, "paid_from")
         end = parse_day(paid_to, "paid_to")
@@ -478,6 +493,7 @@ class FinanceService:
                 cat: {"amount": money(v["amount"]), "count": v["count"]}
                 for cat, v in by_category.items()
             },
+            "data_state": "current",
             "last_import": self._last_import_public(batch),
         }
 
@@ -487,13 +503,14 @@ class FinanceService:
         stores = self._store_scope(store)
         page, page_size = self._page(page, page_size)
         batch = self._current_batch()
+        availability = self._availability()
         empty = {
             "has_data": False, "items": [], "total": 0, "page": page,
             "page_size": page_size, "totals": {}, "by_store": [],
-            "by_month": [], "top_suppliers": [],
+            "by_month": [], "top_suppliers": [], "data_state": availability,
             "last_import": self._last_import_public(batch),
         }
-        if batch is None:
+        if batch is None or availability != "current":
             return empty
 
         conds = self._conditions(
@@ -545,5 +562,6 @@ class FinanceService:
                 {"supplier_name": name, "amount": money(v["amount"]), "count": v["count"]}
                 for name, v in top[:TOP_SUPPLIERS]
             ],
+            "data_state": "current",
             "last_import": self._last_import_public(batch),
         }

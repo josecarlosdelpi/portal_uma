@@ -150,8 +150,8 @@ export type TargetSnapshot = {
   working_day_count: number;
   base_plan: DailyBase[];
   sales: {
-    status: "awaiting_official_import" | "pilot_unverified";
-    data_state?: "current" | "stale" | "missing" | "partial";
+    status: "awaiting_official_import" | "pilot_unverified" | "unavailable";
+    data_state?: SalesDataState;
     monthly_revenue: string | null;
     attainment_percent: string | null;
     dynamic_day_plan: DynamicDayPlan[] | null;
@@ -169,7 +169,7 @@ export type OverviewStore = {
   attainment_percent: string | null;
   previous_month_change_percent: string | null;
   previous_year_change_percent: string | null;
-  data_state?: "current" | "stale" | "missing" | "partial";
+  data_state?: SalesDataState;
 };
 
 export type OverviewSnapshot = {
@@ -263,7 +263,7 @@ export type SalesSyncStatus = {
     file_name: string | null; rows_applied: number;
     period_start: string | null; period_end: string | null;
     coverage?: Array<{store_code: string; first_date: string; last_date: string}>;
-    rows_beyond_coverage?: number;
+    availability?: "current" | "unavailable" | "never_imported";
   }>;
   drive: {
     enabled: boolean; interval_seconds: number;
@@ -276,12 +276,13 @@ export type SalesSyncStatus = {
   };
 };
 
-export type SalesDataState = "current" | "stale" | "missing" | "partial";
+export type SalesDataState = "current" | "missing" | "partial" | "unavailable";
 
 export type SalesStoreSummary = {
   code: string; revenue: string | null; revenue_visibility: "allowed" | "restricted";
-  quantity: string; rows: number;
-  returns_revenue: string | null; returns_quantity: string; returns_rows: number;
+  quantity: string | null; rows: number | null;
+  returns_revenue: string | null; returns_quantity: string | null;
+  returns_rows: number | null;
   data_state?: SalesDataState;
 };
 
@@ -294,10 +295,12 @@ export type SalesSummary = {
   from: string; to: string;
   stores: SalesStoreSummary[];
   totals: {
-    revenue: string; quantity: string; rows: number;
-    returns_revenue: string; returns_quantity: string; returns_rows: number;
+    revenue: string | null; quantity: string | null; rows: number | null;
+    returns_revenue: string | null; returns_quantity: string | null;
+    returns_rows: number | null;
   };
   data_state?: SalesDataState;
+  returns_state?: "current" | "missing" | "unavailable";
   source?: SalesSource;
 };
 
@@ -572,7 +575,9 @@ export const api = {
       (store ? "&store=" + encodeURIComponent(store) : "")),
 
   salesDaily: (token: string, from: string, to: string, store?: string) =>
-    request<{from: string; to: string; days: SalesDailyRow[]; data_state?: SalesDataState}>(
+    request<{from: string; to: string; days: SalesDailyRow[];
+             data_state?: SalesDataState;
+             returns_state?: "current" | "missing" | "unavailable"}>(
       token, "/api/v1/sales/daily?from=" + from + "&to=" + to +
       (store ? "&store=" + encodeURIComponent(store) : "")),
 

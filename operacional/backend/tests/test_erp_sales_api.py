@@ -182,7 +182,7 @@ def test_importacao_v2_persiste_campos_extras(env):
         assert sum(r.total for r in rows) == Decimal("130")
 
 
-def test_importacao_v2_devolucoes_preserva_fora_da_janela(env):
+def test_importacao_v2_devolucoes_substitui_integralmente(env):
     client, _, engine, *_ = env
     upload(client, "devolucoes", DEVOLUCOES_CSV)  # v1: out/nov-2026
     upload(client, "devolucoes", devolucoes_v2_csv(
@@ -190,10 +190,14 @@ def test_importacao_v2_devolucoes_preserva_fora_da_janela(env):
     ))
     with Session(engine) as db:
         rows = db.scalars(select(ErpReturnRow)).all()
-        # Janela do v2 (jan) nao toca nas linhas v1 de out/nov.
+        # Substituicao integral: v1 fora da janela do v2 fica superseded.
         assert len(rows) == 3
-        v2 = [r for r in rows if r.product_description is not None]
-        assert len(v2) == 1 and v2[0].product_unit == "PC"
+        active = [r for r in rows if r.superseded_at is None]
+        assert len(active) == 1 and active[0].product_unit == "PC"
+        assert all(
+            r.superseded_at is not None for r in rows
+            if r.product_description is None
+        )
 
 
 def test_parser_rejects_bad_header_and_lines():
@@ -222,7 +226,9 @@ def test_import_rejects_identical_duplicate_and_applies(env):
         assert len(db.scalars(select(ErpSaleRow)).all()) == 2
 
 
-def test_replace_window_updates_only_covered_scope(env):
+def test_novo_arquivo_substitui_todo_o_conjunto_ativo(env):
+    """O arquivo vigente e a fonte oficial: lojas ausentes no novo arquivo
+    tambem saem dos indicadores (nao ha mistura de historicos)."""
     client, _, engine, admin, _, _ = env
     upload(client, "vendas", sales_csv(LINE_JOI, LINE_TUB))
     # Novo arquivo cobre apenas Tubarao no mesmo dia + um dia novo.
@@ -234,15 +240,16 @@ def test_replace_window_updates_only_covered_scope(env):
         rows = db.scalars(
             select(ErpSaleRow).where(ErpSaleRow.superseded_at.is_(None))
         ).all()
-        assert len(rows) == 3
+        assert len(rows) == 2  # apenas o conteudo do arquivo vigente
         superseded = db.scalars(
             select(ErpSaleRow).where(ErpSaleRow.superseded_at.isnot(None))
         ).all()
-        assert len(superseded) == 1 and superseded[0].store_code == "TUBARAO"
+        # a venda antiga de Joinville virou historico de auditoria
+        assert len(superseded) == 2
+        assert {r.store_code for r in superseded} == {"JOINVILLE", "TUBARAO"}
         tub = [r for r in rows if r.store_code == "TUBARAO" and r.sale_date == date(2026, 10, 2)]
         assert len(tub) == 1 and tub[0].product_code == "P999"
-        joi = [r for r in rows if r.store_code == "JOINVILLE"]
-        assert len(joi) == 1 and joi[0].product_code == "P100"
+        assert not [r for r in rows if r.store_code == "JOINVILLE"]
 
 
 def test_devolucoes_kept_separate(env):
@@ -421,7 +428,8 @@ def test_top_products_sort_by_quantity(env):
         "/api/v1/sales/top/products?from=2026-10-01&to=2026-10-31&sort=x").status_code == 422
 
 
-def test_rejeita_arquivo_com_lacuna_dentro_da_janela(env):
+def test_arquivo_com_mes_ausente_substitui_integral(env):
+    """O arquivo vigente e a fonte oficial: mes ausente deixa de existir."""
     client, _, engine, *_ = env
     upload(client, "vendas", sales_csv(
         "05/01/2026;1;Joinville;1;00000000000;CLIENTE A;P1;1;10;10",
@@ -431,18 +439,20 @@ def test_rejeita_arquivo_com_lacuna_dentro_da_janela(env):
         "05/01/2026;1;Joinville;1;00000000000;CLIENTE A;P1;1;10;10",
         "10/03/2026;1;Joinville;1;00000000000;CLIENTE C;P3;1;30;30",
     ))
-    assert response.status_code == 422
-    batch = response.json()["detail"]["batch"]
-    assert batch["status"] == "FAILED"
-    assert batch["error_summary"]["coverage_gaps"] == [
-        {"store_code": "JOINVILLE", "month": "2026-02"}
-    ]
+    assert response.status_code == 200
+    assert response.json()["batch"]["status"] == "APPLIED"
     with Session(engine) as db:
         active = db.scalars(
             select(ErpSaleRow).where(ErpSaleRow.superseded_at.is_(None))
         ).all()
-        assert len(active) == 2  # fevereiro preservado, nada apagado
-        assert {r.sale_date.month for r in active} == {1, 2}
+        # fev nao existe mais no arquivo vigente: sai do conjunto ativo.
+        assert {r.sale_date.month for r in active} == {1, 3}
+        assert len(db.scalars(select(ErpSaleRow)).all()) == 4  # historico mantido
+    feb = client.get(
+        "/api/v1/sales/summary?from=2026-02-01&to=2026-02-28&store=JOINVILLE"
+    ).json()
+    assert feb["data_state"] == "missing"
+    assert feb["stores"][0]["revenue"] is None  # "sem dados", nao zero
 
 
 def test_substituicao_marca_superseded_sem_apagar(env):
@@ -462,28 +472,95 @@ def test_substituicao_marca_superseded_sem_apagar(env):
         assert active[0].total == Decimal("20")  # versao corrigida vigente
 
 
-def test_summary_identifica_dados_de_exportacao_anterior(env):
+def test_summary_marca_periodo_fora_do_arquivo_vigente(env):
     client, *_ = env
     upload(client, "vendas", sales_csv(
         "05/01/2026;1;Joinville;1;00000000000;CLIENTE A;P1;1;10;10",
         "10/02/2026;1;Joinville;1;00000000000;CLIENTE B;P2;1;20;20",
     ))
-    # Arquivo vigente passa a cobrir apenas janeiro: fev vira 'stale'.
+    # Arquivo vigente passa a cobrir apenas janeiro: fev sai dos indicadores.
     upload(client, "vendas", sales_csv(
         "05/01/2026;1;Joinville;1;00000000000;CLIENTE A;P1;1;10;10",
     ))
     feb = client.get(
         "/api/v1/sales/summary?from=2026-02-01&to=2026-02-28&store=JOINVILLE"
     ).json()
-    assert feb["data_state"] == "stale"
-    assert feb["stores"][0]["data_state"] == "stale"
-    assert feb["stores"][0]["revenue"] == "20.00"  # numero preservado, marcado
+    assert feb["data_state"] == "missing"
+    assert feb["stores"][0]["data_state"] == "missing"
+    assert feb["stores"][0]["revenue"] is None  # "sem dados", nao zero
+    assert feb["totals"]["revenue"] is None
     jan = client.get(
         "/api/v1/sales/summary?from=2026-01-01&to=2026-01-31&store=JOINVILLE"
     ).json()
     # Linhas sao do arquivo vigente, mas a consulta vai alem do fim da janela.
     assert jan["data_state"] == "partial"
+    assert jan["stores"][0]["revenue"] == "10.00"
     empty = client.get(
         "/api/v1/sales/summary?from=2026-06-01&to=2026-06-30&store=JOINVILLE"
     ).json()
     assert empty["data_state"] == "missing"
+
+
+def test_arquivo_invalido_marca_fonte_indisponivel(env):
+    client, _, engine, *_ = env
+    upload(client, "vendas", sales_csv(LINE_JOI))
+    # Nova versao do arquivo e invalida: o conjunto ativo fica intacto no
+    # banco, mas os paineis nao o apresentam como atual.
+    response = upload(client, "vendas", b"coluna;errada\n1;2\n")
+    assert response.status_code == 422
+    summary = client.get(
+        "/api/v1/sales/summary?from=2026-10-01&to=2026-10-31&store=JOINVILLE"
+    ).json()
+    assert summary["data_state"] == "unavailable"
+    assert summary["source"]["status"] == "source_unavailable"
+    assert summary["stores"][0]["revenue"] is None
+    assert summary["totals"]["revenue"] is None
+    top = client.get(
+        "/api/v1/sales/top/products?from=2026-10-01&to=2026-10-31").json()
+    assert top["data_state"] == "unavailable" and top["items"] == []
+    daily = client.get(
+        "/api/v1/sales/daily?from=2026-10-01&to=2026-10-31").json()
+    assert daily["data_state"] == "unavailable" and daily["days"] == []
+    with Session(engine) as db:
+        active = db.scalars(
+            select(ErpSaleRow).where(ErpSaleRow.superseded_at.is_(None))
+        ).all()
+        assert len(active) == 1  # copia interna preservada p/ recuperacao
+
+
+def test_devolucoes_invalidas_ocultam_valores(env):
+    client, *_ = env
+    upload(client, "vendas", sales_csv(LINE_JOI, LINE_TUB))
+    upload(client, "devolucoes", DEVOLUCOES_CSV)
+    response = upload(client, "devolucoes", b"coluna;errada\n1;2\n")
+    assert response.status_code == 422
+    summary = client.get(
+        "/api/v1/sales/summary?from=2026-10-01&to=2026-10-31&store=TUBARAO"
+    ).json()
+    # Vendas continua vigente; devolucoes fica indisponivel sem exibir
+    # registros da versao anterior como atuais.
+    assert summary["stores"][0]["revenue"] == "55.00"
+    assert summary["returns_state"] == "unavailable"
+    assert summary["stores"][0]["returns_revenue"] is None
+    assert summary["totals"]["returns_revenue"] is None
+    daily = client.get(
+        "/api/v1/sales/daily?from=2026-10-01&to=2026-10-31").json()
+    assert daily["returns_state"] == "unavailable"
+
+
+def test_venda_removida_do_csv_deixa_de_aparecer(env):
+    """Cancelamento no ERP: linha ausente no arquivo novo sai dos paineis."""
+    client, _, engine, *_ = env
+    upload(client, "vendas", sales_csv(LINE_JOI, LINE_JOI2))
+    upload(client, "vendas", sales_csv(LINE_JOI))  # LINE_JOI2 removida
+    summary = client.get(
+        "/api/v1/sales/summary?from=2026-10-01&to=2026-10-31&store=JOINVILLE"
+    ).json()
+    assert summary["stores"][0]["revenue"] == "100.00"  # so a venda vigente
+    assert summary["stores"][0]["rows"] == 1
+    with Session(engine) as db:
+        total = len(db.scalars(select(ErpSaleRow)).all())
+        active = db.scalars(
+            select(ErpSaleRow).where(ErpSaleRow.superseded_at.is_(None))
+        ).all()
+        assert total == 3 and len(active) == 1  # removida vira superseded

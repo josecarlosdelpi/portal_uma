@@ -8,6 +8,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.erp_import import kind_availability
+from app.erp_csv import KIND_VENDAS
 from app.erp_sales_service import (
     month_bounds, period_states, pilot_sales_status, store_totals,
 )
@@ -56,9 +58,16 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
     first, last = month_bounds(year, month)
     prev_first, prev_last = month_bounds(year if month > 1 else year - 1,
                                          month - 1 if month > 1 else 12)
-    revenue = store_totals(db, ErpSaleRow, stores, first, last)
-    previous = store_totals(db, ErpSaleRow, stores, prev_first, prev_last)
     states, _overall = period_states(db, stores, first, last)
+    sales_available = kind_availability(db, KIND_VENDAS) == "current"
+    revenue = (
+        store_totals(db, ErpSaleRow, stores, first, last)
+        if sales_available else {}
+    )
+    previous = (
+        store_totals(db, ErpSaleRow, stores, prev_first, prev_last)
+        if sales_available else {}
+    )
     result = []
     for code in stores:
         # Permissao do modulo nao autoriza automaticamente os indicadores.
@@ -137,8 +146,11 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
     amounts = store_targets(db, year, month, STORE_CODES)
     all_goals = all(amounts[code] is not None for code in STORE_CODES)
     first, last = month_bounds(year, month)
-    revenue = store_totals(db, ErpSaleRow, STORE_CODES, first, last)
     states, _overall = period_states(db, STORE_CODES, first, last)
+    revenue = (
+        store_totals(db, ErpSaleRow, STORE_CODES, first, last)
+        if kind_availability(db, KIND_VENDAS) == "current" else {}
+    )
     status = pilot_sales_status(db)
     stores = []
     total_revenue = Decimal("0")
