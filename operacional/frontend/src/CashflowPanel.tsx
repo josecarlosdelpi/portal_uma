@@ -287,7 +287,7 @@ export function CashflowPanel({ token, profile }: Props) {
         {data.entries_source.label} — indicadores da coluna “{colLabel(totalCol)}”,
         período {dmy(data.period.first)} a {dmy(data.period.last)}.</p>
 
-      <div className="table-wrap"><table className="dre-table">
+      <div className="table-wrap"><table className="dre-table cf-main-table">
         <thead><tr>
           <th>Movimento</th>
           {columns.map(col => <th key={col} className="fin-num">{colLabel(col)}</th>)}
