@@ -132,13 +132,18 @@ def test_stock_movement_is_transactional_and_has_no_negative_balance(env):
 def test_contact_log_requires_client_and_active_seller_same_store(env):
     client,identity,engine,_,seller,other=env
     customer=client.post("/api/v1/operations/contacts/JOINVILLE/clients",json={
-        "name":"Oficina Teste","origin":"google","phone":"0000000"
+        "name":"Oficina Teste","origin":"google","phone":"0000000",
+        "city":"Joinville","contact_person":"Dono","tag":"Linha Leve",
+        "status":"ativo","confirm":True
     })
     assert customer.status_code==201,customer.text
-    cid=customer.json()["id"]
-    assert client.post("/api/v1/operations/contacts/JOINVILLE/clients",json={
+    cid=customer.json()["client"]["id"]
+    twin=client.post("/api/v1/operations/contacts/JOINVILLE/clients",json={
         "name":"  OFICINA    TESTE ","origin":"google"
-    }).status_code==409
+    })
+    assert twin.status_code==201,twin.text
+    assert twin.json()["result"]=="review"
+    assert any(w["code"]=="nome_duplicado" for w in twin.json()["warnings"])
     assert len(client.get("/api/v1/operations/contacts/JOINVILLE/team").json())==1
     call={"client_id":cid,"seller_id":str(seller.id),"date":"2026-10-20",
           "outcome":"sem_resposta","next_on":"2026-10-28","note":"Primeira tentativa"}

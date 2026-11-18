@@ -1,4 +1,4 @@
-import {request} from "./api";
+import {ApiError, request} from "./api";
 export type ReviewRow = {
   store_code:string; count:number|null; tier:"nenhum"|"simbolico"|"maior"|null;
   reward_per_seller:string|null; checked_on:string|null; delivered_on:string|null;
@@ -16,16 +16,73 @@ export type SupplyMove = {
 };
 
 export type ClientRow = {
-  id:string;store_code:string;name:string;phone:string|null;erp_code:string|null;
-  origin:string;last_purchase_on:string|null
+  id:string;store_code:string;name:string;phone:string|null;
+  cellphone:string|null;city:string|null;contact_person:string|null;
+  birthday:string|null;birthday_day:number|null;birthday_month:number|null;
+  status:string|null;tag:string|null;last_contact_on:string|null;
+  erp_code:string|null;origin:string;notes:string|null;
+  last_purchase_on:string|null;revision:number;
+  inactive_by_purchases:boolean|null
+};
+export type ClientPage = {
+  store_code:string;total:number;page:number;page_size:number;items:ClientRow[]
+};
+export type ClientFilters = {cities:string[];statuses:string[];tags:string[]};
+export type ClientDetail = ClientRow & {
+  inactivity_days:number;days_since_purchase:number|null;
+  history:ContactRow[];pending_followups:ContactRow[]
+};
+export type ClientWarning = {code:string;message:string};
+export type ClientSaveResult = {
+  result:"saved"|"review";client?:ClientRow;warnings:ClientWarning[];revision?:number
+};
+export type ClientInput = {
+  name:string;phone?:string|null;cellphone?:string|null;erp_code?:string|null;
+  origin?:string;city?:string|null;contact_person?:string|null;
+  birthday_day?:number|null;birthday_month?:number|null;
+  status?:string|null;tag?:string|null;last_contact_on?:string|null;
+  last_purchase_on?:string|null;notes?:string|null;confirm?:boolean
 };
 export type TeamMember = {id:string;name:string};
 export type ContactRow = {
   id:string;store_code:string;client_id:string;client:string;
-  seller_id:string;seller:string;date:string;outcome:string;next_on:string|null;
-  note:string;revision:number
+  seller_id:string;seller:string;date:string;outcome:string;channel:string;
+  next_on:string|null;followup_done_at:string|null;
+  note:string;revision:number;overdue?:boolean
 };
 export type CallsSnapshot = {store_code:string;year:number;month:number;items:ContactRow[]};
+export type FollowupPage = {
+  store_code:string;total:number;page:number;page_size:number;items:ContactRow[]
+};
+export type ContactSettings = {inactivity_days:number};
+export type ContactMetrics = {
+  store_code:string;year:number;month:number;inactivity_days:number;
+  clients_total:number;by_status:Record<string,number>;
+  by_city:{city:string;total:number}[];by_tag:{tag:string;total:number}[];
+  contacts_in_period:number;clients_contacted:number;
+  followups_pending:number;followups_overdue:number;
+  inactive_by_purchases:number
+};
+export type ImportRow = {
+  index:number;sheet:string;city:string|null;name:string;
+  phone:string|null;cellphone:string|null;contact_person:string|null;
+  birthday_day:number|null;birthday_month:number|null;birthday_raw:string|null;
+  status:string|null;status_raw:string|null;tag:string|null;
+  last_contact_on:string|null;last_contact_raw:string|null;notes:string|null;
+  warnings:string[];matches:{id:string;name:string;city:string|null;kinds:string[]}[];
+  suggested:"import"|"update"
+};
+export type ImportPreview = {
+  session_id:string;filename:string;rows_total:number;
+  cities:{city:string;total:number}[];rows:ImportRow[];
+  summary:{with_warnings:number;possible_duplicates:number}
+};
+export type ImportReport = {
+  imported:number;updated:number;skipped:number;warnings:number
+};
+export type ImportCommitResult =
+  {result:"saved";report:ImportReport;details:{index:number;action:string;client:string}[]}
+  | {result:"review";message:string;flagged:number};
 
 export const operationsApi = {
   reviews:(token:string,year:number,month:number) =>
@@ -49,20 +106,78 @@ export const operationsApi = {
     "/api/v1/operations/supplies/movements","POST",body),
   movements:(token:string,store:string) =>
     request<SupplyMove[]>(token,`/api/v1/operations/supplies/${store}/movements`),
-  clients:(token:string,store:string) =>
-    request<ClientRow[]>(token,`/api/v1/operations/contacts/${store}/clients`),
-  addClient:(token:string,store:string,body:{
-    name:string;phone:string|null;erp_code:string|null;origin:string;
-    last_purchase_on:string|null
-  }) => request<ClientRow>(token,`/api/v1/operations/contacts/${store}/clients`,"POST",body),
+  clients:(token:string,store:string,params?:{
+    q?:string;city?:string;status?:string;tag?:string;phone?:string;
+    inactive?:string;page?:number;page_size?:number
+  }) => {
+    const query=new URLSearchParams();
+    for(const [key,value] of Object.entries(params??{}))
+      if(value!==undefined&&value!=="")query.set(key,String(value));
+    const suffix=query.size?"?"+query.toString():"";
+    return request<ClientPage>(token,
+      `/api/v1/operations/contacts/${store}/clients${suffix}`);
+  },
+  clientFilters:(token:string,store:string) =>
+    request<ClientFilters>(token,`/api/v1/operations/contacts/${store}/clients/filters`),
+  clientDetail:(token:string,store:string,id:string) =>
+    request<ClientDetail>(token,`/api/v1/operations/contacts/${store}/clients/${id}`),
+  addClient:(token:string,store:string,body:ClientInput) =>
+    request<ClientSaveResult>(token,`/api/v1/operations/contacts/${store}/clients`,"POST",body),
+  updateClient:(token:string,store:string,id:string,body:Partial<ClientInput>&{
+    expected_revision:number
+  }) => request<ClientSaveResult>(token,
+    `/api/v1/operations/contacts/${store}/clients/${id}`,"PUT",body),
+  contactSettings:(token:string,store:string) =>
+    request<ContactSettings>(token,`/api/v1/operations/contacts/${store}/settings`),
+  saveSettings:(token:string,store:string,inactivityDays:number) =>
+    request<ContactSettings>(token,`/api/v1/operations/contacts/${store}/settings`,"PUT",
+      {inactivity_days:inactivityDays}),
+  contactMetrics:(token:string,store:string,year:number,month:number) =>
+    request<ContactMetrics>(token,
+      `/api/v1/operations/contacts/${store}/metrics/${year}/${month}`),
+  followups:(token:string,store:string,state:string,page=1,pageSize=100) =>
+    request<FollowupPage>(token,
+      `/api/v1/operations/contacts/${store}/followups?state=${state}&page=${page}&page_size=${pageSize}`),
+  followupDone:(token:string,store:string,callId:string,revision:number) =>
+    request<ContactRow>(token,
+      `/api/v1/operations/contacts/${store}/followups/${callId}/done`,"POST",
+      {expected_revision:revision}),
+  followupReschedule:(token:string,store:string,callId:string,nextOn:string,revision:number) =>
+    request<ContactRow>(token,
+      `/api/v1/operations/contacts/${store}/followups/${callId}/reschedule`,"POST",
+      {next_on:nextOn,expected_revision:revision}),
+  importPreview:(token:string,store:string,file:File,defaultCity?:string) => {
+    const form=new FormData();
+    form.append("file",file);
+    const city=defaultCity?"?default_city="+encodeURIComponent(defaultCity):"";
+    return fetch(
+      (import.meta.env.VITE_API_BASE_URL??"").replace(/\/$/,"")+
+      `/api/v1/operations/contacts/${store}/import/preview${city}`,
+      {method:"POST",headers:{Authorization:"Bearer "+token},body:form}
+    ).then(async response=>{
+      if(!response.ok){
+        const detail=await response.json().catch(()=>({}));
+        throw new ApiError(response.status,
+          (detail as {detail?:string}).detail??"Falha ao ler o arquivo.");
+      }
+      return response.json() as Promise<ImportPreview>;
+    });
+  },
+  importCommit:(token:string,store:string,sessionId:string,body:{
+    decisions:Record<string,{action:"import"|"update"|"skip";client_id?:string}>;
+    confirm:boolean
+  }) => request<ImportCommitResult>(token,
+    `/api/v1/operations/contacts/${store}/import/${sessionId}/commit`,"POST",body),
   team:(token:string,store:string) =>
     request<TeamMember[]>(token,`/api/v1/operations/contacts/${store}/team`),
   calls:(token:string,store:string,year:number,month:number) =>
     request<CallsSnapshot>(token,`/api/v1/operations/contacts/${store}/${year}/${month}/calls`),
   addCall:(token:string,store:string,body:{
-    client_id:string;seller_id:string;date:string;outcome:string;next_on:string|null;note:string
+    client_id:string;seller_id:string;date:string;channel:string;
+    outcome:string;next_on:string|null;note:string
   }) => request<ContactRow>(token,`/api/v1/operations/contacts/${store}/calls`,"POST",body),
   correctCall:(token:string,store:string,id:string,body:{
-    date:string;outcome:string;next_on:string|null;note:string;expected_revision:number
+    date:string;channel:string;outcome:string;next_on:string|null;note:string;
+    expected_revision:number
   }) => request<ContactRow>(token,`/api/v1/operations/contacts/${store}/calls/${id}`,"PUT",body),
 };

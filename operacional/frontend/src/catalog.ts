@@ -62,6 +62,7 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
     permissions: [
       { code: "telemarketing.view", name: "Ver telemarketing", kind: "view" },
       { code: "telemarketing.edit", name: "Registrar contatos", kind: "edit" },
+      { code: "telemarketing.admin", name: "Administrar televendas", kind: "action" },
     ],
   },
   {

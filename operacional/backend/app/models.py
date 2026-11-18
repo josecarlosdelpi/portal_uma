@@ -266,18 +266,46 @@ class SupplyMovement(Base):
 
 
 class ContactClient(Base):
-    """Carteira por loja, independente das vendas e sem distribuicao individual."""
+    """Carteira por loja, independente das vendas e sem distribuicao individual.
+
+    Duplicidades de nome ou telefone sao avisadas, nao bloqueadas: a
+    confirmacao explicita do usuario decide entre manter os dois registros.
+    """
     __tablename__ = "contact_clients"
-    __table_args__ = (UniqueConstraint("store_code", "name_key", name="uq_client_name_store"),)
+    __table_args__ = (
+        CheckConstraint("status IS NULL OR status IN ('ativo','inativo','prospect')",
+                        name="ck_client_status"),
+        CheckConstraint("birthday_day IS NULL OR birthday_day BETWEEN 1 AND 31",
+                        name="ck_client_birthday_day"),
+        CheckConstraint("birthday_month IS NULL OR birthday_month BETWEEN 1 AND 12",
+                        name="ck_client_birthday_month"),
+        CheckConstraint("revision >= 1", name="ck_client_revision"),
+        Index("ix_contact_clients_store_city", "store_code", "city"),
+        Index("ix_contact_clients_store_status", "store_code", "status"),
+        Index("ix_contact_clients_store_name", "store_code", "name_key"),
+    )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     name_key: Mapped[str] = mapped_column(String(120), nullable=False)
     erp_code: Mapped[str | None] = mapped_column(String(50))
     phone: Mapped[str | None] = mapped_column(String(40))
+    phone_norm: Mapped[str | None] = mapped_column(String(40))
+    cellphone: Mapped[str | None] = mapped_column(String(40))
+    cellphone_norm: Mapped[str | None] = mapped_column(String(40))
+    city: Mapped[str | None] = mapped_column(String(60))
+    contact_person: Mapped[str | None] = mapped_column(String(100))
+    birthday_day: Mapped[int | None] = mapped_column(Integer)
+    birthday_month: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str | None] = mapped_column(String(12))
+    tag: Mapped[str | None] = mapped_column(String(60))
+    last_contact_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    notes: Mapped[str | None] = mapped_column(String(2000))
     origin: Mapped[str] = mapped_column(String(25), nullable=False)
     last_purchase_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -286,20 +314,63 @@ class ContactAttempt(Base):
     __tablename__ = "contact_attempts"
     __table_args__ = (
         CheckConstraint("outcome IN ('apresentacao','sem_resposta','whatsapp','outro')", name="ck_call_outcome"),
+        CheckConstraint("channel IN ('ligacao','whatsapp')", name="ck_call_channel"),
         CheckConstraint("revision >= 1", name="ck_call_revision"),
+        Index("ix_calls_store_next_on", "store_code", "next_on"),
     )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
     client_id: Mapped[UUID] = mapped_column(ForeignKey("contact_clients.id", ondelete="RESTRICT"), nullable=False)
     seller_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     contacted_on: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
+    channel: Mapped[str] = mapped_column(String(12), nullable=False, default="ligacao")
     outcome: Mapped[str] = mapped_column(String(25), nullable=False)
     next_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    followup_done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     note: Mapped[str] = mapped_column(String(240), nullable=False, default="")
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ContactTag(Base):
+    """Catalogo de classificacoes comerciais reutilizaveis entre clientes."""
+    __tablename__ = "contact_tags"
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ContactSetting(Base):
+    """Parametros do modulo de televendas (linha unica, chave 'global')."""
+    __tablename__ = "contact_settings"
+    __table_args__ = (
+        CheckConstraint("inactivity_days BETWEEN 1 AND 365", name="ck_settings_inactivity"),
+    )
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    inactivity_days: Mapped[int] = mapped_column(Integer, nullable=False, default=45)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ClientImportSession(Base):
+    """Previa de importacao de carteira aguardando decisao do gestor."""
+    __tablename__ = "client_import_sessions"
+    __table_args__ = (
+        CheckConstraint("state IN ('preview','applied','discarded')", name="ck_import_state"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(160), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    state: Mapped[str] = mapped_column(String(12), nullable=False, default="preview")
+    report: Mapped[dict | None] = mapped_column(JSON)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 

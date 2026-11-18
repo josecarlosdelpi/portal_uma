@@ -13,6 +13,7 @@ def test_schema_has_expected_core_tables():
         "monthly_closing_drafts", "monthly_closing_archives",
         "google_review_months", "supply_materials", "supply_stocks",
         "supply_movements", "contact_clients", "contact_attempts",
+        "contact_tags", "contact_settings", "client_import_sessions",
         "weekly_tasks", "weekly_task_checks", "weekly_call_goals", "daily_tasks",
         "whatsapp_posts", "whatsapp_files", "training_documents", "whatsapp_days_off", "instagram_months", "training_records",
         "procedures", "procedure_stores", "procedure_versions", "procedure_files",
