@@ -146,6 +146,8 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
       { code: "finance.view", name: "Consultar módulo financeiro", kind: "view" },
       { code: "dre.view", name: "Consultar DRE gerencial — prévia", kind: "view",
         note: "Somente SuperAdmin por padrão; conceder apenas com aval da gestão." },
+      { code: "cashflow.view", name: "Consultar fluxo de caixa estimado", kind: "view",
+        note: "Somente SuperAdmin por padrão; conceder apenas com aval da gestão." },
     ],
   },
 ];

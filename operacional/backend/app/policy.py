@@ -65,13 +65,15 @@ OPERATIONAL_PERMISSIONS = READ_PERMISSIONS | MANAGEMENT_READ_PERMISSIONS | WRITE
 # explicita via grupo/excecao. 'finance.import' permanece exclusivo do
 # SuperAdmin e nao pode ser concedido a grupos.
 FINANCIAL_READ_PERMISSIONS = frozenset({"finance.view"})
-# DRE gerencial preliminar: leitura concedivel apenas por concessao
-# explicita (padrao: somente SuperAdmin). 'dre.classify' fica reservada a
-# etapa de edicao de regras e nunca e delegavel neste ciclo.
+# DRE gerencial preliminar e Fluxo de Caixa estimado: leitura concedivel
+# apenas por concessao explicita (padrao: somente SuperAdmin). 'dre.classify'
+# fica reservada a etapa de edicao de regras e nunca e delegavel neste ciclo.
 DRE_READ_PERMISSIONS = frozenset({"dre.view"})
+CASHFLOW_READ_PERMISSIONS = frozenset({"cashflow.view"})
 SUPERADMIN_ONLY_PERMISSIONS = frozenset({"finance.import", "dre.classify"})
 FINANCIAL_PERMISSIONS = (
-    FINANCIAL_READ_PERMISSIONS | DRE_READ_PERMISSIONS | SUPERADMIN_ONLY_PERMISSIONS
+    FINANCIAL_READ_PERMISSIONS | DRE_READ_PERMISSIONS
+    | CASHFLOW_READ_PERMISSIONS | SUPERADMIN_ONLY_PERMISSIONS
 )
 
 KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS | FINANCIAL_PERMISSIONS
@@ -91,7 +93,8 @@ FULL_SCOPE_PERMISSIONS = frozenset({
 # edicao de regras da DRE ficam restritas ao SuperAdmin independentemente
 # de concessoes.
 GRANTABLE_PERMISSIONS = (
-    OPERATIONAL_PERMISSIONS | FINANCIAL_READ_PERMISSIONS | DRE_READ_PERMISSIONS
+    OPERATIONAL_PERMISSIONS | FINANCIAL_READ_PERMISSIONS
+    | DRE_READ_PERMISSIONS | CASHFLOW_READ_PERMISSIONS
 )
 
 USER_PROFILES = frozenset({"administrator", "seller", "staff"})
