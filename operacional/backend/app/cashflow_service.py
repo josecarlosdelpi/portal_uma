@@ -389,9 +389,11 @@ class CashflowService:
 
         # ---- confiabilidade do saldo por coluna ----
         # complete: entradas+saidas apuradas e vendas cobrem o periodo todo;
-        # partial:  computavel, mas com ressalvas (vendas parciais, coluna
-        #           compartilhada sem entradas proprias ou consolidado com
-        #           membro incompleto) — numeros visiveis, jamais "completo";
+        # partial:  computavel, mas com ressalvas (vendas parciais ou
+        #           consolidado com membro incompleto) — numeros visiveis,
+        #           jamais apresentados como saldo do periodo inteiro;
+        # payments_only: coluna compartilhada — so pagamentos, sem receitas
+        #           proprias por definicao; nao degrada o consolidado;
         # unavailable: sem base para a diferenca (sem vendas ou fonte falha).
         balance_state: dict[str, str] = {}
         for c in columns:
@@ -400,15 +402,23 @@ class CashflowService:
             if summary_balance.get(c) is None:
                 balance_state[c] = "unavailable"
             elif c == SHARED_COLUMN:
-                balance_state[c] = "partial"
+                balance_state[c] = "payments_only"
             else:
                 st = sales_meta["states"].get(c)
                 balance_state[c] = (
                     "unavailable" if st in ("missing", "unavailable")
                     else "partial" if st == "partial" else "complete")
         if total_key in columns:
-            members = [balance_state[c] for c in columns if c != total_key]
-            if all(s == "unavailable" for s in members):
+            # o consolidado reflete a disponibilidade das lojas e dos
+            # arquivos — a coluna compartilhada nao entra nessa avaliacao.
+            members = [balance_state[c] for c in columns
+                       if c != total_key and c != SHARED_COLUMN]
+            if not members:
+                balance_state[total_key] = (
+                    "payments_only"
+                    if summary_balance.get(total_key) is not None
+                    else "unavailable")
+            elif all(s == "unavailable" for s in members):
                 balance_state[total_key] = "unavailable"
             elif any(s != "complete" for s in members):
                 balance_state[total_key] = "partial"

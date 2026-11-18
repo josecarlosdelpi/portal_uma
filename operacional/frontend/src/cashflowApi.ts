@@ -3,7 +3,8 @@ import type { DreSource, DreLinesPage } from "./dreApi";
 
 export type { DreSource, DreLinesPage };
 
-export type CfBalanceState = "complete" | "partial" | "unavailable";
+export type CfBalanceState =
+  "complete" | "partial" | "unavailable" | "payments_only";
 
 export type CfSummary = {
   entries: Record<string, string | null>;

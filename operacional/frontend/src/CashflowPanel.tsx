@@ -54,13 +54,16 @@ const RULE_LABEL: Record<string, string> = {
   sem_regra: "sem regra — a classificar",
 };
 const STATE_LABEL: Record<string, string> = {
-  current: "completo", partial: "parcial", missing: "sem dados",
+  current: "integral", partial: "parcial", missing: "sem dados",
   unavailable: "fonte indisponível",
 };
 const BALANCE_STATE_LABEL: Record<string, string> = {
-  complete: "", partial: "parcial — somente registros disponíveis",
+  complete: "",
+  partial: "parcial — registros disponíveis; não representa o período completo",
   unavailable: "não apurável",
+  payments_only: "somente pagamentos — sem receitas próprias",
 };
+const BALANCE_STATE_WARN = new Set(["partial", "unavailable"]);
 
 const PERIOD_KIND_LABEL: Record<PeriodKind, string> = {
   month: "Mês", quarter: "Trimestre", semester: "Semestre",
@@ -203,7 +206,8 @@ export function CashflowPanel({ token, profile }: Props) {
           {key === "exits" && v == null &&
             <small className="dre-note dre-note-warn">fonte indisponível</small>}
           {st && st !== "complete" &&
-            <small className="dre-note dre-note-warn">{BALANCE_STATE_LABEL[st]}</small>}
+            <small className={"dre-note" + (BALANCE_STATE_WARN.has(st) ? " dre-note-warn" : "")}>
+              {BALANCE_STATE_LABEL[st]}</small>}
         </td>;
       })}
     </tr>;
@@ -270,12 +274,14 @@ export function CashflowPanel({ token, profile }: Props) {
         <div className={"panel dre-kpi" + (balanceV != null && balanceV < 0 ? " dre-kpi-neg" : "")}>
           <span>Saldo Financeiro Estimado</span>
           <strong className={balanceV == null ? "dre-kpi-na" : ""}>{fmtNum(balanceV)}</strong>
-          <small className={saldoState !== "complete" ? "cf-warn" : ""}>
+          <small className={BALANCE_STATE_WARN.has(saldoState) ? "cf-warn" : ""}>
             {saldoState === "unavailable"
               ? "não apurável — dados insuficientes"
               : saldoState === "partial"
-                ? "parcial — somente registros disponíveis · abertura R$ 0,00"
-                : "abertura R$ 0,00 — não é saldo bancário"}</small></div>
+                ? "parcial — registros disponíveis; não é o saldo do período completo"
+                : saldoState === "payments_only"
+                  ? "somente pagamentos — sem receitas próprias"
+                  : "abertura R$ 0,00 — não é saldo bancário"}</small></div>
       </div>
       <p className="dre-kpi-note">
         {data.entries_source.label} — indicadores da coluna “{colLabel(totalCol)}”,
@@ -316,7 +322,8 @@ export function CashflowPanel({ token, profile }: Props) {
       <article className="panel cf-section">
         <div className="panel-head"><div>
           <h2>Evolução mensal</h2>
-          <p>Entradas estimadas, saídas efetivas e saldo de cada mês — cada período começa do zero.</p>
+          <p>Entradas estimadas, saídas efetivas e saldo de cada mês — cada período começa do zero.
+            A cobertura refere-se às vendas; pagamentos são sempre indicativos dos registros vigentes.</p>
         </div></div>
         <div className="table-wrap"><table className="dre-table">
           <thead><tr>
@@ -338,7 +345,7 @@ export function CashflowPanel({ token, profile }: Props) {
                     {m.balance_state === "unavailable" ? "não apurável" : "parcial"}</small>}</td>
               <td>{STATE_LABEL[m.vendas_state] ?? m.vendas_state}
                 {m.vendas_state !== "current" &&
-                  <small className="dre-note dre-note-warn">período não comparável a um mês completo</small>}</td>
+                  <small className="dre-note dre-note-warn">vendas não cobrem o mês inteiro</small>}</td>
             </tr>)}
           </tbody>
         </table></div>

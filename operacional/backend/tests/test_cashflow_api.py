@@ -238,7 +238,7 @@ def test_saldo_parcial_quando_vendas_nao_cobrem_mes(env):
     assert st["JOINVILLE"] == "partial"
     assert st["TUBARAO"] == "partial"
     assert st["ITAJAI"] == "unavailable"        # sem vendas
-    assert st["COMPARTILHADO"] == "partial"     # sem entradas proprias
+    assert st["COMPARTILHADO"] == "payments_only"  # sem receitas proprias
     assert st["UMA"] == "partial"               # consolidado nunca "completo"
     # numeros permanecem consultaveis
     assert data["summary"]["balance"]["UMA"] == "-6720.00"
@@ -273,6 +273,39 @@ def test_consolidado_com_loja_sem_dados(env):
     single = c.get(f"/api/v1/cashflow/preview?{OUT}&store=ITAJAI").json()
     assert single["summary"]["balance_state"]["ITAJAI"] == "unavailable"
     assert single["summary"]["balance"]["ITAJAI"] is None
+
+
+VENDAS_FULL = HEADER_VENDAS + "\n".join([
+    # as 3 lojas com vendas ate o ultimo dia do periodo -> cobertura integral
+    "05/10/2026;1;Joinville;7;MARIA;000;CONSUMIDOR;P1;MANGA;KG;1;100;100;30",
+    "31/10/2026;1;Joinville;7;MARIA;000;CONSUMIDOR;P1;MANGA;KG;1;50;50;30",
+    "05/10/2026;2;Tubarao;4;JOAO;000;CONSUMIDOR;P2;MANGA;PC;1;30;30;7",
+    "31/10/2026;2;Tubarao;4;JOAO;000;CONSUMIDOR;P2;MANGA;PC;1;20;20;7",
+    "05/10/2026;3;Itajai;2;ANA;000;CONSUMIDOR;P3;MANGA;PC;1;40;40;5",
+    "31/10/2026;3;Itajai;2;ANA;000;CONSUMIDOR;P3;MANGA;PC;1;10;10;5",
+]) + "\n"
+
+
+def test_consolidado_completo_com_pagamentos_compartilhados(env):
+    """Tres lojas com cobertura integral de vendas + DAS compartilhado:
+    a coluna compartilhada nao degrada o consolidado — UMA reflete a
+    disponibilidade das lojas e dos arquivos, nao a falta de receita
+    propria da coluna compartilhada."""
+    c, *_ = env
+    assert upload_vendas(c, VENDAS_FULL).status_code == 200
+    assert upload_despesas(c).status_code == 200
+    data = c.get(f"/api/v1/cashflow/preview?{OUT}").json()
+    st = data["summary"]["balance_state"]
+    assert st["JOINVILLE"] == "complete"
+    assert st["TUBARAO"] == "complete"
+    assert st["ITAJAI"] == "complete"
+    assert st["COMPARTILHADO"] == "payments_only"
+    assert st["UMA"] == "complete"
+    # pagamentos compartilhados seguem integralmente no consolidado, sem rateio
+    assert data["summary"]["exits"]["COMPARTILHADO"] == "500.00"
+    assert data["summary"]["entries"]["UMA"] == "250.00"
+    assert data["summary"]["exits"]["UMA"] == "6930.00"
+    assert data["summary"]["balance"]["UMA"] == "-6680.00"
 
 
 def test_cobertura_pagamentos_indicativa_nao_confirmacao(env):
