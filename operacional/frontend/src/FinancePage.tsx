@@ -243,7 +243,8 @@ export function FinancePage({token,profile}:Props){
       <div className="eyebrow">ERP — DESPESAS E PAGAMENTOS</div>
       <h1>Financeiro</h1>
       <p>Compromissos por vencimento e pagamentos por data efetiva, separados entre
-        compras para revenda e despesas operacionais. Sem cálculo de CMV ou margem nesta etapa.</p>
+        compras para revenda e despesas operacionais. A aba DRE apura CMV, margem e
+        saldo gerencial sobre os arquivos vigentes — resultados preliminares em validação.</p>
     </div></div>
 
     {error&&<div className="notice notice-error" role="alert">{error}

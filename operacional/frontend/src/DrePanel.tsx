@@ -48,6 +48,25 @@ const BUCKET_LABEL: Record<string, string> = {
   a_classificar: "A classificar",
 };
 
+const STORE_ORDER = ["JOINVILLE", "TUBARAO", "ITAJAI"];
+const orderColumns = (cols: string[]) => {
+  const rank = (c: string) =>
+    c === "COMPARTILHADO" ? 80
+      : c === "UMA" || c === "TOTAL" ? 90
+      : STORE_ORDER.indexOf(c) >= 0 ? STORE_ORDER.indexOf(c) : 50;
+  return [...cols].sort((a, b) => rank(a) - rank(b) || cols.indexOf(a) - cols.indexOf(b));
+};
+
+const DESPESA_KEYS = ["despesa_comercial", "despesa_operacional", "das"];
+const EXCLUDED_CALC = ["compra_revenda", "financiamento", "imobilizado"];
+const EXCLUDED_INFO: Record<string, string> = {
+  compra_revenda: "Mercadoria para revenda — não é despesa operacional nem CMV; controle próprio em Compras p/ revenda.",
+  financiamento: "Parcelas sem segregação de juros e principal — fora do resultado operacional.",
+  imobilizado: "Investimento em bens — fora do resultado; sem depreciação nesta etapa.",
+  a_classificar: "Sem regra de classificação vigente — fora do saldo até validação gerencial.",
+};
+const fmtNum = (v: number | null) => v == null ? "—" : brl.format(v);
+
 function Cell({ row, column }: { row: DreRow; column: string }) {
   const value = row.values[column];
   const pct = row.pct[column];
@@ -150,14 +169,58 @@ export function DrePanel({ token, profile }: Props) {
       .catch(cause => setError(cause instanceof Error ? cause.message : "Falha ao consultar a classificação."));
   }, [view, token]);
 
-  const columns = data?.columns ?? [];
+  const columns = orderColumns(data?.columns ?? []);
+  const storeCols = columns.filter(c => c !== "UMA" && c !== "TOTAL");
+  const totalCol = columns.length ? columns[columns.length - 1] : "";
   const storeParam = store === "TODAS" ? undefined : store;
 
-  return <div className="dre">
-    <div className="dre-disclaimer" role="note">
-      {data?.disclaimer ?? "DRE GERENCIAL PRELIMINAR — valores em validação; não representa lucro definitivo"}
-    </div>
+  const rowNum = (key: string): number | null => {
+    const v = data?.rows.find(r => r.key === key)?.values[totalCol];
+    return v == null ? null : Number(v);
+  };
+  const receitaV = rowNum("receita");
+  const margemV = rowNum("margem");
+  const saldoV = rowNum("saldo");
+  const despParts = DESPESA_KEYS.map(rowNum);
+  const despV = despParts.every(v => v == null) ? null
+    : despParts.reduce<number>((a, v) => a + (v ?? 0), 0);
+  const sharedInResult = data ? DESPESA_KEYS.reduce<number>((a, key) => {
+    const v = data.rows.find(r => r.key === key)?.values["COMPARTILHADO"];
+    return a + (v == null ? 0 : Number(v));
+  }, 0) : 0;
 
+  const ExcludedTable = ({ buckets }: { buckets: string[] }) => {
+    const groups = (data?.excluded ?? []).filter(g => buckets.includes(g.bucket));
+    if (!groups.length) return <p className="empty">Nenhum lançamento neste grupo no período.</p>;
+    return <div className="table-wrap"><table className="dre-table dre-excl-table">
+      <thead><tr>
+        <th>Grupo / justificativa</th>
+        {storeCols.map(col => <th key={col} className="fin-num">{colLabel(col)}</th>)}
+        <th className="fin-num">Total</th><th className="fin-num">Lançamentos</th>
+      </tr></thead>
+      <tbody>
+        {groups.map(group => <Fragment key={group.bucket}>
+          <tr>
+            <td><button className="dre-expand" onClick={() =>
+                setOpenBucket(openBucket === group.bucket ? null : group.bucket)}>
+              {openBucket === group.bucket ? "▾" : "▸"} {group.label}</button>
+              {EXCLUDED_INFO[group.bucket] &&
+                <small className="dre-note">{EXCLUDED_INFO[group.bucket]}</small>}</td>
+            {storeCols.map(col =>
+              <td key={col} className="fin-num">
+                {group.columns[col] != null ? fmt(group.columns[col]) : "—"}</td>)}
+            <td className="fin-num"><strong>{group.amount != null ? fmt(group.amount) : "—"}</strong></td>
+            <td className="fin-num">{group.count}</td>
+          </tr>
+          {openBucket === group.bucket && <LinesDrill
+            token={token} bucket={group.bucket} month={month} mode={mode}
+            store={storeParam} columns={storeCols.length + 3} />}
+        </Fragment>)}
+      </tbody>
+    </table></div>;
+  };
+
+  return <div className="dre">
     <div className="tabs" role="tablist" aria-label="DRE gerencial">
       <button role="tab" aria-selected={view === "preview"}
         className={"tab" + (view === "preview" ? " active" : "")}
@@ -185,29 +248,30 @@ export function DrePanel({ token, profile }: Props) {
         </select></label>
       </div>
 
+      <p className="dre-disclaimer" role="note">
+        {data?.disclaimer ?? "DRE GERENCIAL PRELIMINAR — valores em validação; não representa lucro definitivo"}
+      </p>
+
       {loading && <p role="status">Apurando prévia…</p>}
 
       {data && !loading && <>
-        <div className="dre-sources">
-          {(["vendas", "devolucoes", "despesas"] as const).map(kind => {
-            const src = data.sources[kind];
-            return <div key={kind}
-              className={"dre-source" + (src.availability !== "current" ? " dre-source-warn" : "")}>
-              <strong>{SOURCE_LABEL[kind]}</strong>
-              <span>{AVAIL_LABEL[src.availability] ?? src.availability}</span>
-              {src.last_import && <small>
-                importado {dtHora(src.last_import.imported_at)}
-                {src.last_import.period_start && ` · ${dmy(src.last_import.period_start)} a ${dmy(src.last_import.period_end)}`}
-              </small>}
-            </div>;
-          })}
+        <div className="dre-kpis" aria-label="Indicadores do período">
+          <div className="panel dre-kpi"><span>Receita registrada</span>
+            <strong className={receitaV == null ? "dre-kpi-na" : ""}>{fmtNum(receitaV)}</strong>
+            <small>{receitaV == null ? "indisponível neste período" : "arquivo vigente de vendas"}</small></div>
+          <div className="panel dre-kpi"><span>Margem bruta preliminar</span>
+            <strong className={margemV == null ? "dre-kpi-na" : ""}>{fmtNum(margemV)}</strong>
+            <small>receita − CMV · antes de devoluções</small></div>
+          <div className="panel dre-kpi"><span>Despesas consideradas</span>
+            <strong className={despV == null ? "dre-kpi-na" : ""}>{fmtNum(despV)}</strong>
+            <small>comerciais + operacionais + DAS</small></div>
+          <div className={"panel dre-kpi" + (saldoV != null && saldoV < 0 ? " dre-kpi-neg" : "")}>
+            <span>Saldo gerencial parcial</span>
+            <strong className={saldoV == null ? "dre-kpi-na" : ""}>{fmtNum(saldoV)}</strong>
+            <small>não é lucro líquido</small></div>
         </div>
-
-        {data.warnings.length > 0 && <ul className="dre-warnings">
-          {data.warnings.map((w, i) => <li key={i}>{w.message}</li>)}
-        </ul>}
-
-        <p className="dre-basis">Base: {data.basis} · Arredondamento: {data.rounding_policy}</p>
+        <p className="dre-kpi-note">Indicadores da coluna “{colLabel(totalCol)}”
+          {data.period.mode === "ytd" ? " — acumulado no ano" : ""}.</p>
 
         <div className="table-wrap"><table className="dre-table">
           <thead><tr>
@@ -238,40 +302,58 @@ export function DrePanel({ token, profile }: Props) {
           </tbody>
         </table></div>
 
-        {data.shared_memo && <p className="dre-note dre-shared-memo">
-          Valores compartilhados não distribuídos fora do consolidado: {fmt(data.shared_memo.amount)}
-          {" "}({data.shared_memo.count} lançamento(s)) — visíveis apenas na visão UMA.</p>}
+        {data.consolidated && columns.includes("COMPARTILHADO") &&
+          <p className="dre-note dre-shared-memo">
+            Despesas compartilhadas{sharedInResult ? ` (${brl.format(sharedInResult)})` : ""} entram
+            no resultado UMA e não são rateadas entre as lojas — por isso a soma das colunas
+            das lojas pode diferir do total consolidado.</p>}
+        {!data.consolidated && data.shared_memo &&
+          <p className="dre-note dre-shared-memo">
+            Despesas compartilhadas fora deste recorte: {fmt(data.shared_memo.amount)}
+            {" "}({data.shared_memo.count} lançamento(s)) — compõem somente o resultado UMA
+            consolidado, sem rateio entre as lojas.</p>}
 
         <article className="panel dre-excluded">
           <div className="panel-head"><div>
-            <h2>Fora da DRE / A classificar</h2>
-            <p>Excluídos e pendentes — nunca somados ao saldo parcial e sempre visíveis.</p>
+            <h2>Lançamentos não considerados no resultado</h2>
+            <p>Valores fora do saldo gerencial parcial — sempre visíveis, nunca somados.</p>
           </div></div>
-          <table className="dre-table">
-            <thead><tr>
-              <th>Grupo</th>
-              {columns.filter(c => c !== "UMA" && c !== "TOTAL").map(col =>
-                <th key={col} className="fin-num">{colLabel(col)}</th>)}
-              <th className="fin-num">Total</th><th className="fin-num">Lançamentos</th>
-            </tr></thead>
-            <tbody>
-              {data.excluded.map(group => <Fragment key={group.bucket}>
-                <tr>
-                  <td><button className="dre-expand" onClick={() =>
-                      setOpenBucket(openBucket === group.bucket ? null : group.bucket)}>
-                    {openBucket === group.bucket ? "▾" : "▸"} {group.label}</button></td>
-                  {columns.filter(c => c !== "UMA" && c !== "TOTAL").map(col =>
-                    <td key={col} className="fin-num">
-                      {group.columns[col] != null ? fmt(group.columns[col]) : "—"}</td>)}
-                  <td className="fin-num"><strong>{group.amount != null ? fmt(group.amount) : "—"}</strong></td>
-                  <td className="fin-num">{group.count}</td>
-                </tr>
-                {openBucket === group.bucket && <LinesDrill
-                  token={token} bucket={group.bucket} month={month} mode={mode}
-                  store={storeParam} columns={columns.length + 2} />}
-              </Fragment>)}
-            </tbody>
-          </table>
+          <div className="dre-excl-sub">
+            <h3>Excluídos do cálculo</h3>
+            <p>Não são despesas operacionais do período — a natureza do lançamento o exclui do resultado.</p>
+            <ExcludedTable buckets={EXCLUDED_CALC} />
+          </div>
+          <div className="dre-excl-sub">
+            <h3>Pendentes de classificação</h3>
+            <p>Lançamentos ainda sem destino definido — ficam fora do saldo até a validação gerencial.</p>
+            <ExcludedTable buckets={(data.excluded ?? [])
+              .filter(g => !EXCLUDED_CALC.includes(g.bucket)).map(g => g.bucket)} />
+          </div>
+        </article>
+
+        <article className="panel dre-tech">
+          <div className="panel-head"><div>
+            <h2>Fontes, validações e metodologia</h2>
+            <p>Situação dos arquivos vigentes, pendências de validação e premissas da apuração.</p>
+          </div></div>
+          <div className="dre-sources">
+            {(["vendas", "devolucoes", "despesas"] as const).map(kind => {
+              const src = data.sources[kind];
+              return <div key={kind}
+                className={"dre-source" + (src.availability !== "current" ? " dre-source-warn" : "")}>
+                <strong>{SOURCE_LABEL[kind]}</strong>
+                <span>{AVAIL_LABEL[src.availability] ?? src.availability}</span>
+                {src.last_import && <small>
+                  importado {dtHora(src.last_import.imported_at)}
+                  {src.last_import.period_start && ` · ${dmy(src.last_import.period_start)} a ${dmy(src.last_import.period_end)}`}
+                </small>}
+              </div>;
+            })}
+          </div>
+          {data.warnings.length > 0 && <ul className="dre-warnings">
+            {data.warnings.map((w, i) => <li key={i}>{w.message}</li>)}
+          </ul>}
+          <p className="dre-basis">Base: {data.basis} · Arredondamento: {data.rounding_policy}</p>
         </article>
       </>}
     </>}
