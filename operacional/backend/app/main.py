@@ -117,7 +117,8 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
             "expenses": any(
                 can_access(principal, "expenses.view", s) for s in visible_stores(principal)
             ),
-            "expenses_manage": any(
+            "expenses_manage": (user.is_superadmin
+                or user.profile == "administrator") and any(
                 can_access(principal, "expenses.manage", s) for s in visible_stores(principal)
             ),
             "monthly_closing": can_access(principal, "monthly_closing.view"),

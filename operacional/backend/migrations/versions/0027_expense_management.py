@@ -12,9 +12,37 @@ Estrutura persistente e independente dos snapshots do ERP:
   dos campos identitarios do lancamento — nunca pelo id interno, que
   muda a cada importacao.
 
-ATENCAO: esta revisao e irma da 0026 (televendas), ambas descendentes de
-0025 — ao integrar as duas linhas de desenvolvimento, criar a migration
-de merge Alembic correspondente.
+ATENCAO — DIVERGENCIA 0026/0027 (estrategia documentada, nao executar
+sem autorizacao): esta revisao e irma da 0026 (televendas), ambas
+descendentes de 0025. Ao integrar as duas linhas de desenvolvimento:
+
+1. BANCO NOVO: com ambos os arquivos presentes no diretorio versions/,
+   `alembic heads` mostra dois heads (0026, 0027) e `alembic upgrade
+   head` falha. A solucao canonica e criar UMA migration de merge:
+       alembic merge -m "merge televendas + gestao de despesas" 0026 0027
+   que gera uma revisao vazia com down_revision=("0026","0027"). Nenhuma
+   das duas frentes e alterada — apenas um no de uniao e adicionado.
+   Depois disso `alembic upgrade head` aplica toda a cadeia em ordem
+   qualquer (as tabelas sao disjuntas, nao ha conflito de DDL).
+
+2. BANCO EXISTENTE (ja em 0026 ou 0027): mesma solucao — adicionar o
+   arquivo de merge em versions/ e rodar `alembic upgrade head`. O
+   Alembic detecta o head corrente e aplica apenas as revisoes
+   pendentes + o no de merge; nenhum dado e recriado nem perdido.
+
+3. BANCO COM alembic_version APONTANDO PARA REVISAO AUSENTE (ex.: banco
+   local estampado em 0026 rodando a branch da 0027, sem o arquivo):
+   NUNCA editar a tabela alembic_version como solucao permanente. O
+   workaround local usado em desenvolvimento (`alembic stamp 0025` +
+   `upgrade head`) apenas reancora o ponteiro e NAO desfaz DDL — as
+   tabelas televendas permanecem intactas no banco. Em ambiente real,
+   a correcao definitiva e publicar juntos todos os arquivos de
+   versions/ (0026 + 0027 + merge) e rodar `alembic upgrade head`,
+   que traz o banco ao head unico sem perda de dados.
+
+4. PROIBIDO: reescrever o down_revision de 0026 ou 0027 para linearizar
+   a cadeia (quebraria bancos ja migrados em qualquer um dos ramos) e
+   executar `alembic merge`/upgrade em producao sem autorizacao.
 """
 from alembic import op
 import sqlalchemy as sa

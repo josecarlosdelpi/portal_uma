@@ -49,13 +49,16 @@ export type ExpAnalysis = {
 };
 
 export type ExpLine = {
+  row_key: string;
   fingerprint: string;
+  duplicate_count: number;
   supplier_name: string; supplier_doc: string | null;
   store_code: string;
   paid_at: string;
   document_number: string | null; installment_number: string | null;
   amount: string;
-  nature: string; nature_label: string; eligible: boolean;
+  nature: string; nature_label: string; allocation: string;
+  eligible: boolean;
   category_id: string | null; category_name: string | null;
   origin: "manual" | "rule_store" | "rule_general" | "none" | string;
 };
@@ -64,6 +67,21 @@ export type ExpLinesPage = {
   items: ExpLine[]; total: number; page: number; page_size: number;
   orphan_classifications: number; availability?: string;
   categories: ExpCategory[];
+};
+
+export type ExpCatalogRule = {
+  id: string; category_id: string; category_name: string; active: boolean;
+};
+
+export type ExpCatalogItem = {
+  supplier_key: string; label: string; doc: string | null; name: string;
+  rows: number; stores: string[]; has_rule: boolean;
+  rules: Record<string, ExpCatalogRule>;
+};
+
+export type ExpCatalogPage = {
+  items: ExpCatalogItem[]; total: number; page: number; page_size: number;
+  availability?: string;
 };
 
 export type ExpSetResult = {
@@ -93,6 +111,14 @@ export const expensesApi = {
   suppliers: (token: string, q: string) =>
     request<{ items: ExpSupplier[] }>(token,
       "/api/v1/expenses/suppliers" + qs({ q })),
+
+  supplierCatalog: (token: string, params: { q?: string; page?: number;
+    page_size?: number; without_rule?: boolean; sort?: string }) =>
+    request<ExpCatalogPage>(token,
+      "/api/v1/expenses/supplier-catalog" + qs({
+        q: params.q, page: params.page, page_size: params.page_size,
+        without_rule: params.without_rule ? "true" : undefined,
+        sort: params.sort })),
 
   rules: (token: string) =>
     request<{ items: ExpRule[] }>(token, "/api/v1/expenses/supplier-rules"),

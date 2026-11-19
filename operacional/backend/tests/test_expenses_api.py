@@ -531,6 +531,253 @@ def test_consolidado_proibido_para_escopo_parcial(env):
     assert data["totals"]["paid_total"] == "425.00"
 
 
+# ---------- catalogo completo de fornecedores ----------
+
+def get_catalog(client, **kw):
+    qs = "&".join(f"{k}={v}" for k, v in kw.items())
+    res = client.get(f"/api/v1/expenses/supplier-catalog?{qs}")
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def test_catalogo_lista_todos_incluindo_abertos(env):
+    """Todos os fornecedores distintos do snapshot vigente — pagos e em
+    aberto — aparecem, deduplicados por CNPJ valido."""
+    c, *_ = env
+    seed_all(c)
+    data = get_catalog(c, page_size=100)
+    names = {i["name"] for i in data["items"]}
+    # 8 fornecedores distintos; GIASSI nas duas lojas = 1 so entrada
+    assert data["total"] == 8
+    assert "FORN FRETE" in names  # apenas Aberto — presente no catalogo
+    giassi = next(i for i in data["items"] if i["name"] == "SUPER MERCADO GIASSI")
+    assert giassi["supplier_key"] == "doc:12345678000199"
+    assert giassi["rows"] == 2
+    assert giassi["stores"] == ["JOINVILLE", "TUBARAO"]
+    assert giassi["has_rule"] is False
+
+
+def test_catalogo_paginacao_e_ordenacao(env):
+    c, *_ = env
+    seed_all(c)
+    p1 = get_catalog(c, page_size=3, page=1)
+    p3 = get_catalog(c, page_size=3, page=3)
+    assert p1["total"] == 8 and len(p1["items"]) == 3
+    assert len(p3["items"]) == 2
+    keys = [i["supplier_key"] for i in p1["items"] + p3["items"]]
+    assert len(keys) == len(set(keys))  # sem repeticao entre paginas
+    nomes = [i["name"] for i in p1["items"]]
+    assert nomes == sorted(nomes)  # ordenacao alfabetica
+
+
+def test_catalogo_pesquisa_nome_e_documento(env):
+    c, *_ = env
+    seed_all(c)
+    data = get_catalog(c, q="giassi", page_size=100)
+    assert [i["name"] for i in data["items"]] == ["SUPER MERCADO GIASSI"]
+    data = get_catalog(c, q="12345678000199", page_size=100)
+    assert [i["supplier_key"] for i in data["items"]] == ["doc:12345678000199"]
+    assert get_catalog(c, q="inexistente", page_size=100)["total"] == 0
+
+
+def test_catalogo_regras_visiveis_e_filtro_sem_categoria(env):
+    c, *_ = env
+    seed_all(c)
+    limpeza = mk_cat(c, "Limpeza")
+    copa = mk_cat(c, "Copa")
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "GIASSI",
+        "store_code": None, "category_id": limpeza})
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "GIASSI",
+        "store_code": "TUBARAO", "category_id": copa})
+    data = get_catalog(c, q="giassi", page_size=100)
+    rules = data["items"][0]["rules"]
+    assert rules["general"]["category_name"] == "Limpeza"
+    assert rules["TUBARAO"]["category_name"] == "Copa"
+    assert data["items"][0]["has_rule"] is True
+    # filtro "somente sem categoria" remove o GIASSI
+    data = get_catalog(c, without_rule="true", page_size=100)
+    assert all(not i["has_rule"] for i in data["items"])
+    assert data["total"] == 7
+
+
+def test_catalogo_autosave_cria_e_desativa_regra(env):
+    """Selecionar categoria na lista cria a regra (retroativa); 'Sem
+    categoria' a desativa preservando classificacoes manuais."""
+    c, *_ = env
+    seed_all(c)
+    limpeza = mk_cat(c, "Limpeza")
+    copa = mk_cat(c, "Copa")
+    # classificacao manual em E1 antes da regra
+    fp = line_by_doc(get_lines(c, page_size=200)["items"], "E1")[0]["fingerprint"]
+    c.put(f"/api/v1/expenses/lines/{fp}/category",
+          json={"category_id": copa})
+    # autosave: cria regra geral
+    res = c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199",
+        "supplier_label": "SUPER MERCADO GIASSI (12345678000199)",
+        "store_code": None, "category_id": limpeza})
+    assert res.status_code == 201
+    rule_id = res.json()["id"]
+    items = get_lines(c, page_size=200)["items"]
+    # retroativa em E2; manual em E1 preservada
+    assert line_by_doc(items, "E2")[0]["category_id"] == limpeza
+    e1 = line_by_doc(items, "E1")[0]
+    assert e1["category_id"] == copa and e1["origin"] == "manual"
+    # "Sem categoria": desativa a regra
+    res = c.patch(f"/api/v1/expenses/supplier-rules/{rule_id}",
+                  json={"active": False})
+    assert res.status_code == 200
+    items = get_lines(c, page_size=200)["items"]
+    assert line_by_doc(items, "E2")[0]["category_id"] is None
+    e1 = line_by_doc(items, "E1")[0]
+    assert e1["category_id"] == copa and e1["origin"] == "manual"
+
+
+def test_catalogo_regra_por_loja_na_lista(env):
+    """Regra especifica de loja criada pela lista sobrepoe a geral."""
+    c, *_ = env
+    seed_all(c)
+    limpeza = mk_cat(c, "Limpeza")
+    copa = mk_cat(c, "Copa")
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "G",
+        "store_code": None, "category_id": limpeza})
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "G",
+        "store_code": "TUBARAO", "category_id": copa})
+    items = get_lines(c, page_size=200)["items"]
+    assert line_by_doc(items, "E1")[0]["category_id"] == limpeza
+    assert line_by_doc(items, "E2")[0]["category_id"] == copa
+
+
+def test_catalogo_escopo_parcial_restrito(env):
+    """Admin JOI ve apenas fornecedores com lancamentos em Joinville e
+    nao ve a regra geral UMA."""
+    c, actor, *_ = env
+    seed_all(c)
+    limpeza = mk_cat(c, "Limpeza")
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "G",
+        "store_code": None, "category_id": limpeza})
+    actor["user"] = env[5]  # admin_joi
+    data = get_catalog(c, page_size=100)
+    assert all(i["stores"] == ["JOINVILLE"] for i in data["items"])
+    giassi = next(i for i in data["items"] if "GIASSI" in i["name"])
+    assert "general" not in giassi["rules"]
+    assert "TUBARAO" not in giassi["rules"]
+
+
+# ---------- fingerprint duplicado ----------
+
+def test_linhas_duplicadas_sinalizam_duplicate_count(env):
+    """Registros indistinguiveis (mesmo fingerprint) sao sinalizados —
+    sem deduplicar — e a classificacao atinge todos."""
+    c, *_ = env
+    seed_all(c)
+    items = get_lines(c, page_size=200)["items"]
+    dups = line_by_doc(items, "D16")
+    assert len(dups) == 2
+    assert all(d["duplicate_count"] == 2 for d in dups)
+    assert dups[0]["row_key"] != dups[1]["row_key"]
+    e1 = line_by_doc(items, "E1")[0]
+    assert e1["duplicate_count"] == 1
+
+
+# ---------- reconciliacao analise x detalhe ----------
+
+def test_detalhe_reconcilia_com_analise(env):
+    """A soma do detalhamento paginado reproduz os totais da analise
+    para cada combinacao de filtros."""
+    c, *_ = env
+    seed_all(c)
+    limpeza = mk_cat(c, "Limpeza")
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "GIASSI",
+        "store_code": None, "category_id": limpeza})
+    from decimal import Decimal
+
+    def soma_detalhe(**kw):
+        total = Decimal("0")
+        page = 1
+        while True:
+            data = get_lines(c, page=page, page_size=2, **kw)
+            for i in data["items"]:
+                if i["eligible"]:
+                    total += Decimal(i["amount"])
+            if page * data["page_size"] >= data["total"]:
+                break
+            page += 1
+        return total
+
+    for params in ({}, {"situation": "unclassified"},
+                   {"situation": "classified"},
+                   {"supplier": "aluguel"},
+                   {"store": "JOINVILLE"}):
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+        analysis = c.get(f"/api/v1/expenses/analysis?{OUT}&{qs}").json()
+        assert soma_detalhe(**params) == Decimal(
+            analysis["totals"]["paid_total"])
+
+
+# ---------- perfil obrigatorio ----------
+
+def test_vendedor_com_manage_concedido_nao_edita(env):
+    """'expenses.manage' concedido a vendedor nao libera edicao — o
+    backend exige perfil Admin ou SuperAdmin."""
+    c, actor, engine, root, admin, admin_joi, seller = env
+    seed_all(c)
+    with Session(engine) as db:
+        db.add(UserPermissionOverride(
+            user_id=seller.id, code="expenses.manage", granted=True))
+        db.add(UserPermissionOverride(
+            user_id=seller.id, code="expenses.view", granted=True))
+        db.commit()
+    actor["user"] = seller
+    assert c.get(f"/api/v1/expenses/analysis?{OUT}").status_code == 200
+    assert c.post("/api/v1/expenses/categories",
+                  json={"name": "X"}).status_code == 403
+    res = c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:12345678000199", "supplier_label": "G",
+        "store_code": "JOINVILLE", "category_id": "x"})
+    assert res.status_code == 403
+    items = c.get(f"/api/v1/expenses/lines?{OUT}").json()["items"]
+    fp = items[0]["fingerprint"]
+    assert c.put(f"/api/v1/expenses/lines/{fp}/category",
+                 json={"category_id": "x"}).status_code == 403
+
+
+# ---------- falha de sincronizacao ----------
+
+def test_import_falho_bloqueia_classificacao(env):
+    """Se o arquivo mais recente falhou, a classificacao manual e
+    bloqueada — nunca classificar sobre snapshot vencido."""
+    from app.models import ErpImportBatch
+    c, actor, engine, *_ = env
+    seed_all(c)
+    cat_id = mk_cat(c, "Limpeza")
+    fp = line_by_doc(get_lines(c, page_size=200)["items"], "E1")[0]["fingerprint"]
+    assert c.put(f"/api/v1/expenses/lines/{fp}/category",
+                 json={"category_id": cat_id}).status_code == 200
+    # simula nova sincronizacao com arquivo invalido (mais recente)
+    from datetime import datetime, timedelta, timezone
+    with Session(engine) as db:
+        db.add(ErpImportBatch(
+            id=uuid4(), kind="DESPESAS", source="DRIVE_SYNC",
+            status="FAILED", file_name="Despesas.csv", file_sha256="x",
+            error_summary={"detail": "arquivo inválido"},
+            created_at=datetime.now(timezone.utc) + timedelta(minutes=1)))
+        db.commit()
+    res = c.put(f"/api/v1/expenses/lines/{fp}/category",
+                json={"category_id": cat_id})
+    assert res.status_code == 422
+    data = get_lines(c, page_size=200)
+    assert data["availability"] == "unavailable"
+    # classificacoes e regras ja existentes permanecem preservadas
+    assert line_by_doc(data["items"], "E1")[0]["category_id"] == cat_id
+
+
 # ---------- auditoria ----------
 
 def test_auditoria_registra_operacoes(env):

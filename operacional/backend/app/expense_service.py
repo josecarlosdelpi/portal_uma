@@ -168,8 +168,18 @@ class ExpenseService:
             raise OperationError(403, "Acesso negado")
         return [requested], False
 
+    def _require_admin(self) -> None:
+        """Edicao restrita a Admin/SuperAdmin — 'expenses.manage' sozinho
+        nao habilita vendedores ou colaboradores."""
+        if not (self.actor.is_superadmin
+                or self.actor.profile == "administrator"):
+            raise OperationError(
+                403, "Somente Admin e SuperAdmin podem gerenciar despesas")
+
     def _require_manage(self, store_code: str | None) -> None:
-        """Edicao por loja; regra geral (store None) exige escopo total."""
+        """Edicao exige perfil Admin/SuperAdmin + 'expenses.manage' na
+        loja; regra geral (store None) exige escopo total."""
+        self._require_admin()
         if store_code is None:
             if not STORE_CODES <= set(self.stores_with("expenses.manage")):
                 raise OperationError(
@@ -351,6 +361,7 @@ class ExpenseService:
         } for c in self.db.scalars(query).all()]}
 
     def create_category(self, name: str) -> dict:
+        self._require_admin()
         if not self.stores_with("expenses.manage"):
             raise OperationError(403, "Acesso negado")
         clean = " ".join((name or "").split())[:80]
@@ -374,6 +385,7 @@ class ExpenseService:
 
     def update_category(self, category_id: str, name: str | None,
                         active: bool | None) -> dict:
+        self._require_admin()
         if not self.stores_with("expenses.manage"):
             raise OperationError(403, "Acesso negado")
         cat = self.db.get(ExpenseCategory, UUID(category_id))
@@ -436,6 +448,81 @@ class ExpenseService:
                           "rows": count})
         items.sort(key=lambda i: i["name"])
         return {"items": items[:limit]}
+
+    def supplier_catalog(self, query: str, page: int, page_size: int,
+                         without_rule: bool, sort: str) -> dict:
+        """Catalogo completo de fornecedores do snapshot vigente (pagos e
+        em aberto), com as regras automaticas visiveis ao escopo do
+        usuario — base da associacao em massa no Gerenciar Categorias."""
+        stores = self.stores_with()
+        if not stores:
+            raise OperationError(403, "Acesso negado")
+        batch = self._batch()
+        if batch is None:
+            return {"items": [], "total": 0, "page": page,
+                    "page_size": page_size,
+                    "availability": self._availability()}
+        rows = self.db.execute(
+            select(FinancialObligation.supplier_doc,
+                   FinancialObligation.supplier_name,
+                   FinancialObligation.store_code,
+                   func.count())
+            .where(FinancialObligation.batch_id == batch.id,
+                   FinancialObligation.store_code.in_(stores))
+            .group_by(FinancialObligation.supplier_doc,
+                      FinancialObligation.supplier_name,
+                      FinancialObligation.store_code)
+        ).all()
+        grouped: dict[str, dict] = {}
+        for doc, name, store, count in rows:
+            key = supplier_key(doc, name)
+            entry = grouped.setdefault(key, {
+                "supplier_key": key, "doc": _digits(doc) or None,
+                "name": _norm_name(name) or "SEM NOME",
+                "label": supplier_label(doc, name),
+                "rows": 0, "stores": set()})
+            entry["rows"] += count
+            entry["stores"].add(store)
+        keys = list(grouped)
+        rules = self.db.scalars(
+            select(SupplierCategoryRule).where(
+                SupplierCategoryRule.supplier_key.in_(keys))
+        ).all() if keys else []
+        full_scope = STORE_CODES <= set(stores)
+        rules_by: dict[str, dict] = {}
+        for r in rules:
+            slot = "general" if r.store_code is None else r.store_code
+            # mesma visibilidade de list_rules: geral so com escopo total
+            if slot == "general" and not full_scope:
+                continue
+            if slot != "general" and slot not in stores:
+                continue
+            rules_by.setdefault(r.supplier_key, {})[slot] = {
+                "id": str(r.id), "category_id": str(r.category_id),
+                "category_name": self._category_names().get(
+                    r.category_id, "—"),
+                "active": r.active}
+        q, qd = _norm_name(query or ""), _digits(query or "")
+        items = []
+        for key, e in grouped.items():
+            if q and q not in e["name"] and not (qd and qd in (e["doc"] or "")):
+                continue
+            supplier_rules = rules_by.get(key, {})
+            has_rule = any(r["active"] for r in supplier_rules.values())
+            if without_rule and has_rule:
+                continue
+            items.append({**e, "stores": sorted(e["stores"]),
+                          "rules": supplier_rules,
+                          "has_rule": has_rule})
+        if sort == "unclassified_first":
+            items.sort(key=lambda i: (i["has_rule"], i["name"]))
+        else:
+            items.sort(key=lambda i: i["name"])
+        total = len(items)
+        start = (page - 1) * page_size
+        return {"items": items[start:start + page_size], "total": total,
+                "page": page, "page_size": page_size,
+                "availability": self._availability()}
 
     def list_rules(self) -> dict:
         stores = self.stores_with()
@@ -548,6 +635,11 @@ class ExpenseService:
         category_id None = remover a classificacao manual — o lancamento
         volta a cair na regra automatica aplicavel ou em sem categoria.
         """
+        if self._availability() != "current":
+            raise OperationError(
+                422, "Arquivo de despesas vigente indisponível ou "
+                     "inválido — classificação bloqueada até uma nova "
+                     "sincronização válida do ERP")
         batch = self._batch()
         if batch is None:
             raise OperationError(422, "Sem arquivo vigente de despesas")
@@ -627,7 +719,8 @@ class ExpenseService:
               store: str | None, category_id: str | None,
               situation: str | None, supplier: str | None,
               page: int, page_size: int) -> dict:
-        stores, _ = self._store_scope(store)
+        stores, full_scope = self._store_scope(store)
+        consolidated = store in (None, "", "TODAS") and full_scope
         first, last = self._range(date_from, date_to)
         batch = self._batch()
         orphans = self._sync_orphans(batch)
@@ -649,12 +742,21 @@ class ExpenseService:
             cat_filter = "none"
         elif category_id:
             cat_filter = category_id
+        fp_counts: dict[str, int] = {}
+        for row in rows:
+            fp = line_fingerprint(row)
+            fp_counts[fp] = fp_counts.get(fp, 0) + 1
 
         items = []
         for row in rows:
             resolved = self._resolve(row, manual, rules_map, names)
-            bucket, _ = self._nature(row, dre_rules)
+            bucket, alloc = self._nature(row, dre_rules)
             eligible = bucket in ELIGIBLE_BUCKETS
+            # na visao de loja individual, despesas compartilhadas ficam
+            # fora da lista — mesma fronteira do total da analise (elas
+            # aparecem como memo e na coluna propria do consolidado)
+            if not consolidated and alloc == SHARED_COLUMN:
+                continue
             if situation == "classified" and resolved["category_id"] is None:
                 continue
             if situation == "unclassified" and (
@@ -669,7 +771,9 @@ class ExpenseService:
                     and q not in _digits(row.supplier_doc):
                 continue
             items.append({
+                "row_key": str(row.id),
                 "fingerprint": resolved["fingerprint"],
+                "duplicate_count": fp_counts.get(resolved["fingerprint"], 1),
                 "supplier_name": row.supplier_name,
                 "supplier_doc": _digits(row.supplier_doc) or None,
                 "store_code": row.store_code,
@@ -679,6 +783,7 @@ class ExpenseService:
                 "amount": money(row.amount),
                 "nature": bucket,
                 "nature_label": BUCKET_LABELS.get(bucket, bucket),
+                "allocation": alloc,
                 "eligible": eligible,
                 "category_id": (str(resolved["category_id"])
                                 if resolved["category_id"] else None),

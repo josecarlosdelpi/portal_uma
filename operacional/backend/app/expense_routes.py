@@ -56,6 +56,17 @@ def search_suppliers(q: str = Query(default=""),
     return checked(lambda: svc.search_suppliers(q, limit))
 
 
+@router.get("/supplier-catalog")
+def supplier_catalog(q: str = Query(default=""),
+                     page: int = Query(default=1, ge=1),
+                     page_size: int = Query(default=25, ge=1, le=100),
+                     without_rule: bool = Query(default=False),
+                     sort: str = Query(default="alpha"),
+                     svc: ExpenseService = Depends(service)) -> dict:
+    return checked(lambda: svc.supplier_catalog(
+        q, page, page_size, without_rule, sort))
+
+
 @router.get("/supplier-rules")
 def list_rules(svc: ExpenseService = Depends(service)) -> dict:
     return checked(lambda: svc.list_rules())

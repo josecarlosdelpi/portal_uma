@@ -2,8 +2,8 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import type { MyProfile } from "./api";
 import { labelStore } from "./catalog";
 import {
-  expensesApi, type ExpAnalysis, type ExpCategory, type ExpLine,
-  type ExpLinesPage, type ExpRule, type ExpSupplier,
+  expensesApi, type ExpAnalysis, type ExpCatalogItem, type ExpCategory,
+  type ExpLine, type ExpLinesPage, type ExpRule, type ExpSupplier,
 } from "./expensesApi";
 
 type Props = { token: string; profile: MyProfile };
@@ -332,38 +332,228 @@ function CategoriesModal({ token, profile, canManage, onClose, onChanged }:
           </tbody>
         </table></div>}
       </section>
+
+      <SupplierCatalog token={token} profile={profile} canManage={canManage}
+        activeCats={activeCats} onChanged={onChanged} />
     </div>
   </div>;
 }
 
+// ---------- catalogo completo de fornecedores ----------
+
+function SupplierCatalog({ token, profile, canManage, activeCats, onChanged }:
+  { token: string; profile: MyProfile; canManage: boolean;
+    activeCats: ExpCategory[]; onChanged: () => void }) {
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [withoutRule, setWithoutRule] = useState(false);
+  const [sort, setSort] = useState("alpha");
+  const [items, setItems] = useState<ExpCatalogItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [lastPage, setLastPage] = useState(0);
+  const [availability, setAvailability] = useState("current");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [scopeSel, setScopeSel] = useState<Record<string, string>>({});
+  const [saving, setSaving] =
+    useState<Record<string, "saving" | "saved" | "error">>({});
+
+  const canGeneral = STORE_ORDER.every(s => profile.stores.includes(s));
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const load = useCallback(async (pg: number, append: boolean) => {
+    setLoading(true); setError("");
+    try {
+      const res = await expensesApi.supplierCatalog(token, {
+        q: debouncedQ, page: pg, page_size: 25,
+        without_rule: withoutRule, sort });
+      setItems(cur => append ? [...cur, ...res.items] : res.items);
+      setTotal(res.total); setLastPage(pg);
+      setAvailability(res.availability ?? "current");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message
+        : "Falha ao listar fornecedores.");
+    } finally { setLoading(false); }
+  }, [token, debouncedQ, withoutRule, sort]);
+  useEffect(() => { void load(1, false); }, [load]);
+
+  const editableStores = (s: ExpCatalogItem) =>
+    s.stores.filter(st => profile.stores.includes(st));
+  const scopeOf = (s: ExpCatalogItem) =>
+    scopeSel[s.supplier_key]
+    ?? (canGeneral ? "uma" : editableStores(s)[0] ?? "uma");
+  const ruleOf = (s: ExpCatalogItem) => {
+    const scope = scopeOf(s);
+    return scope === "uma" ? s.rules["general"] : s.rules[scope];
+  };
+
+  async function saveRule(s: ExpCatalogItem, categoryId: string) {
+    const scope = scopeOf(s);
+    const slot = scope === "uma" ? "general" : scope;
+    const key = s.supplier_key + "|" + slot;
+    const rule = ruleOf(s);
+    if (!categoryId && !rule?.active) return;
+    setSaving(m => ({ ...m, [key]: "saving" }));
+    const catName = (id: string) =>
+      activeCats.find(c => c.id === id)?.name ?? rule?.category_name ?? "";
+    try {
+      if (categoryId && rule) {
+        await expensesApi.updateRule(token, rule.id,
+          { category_id: categoryId, active: true });
+        setItems(cur => cur.map(i => i.supplier_key === s.supplier_key
+          ? { ...i, has_rule: true, rules: { ...i.rules, [slot]:
+              { ...rule, category_id: categoryId, active: true,
+                category_name: catName(categoryId) } } }
+          : i));
+      } else if (categoryId) {
+        const res = await expensesApi.createRule(token, {
+          supplier_key: s.supplier_key, supplier_label: s.label,
+          store_code: scope === "uma" ? null : scope,
+          category_id: categoryId });
+        setItems(cur => cur.map(i => i.supplier_key === s.supplier_key
+          ? { ...i, has_rule: true, rules: { ...i.rules, [slot]:
+              { id: res.id, category_id: categoryId, active: true,
+                category_name: catName(categoryId) } } }
+          : i));
+      } else if (rule) {
+        await expensesApi.updateRule(token, rule.id, { active: false });
+        setItems(cur => cur.map(i => {
+          if (i.supplier_key !== s.supplier_key) return i;
+          const rules = { ...i.rules, [slot]: { ...rule, active: false } };
+          return { ...i, rules,
+                   has_rule: Object.values(rules).some(r => r.active) };
+        }));
+      }
+      setSaving(m => ({ ...m, [key]: "saved" }));
+      setTimeout(() => setSaving(m => {
+        const next = { ...m }; delete next[key]; return next;
+      }), 2500);
+      onChanged();
+    } catch (cause) {
+      setSaving(m => ({ ...m, [key]: "error" }));
+      setError(cause instanceof Error ? cause.message
+        : "Falha ao salvar a regra do fornecedor.");
+    }
+  }
+
+  return <section className="exp-cat-section">
+    <h3>Fornecedores do ERP</h3>
+    <p className="dre-note">Todos os fornecedores do arquivo vigente — pagos e em
+      aberto. A categoria padrão preenche os lançamentos elegíveis sem classificação
+      manual, inclusive retroativamente. Escolha a abrangência antes de selecionar.</p>
+    {availability !== "current" &&
+      <div className="notice notice-amber" role="note">Fonte de despesas indisponível —
+        a classificação manual de lançamentos está bloqueada até nova
+        sincronização válida.</div>}
+    <div className="exp-sup-tools">
+      <input type="search" placeholder="Pesquisar por nome ou CNPJ/CPF"
+        value={q} onChange={e => setQ(e.target.value)} />
+      <label className="exp-sup-onlynone">
+        <input type="checkbox" checked={withoutRule}
+          onChange={e => setWithoutRule(e.target.checked)} />
+        Somente sem categoria
+      </label>
+      <select value={sort} onChange={e => setSort(e.target.value)}
+        aria-label="Ordenação dos fornecedores">
+        <option value="alpha">Ordem alfabética</option>
+        <option value="unclassified_first">Sem categoria primeiro</option>
+      </select>
+    </div>
+    {error && <div className="notice notice-error" role="alert">{error}</div>}
+    {loading && !items.length && <p role="status">Listando fornecedores…</p>}
+    {!loading && !items.length &&
+      <p className="empty">Nenhum fornecedor encontrado.</p>}
+    {items.length > 0 && <>
+      <ul className="exp-sup-list">
+        {items.map(s => {
+          const scope = scopeOf(s);
+          const rule = ruleOf(s);
+          const st = saving[s.supplier_key + "|" +
+            (scope === "uma" ? "general" : scope)];
+          const stores = editableStores(s);
+          return <li key={s.supplier_key} className="exp-sup-item">
+            <div className="exp-sup-info">
+              <strong>{s.name}</strong>
+              {s.doc && <span className="mono fin-doc">{s.doc}</span>}
+              <small>{s.rows} lanç. · {s.stores.map(labelStore).join(", ")}</small>
+            </div>
+            <div className="exp-sup-rule">
+              {(canGeneral || stores.length > 1) &&
+                <select aria-label={"Abrangência — " + s.name} value={scope}
+                  disabled={!canManage || st === "saving"}
+                  onChange={e => setScopeSel(m => ({
+                    ...m, [s.supplier_key]: e.target.value }))}>
+                  {canGeneral &&
+                    <option value="uma">Todas as lojas (UMA)</option>}
+                  {stores.map(code =>
+                    <option key={code} value={code}>
+                      Somente {labelStore(code)}</option>)}
+                </select>}
+              <select aria-label={"Categoria padrão — " + s.name}
+                disabled={!canManage || st === "saving"}
+                value={rule?.active ? rule.category_id : ""}
+                onChange={e => void saveRule(s, e.target.value)}>
+                <option value="">Sem categoria</option>
+                {rule?.active &&
+                  !activeCats.some(c => c.id === rule.category_id) &&
+                  <option value={rule.category_id}>
+                    {rule.category_name} (desativada)</option>}
+                {activeCats.map(c =>
+                  <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <SaveState state={st} />
+            </div>
+          </li>;
+        })}
+      </ul>
+      <p className="dre-note">{total} fornecedor(es) no arquivo vigente —
+        exibindo {items.length}.</p>
+      {items.length < total &&
+        <button className="btn-ghost" disabled={loading}
+          onClick={() => void load(lastPage + 1, true)}>
+          {loading ? "Carregando…" :
+            `Carregar mais (${total - items.length} restantes)`}
+        </button>}
+    </>}
+  </section>;
+}
+
 // ---------- detalhe de categoria (analise) ----------
 
-function CategoryDrill({ token, categoryId, from, to, store, columns }:
+function CategoryDrill({ token, categoryId, from, to, store, supplier,
+                        situation, columns }:
   { token: string; categoryId: string; from: string; to: string;
-    store?: string; columns: number }) {
-  const [page, setPage] = useState<ExpLinesPage | null>(null);
+    store?: string; supplier?: string; situation?: string;
+    columns: number }) {
+  const [items, setItems] = useState<ExpLine[]>([]);
+  const [total, setTotal] = useState(0);
+  const [lastPage, setLastPage] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let alive = true;
+  const load = useCallback(async (pg: number, append: boolean) => {
     setLoading(true); setError("");
-    expensesApi.lines(token, {
-      date_from: from, date_to: to, store,
-      category_id: categoryId, page: 1, page_size: 50,
-    }).then(res => { if (alive) setPage(res); })
-      .catch(cause => {
-        if (alive) setError(cause instanceof Error ? cause.message : "Falha ao detalhar.");
-      })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [token, categoryId, from, to, store]);
+    try {
+      const res = await expensesApi.lines(token, {
+        date_from: from, date_to: to, store, supplier, situation,
+        category_id: categoryId, page: pg, page_size: 50 });
+      setItems(cur => append ? [...cur, ...res.items] : res.items);
+      setTotal(res.total); setLastPage(pg);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Falha ao detalhar.");
+    } finally { setLoading(false); }
+  }, [token, categoryId, from, to, store, supplier, situation]);
+  useEffect(() => { void load(1, false); }, [load]);
 
-  if (loading && !page)
+  if (loading && !items.length)
     return <tr className="dre-drill"><td colSpan={columns}>Carregando pagamentos…</td></tr>;
   if (error)
     return <tr className="dre-drill"><td colSpan={columns}><span className="notice notice-error">{error}</span></td></tr>;
-  if (!page || !page.items.length)
+  if (!items.length)
     return <tr className="dre-drill"><td colSpan={columns}>Nenhum pagamento nesta categoria.</td></tr>;
   return <tr className="dre-drill"><td colSpan={columns}>
     <div className="dre-drill-box">
@@ -373,20 +563,24 @@ function CategoryDrill({ token, categoryId, from, to, store, columns }:
           <th>Loja</th><th>Origem</th><th className="fin-num">Valor</th>
         </tr></thead>
         <tbody>
-          {page.items.map(item => <tr key={item.fingerprint}>
+          {items.map(item => <tr key={item.row_key}>
             <td>{dmy(item.paid_at)}</td>
             <td><strong>{item.supplier_name}</strong>
               {item.supplier_doc && <small className="dre-doc"> {item.supplier_doc}</small>}</td>
             <td>{[item.document_number, item.installment_number].filter(Boolean).join(" / ") || "—"}</td>
-            <td>{labelStore(item.store_code)}</td>
+            <td>{item.allocation === "COMPARTILHADO" ? "Compartilhado"
+                : labelStore(item.store_code)}</td>
             <td>{ORIGIN_LABEL[item.origin] ?? item.origin}</td>
             <td className="fin-num">{fmt(item.amount)}</td>
           </tr>)}
         </tbody>
       </table>
-      {page.total > page.items.length &&
-        <p className="dre-note">Exibindo {page.items.length} de {page.total} lançamentos —
-          refine os filtros na aba Classificar Despesas.</p>}
+      {items.length < total &&
+        <button className="btn-ghost dre-drill-more" disabled={loading}
+          onClick={() => void load(lastPage + 1, true)}>
+          {loading ? "Carregando…" :
+            `Carregar mais (${total - items.length} de ${total} restantes)`}
+        </button>}
     </div>
   </td></tr>;
 }
@@ -596,7 +790,8 @@ export function ExpensesPanel({ token, profile }: Props) {
                     </tr>
                     {openCat === (c.category_id ?? "none") && <CategoryDrill
                       token={token} categoryId={c.category_id ?? "none"}
-                      from={r.from} to={r.to} store={storeParam} columns={4} />}
+                      from={r.from} to={r.to} store={storeParam}
+                      supplier={supParam} situation={sitParam} columns={4} />}
                   </Fragment>)}
                 </tbody>
               </table></div>
@@ -705,14 +900,22 @@ export function ExpensesPanel({ token, profile }: Props) {
                 const st = saving[line.fingerprint];
                 const inactive = line.category_id &&
                   !cats.some(c => c.id === line.category_id && c.active);
-                return <tr key={line.fingerprint}
+                return <tr key={line.row_key}
                   className={line.eligible && !line.category_id ? "exp-row-none" : ""}>
                   <td><strong>{line.supplier_name}</strong>
                     {line.supplier_doc && <div className="mono fin-doc">{line.supplier_doc}</div>}</td>
-                  <td>{labelStore(line.store_code)}</td>
+                  <td>{labelStore(line.store_code)}
+                    {line.allocation === "COMPARTILHADO" &&
+                      <small className="dre-note"> compartilhado</small>}</td>
                   <td>{dmy(line.paid_at)}</td>
                   <td>{[line.document_number, line.installment_number]
-                        .filter(Boolean).join(" / ") || "—"}</td>
+                        .filter(Boolean).join(" / ") || "—"}
+                    {line.duplicate_count > 1 &&
+                      <span className="exp-dup" role="note"
+                        title={"Existem " + line.duplicate_count +
+                          " lançamentos com identidade idêntica — a " +
+                          "classificação manual vale para todos eles."}>
+                        ×{line.duplicate_count}</span>}</td>
                   <td className="fin-num">{fmt(line.amount)}</td>
                   <td>{line.nature_label}
                     {!line.eligible && <small className="dre-note"> fora da análise</small>}</td>
