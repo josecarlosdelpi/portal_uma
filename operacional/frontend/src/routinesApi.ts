@@ -28,7 +28,13 @@ export type TrainingEntry={
   id:string;store_code:string;participant_id:string;participant:string;procedure:string;
   version:string;title:string;instructor:string;happened_on:string;
   step:"participou"|"pratica";note:string;signed:false;
+  revision:number;procedure_id:string|null;procedure_version_id:string|null;
   document_attached:boolean;document:PrivateFileInfo|null
+};
+export type TrainingPayload={
+  participant_id:string;procedure?:string;version?:string;procedure_id?:string|null;
+  title:string;instructor:string;happened_on:string;
+  step:"participou"|"pratica";note:string
 };
 
 export const routinesApi={
@@ -64,10 +70,24 @@ export const routinesApi={
                 planned:number,completed:number,expected_revision:number)=>
     request<InstagramRow>(token,`/api/v1/routines/instagram/${store}/${year}/${month}`,
       "PUT",{planned,completed,expected_revision}),
-  trainings:(token:string,store:string)=>
-    request<TrainingEntry[]>(token,`/api/v1/routines/trainings/${store}`),
-  addTraining:(token:string,store:string,body:{
-    participant_id:string;procedure:string;version:string;title:string;
-    instructor:string;happened_on:string;step:"participou"|"pratica";note:string
-  })=>request<TrainingEntry>(token,`/api/v1/routines/trainings/${store}`,"POST",body)
+  trainings:(token:string,store:string,filters:{
+    participant_id?:string;procedure_id?:string;start?:string;end?:string}={})=>{
+    const qs=new URLSearchParams();
+    if(filters.participant_id)qs.set("participant_id",filters.participant_id);
+    if(filters.procedure_id)qs.set("procedure_id",filters.procedure_id);
+    if(filters.start)qs.set("start",filters.start);
+    if(filters.end)qs.set("end",filters.end);
+    const suffix=qs.toString()?"?"+qs.toString():"";
+    return request<TrainingEntry[]>(token,`/api/v1/routines/trainings/${store}${suffix}`);
+  },
+  addTraining:(token:string,store:string,body:TrainingPayload)=>
+    request<TrainingEntry>(token,`/api/v1/routines/trainings/${store}`,"POST",body),
+  updateTraining:(token:string,store:string,id:string,
+                  body:TrainingPayload&{expected_revision:number})=>
+    request<TrainingEntry>(token,`/api/v1/routines/trainings/${store}/${id}`,"PUT",body),
+  deleteTraining:(token:string,store:string,id:string,expectedRevision:number)=>
+    request<{deleted:boolean}>(token,`/api/v1/routines/trainings/${store}/${id}`,
+      "DELETE",{expected_revision:expectedRevision}),
+  myTrainings:(token:string)=>
+    request<TrainingEntry[]>(token,"/api/v1/routines/my-trainings")
 };

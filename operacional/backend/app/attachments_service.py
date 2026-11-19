@@ -14,6 +14,7 @@ from app.models import (
     TrainingDocument, TrainingRecord, WhatsAppFile, WhatsAppPost,
 )
 from app.operations_service import OperationError
+from app.policy import can_access
 from app.routines_service import RoutinesService, start_of
 
 MAX_ART_BYTES = 3 * 1024 * 1024
@@ -145,7 +146,8 @@ class AttachmentService(RoutinesService):
                       lock: bool = False) -> TrainingRecord:
         self.require(store, permission)
         query = select(TrainingRecord).where(
-            TrainingRecord.store_code == store, TrainingRecord.id == record_id
+            TrainingRecord.store_code == store, TrainingRecord.id == record_id,
+            TrainingRecord.deleted_at.is_(None),
         )
         record = self.db.scalar(query.with_for_update() if lock else query)
         if record is None:
@@ -187,7 +189,11 @@ class AttachmentService(RoutinesService):
         return info(record)
 
     def get_training(self, store: str, record_id: UUID) -> tuple[dict, bytes]:
-        self._training_row(store, record_id, "training.view")
+        record = self._training_row(store, record_id, "training.view")
+        # Somente o proprio colaborador ou quem gerencia treinamentos baixa o PDF.
+        if (record.participant_id != self.actor.id
+                and not can_access(self.principal, "training.edit", store)):
+            raise OperationError(403, "Acesso negado")
         item = self.db.get(TrainingDocument, record_id)
         if item is None:
             raise OperationError(404, "Documento não encontrado")
