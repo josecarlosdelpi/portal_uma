@@ -18,12 +18,76 @@ from app.policy import can_access
 from app.routines_service import RoutinesService, start_of
 
 MAX_ART_BYTES = 3 * 1024 * 1024
-MAX_TRAINING_BYTES = 5 * 1024 * 1024
+MAX_TRAINING_BYTES = 10 * 1024 * 1024
 IMAGE_EXTENSIONS = {
     "image/png": (".png",),
     "image/jpeg": (".jpg", ".jpeg"),
     "image/webp": (".webp",),
 }
+OFFICE_MIMES = {
+    "wordprocessingml": ("application/vnd.openxmlformats-officedocument"
+                        ".wordprocessingml.document", ".docx"),
+    "spreadsheetml": ("application/vnd.openxmlformats-officedocument"
+                      ".spreadsheetml.sheet", ".xlsx"),
+    "presentationml": ("application/vnd.openxmlformats-officedocument"
+                       ".presentationml.presentation", ".pptx"),
+}
+TRAINING_MEDIA = {
+    **IMAGE_EXTENSIONS,
+    "application/pdf": (".pdf",),
+    "text/plain": (".txt",),
+    "text/csv": (".csv",),
+    "video/mp4": (".mp4",),
+    "video/quicktime": (".mov",),
+    "video/webm": (".webm",),
+    "audio/mpeg": (".mp3",),
+    "audio/wav": (".wav",),
+    **{mime: (ext,) for mime, ext in OFFICE_MIMES.values()},
+}
+
+
+def _office_media(data: bytes) -> str | None:
+    """DOCX/XLSX/PPTX sao conteineres ZIP; o tipo real esta no [Content_Types].xml.
+
+    Leitura limitada do membro (evita descompactacao excessiva) e rejeita
+    pacotes com macros (vbaProject.bin).
+    """
+    if not data.startswith(b"PK\x03\x04"):
+        return None
+    try:
+        import io, zipfile
+        with zipfile.ZipFile(io.BytesIO(data)) as pack:
+            names = {n.casefold() for n in pack.namelist()}
+            if any(n.endswith("vbaproject.bin") for n in names):
+                return None
+            member = next((n for n in pack.namelist()
+                           if n.casefold() == "[content_types].xml"), None)
+            if member is None:
+                return None
+            info = pack.getinfo(member)
+            if info.file_size > 4 * 1024 * 1024 or info.compress_size > 1024 * 1024:
+                return None
+            with pack.open(info) as fh:
+                head = fh.read(64 * 1024).decode("utf-8", "ignore")
+    except Exception:
+        return None
+    for marker, (mime, _ext) in OFFICE_MIMES.items():
+        if marker in head:
+            return mime
+    return None
+
+
+def _text_media(data: bytes, filename: str) -> str | None:
+    try:
+        data[:8192].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    name = filename.casefold()
+    if name.endswith(".txt"):
+        return "text/plain"
+    if name.endswith(".csv"):
+        return "text/csv"
+    return None
 
 
 def detect_media(data: bytes) -> str | None:
@@ -35,16 +99,29 @@ def detect_media(data: bytes) -> str | None:
         return "image/webp"
     if data.startswith(b"%PDF-"):
         return "application/pdf"
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return "audio/wav"
+    if data[4:8] == b"ftyp":
+        brand = data[8:12]
+        return "video/quicktime" if brand == b"qt  " else "video/mp4"
+    if data.startswith(b"\x1a\x45\xdf\xa3"):
+        return "video/webm"
+    if data.startswith(b"ID3") or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
+        return "audio/mpeg"
     return None
 
 
+def detect_training_media(data: bytes, filename: str) -> str | None:
+    return detect_media(data) or _office_media(data) or _text_media(data, filename)
+
+
 def validated_file(content: bytes, filename: str | None,
-                   client_type: str | None, allowed: set[str],
-                   size_limit: int) -> tuple[str, str]:
+                   client_type: str | None, media_map: dict,
+                   size_limit: int, detector=None) -> tuple[str, str]:
     if not content or len(content) > size_limit:
         raise OperationError(413, "Arquivo vazio ou maior que o limite permitido")
-    detected = detect_media(content)
-    if detected not in allowed:
+    detected = detector(content, filename or "") if detector else detect_media(content)
+    if detected not in media_map:
         raise OperationError(422, "Formato não permitido para este anexo")
     if client_type not in (None, "", "application/octet-stream", detected):
         raise OperationError(422, "O tipo informado não corresponde ao conteúdo do arquivo")
@@ -54,7 +131,7 @@ def validated_file(content: bytes, filename: str | None,
     ).strip(" .")
     if not sanitized:
         raise OperationError(422, "Informe um arquivo com nome válido")
-    extensions = IMAGE_EXTENSIONS.get(detected, (".pdf",))
+    extensions = media_map[detected]
     if not sanitized.casefold().endswith(extensions):
         raise OperationError(422, "Extensão não corresponde ao formato enviado")
     return sanitized, detected
@@ -75,7 +152,7 @@ class AttachmentService(RoutinesService):
         if kind not in ("art", "evidence"):
             raise OperationError(422, "Tipo de anexo inválido")
         name, mime = validated_file(
-            raw, filename, media_type, set(IMAGE_EXTENSIONS), MAX_ART_BYTES
+            raw, filename, media_type, IMAGE_EXTENSIONS, MAX_ART_BYTES
         )
         post = self.db.scalar(select(WhatsAppPost).where(
             WhatsAppPost.post_date == start_of(when)
@@ -159,7 +236,8 @@ class AttachmentService(RoutinesService):
                      expected: int) -> dict:
         self._training_row(store, record_id, "training.edit", lock=True)
         name, mime = validated_file(
-            raw, filename, media_type, {"application/pdf"}, MAX_TRAINING_BYTES
+            raw, filename, media_type, TRAINING_MEDIA, MAX_TRAINING_BYTES,
+            detector=detect_training_media
         )
         record = self.db.scalar(select(TrainingDocument).where(
             TrainingDocument.training_id == record_id

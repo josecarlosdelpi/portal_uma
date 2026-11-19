@@ -24,17 +24,18 @@ export type InstagramRow={
   store_code:string;planned:number|null;completed:number|null;revision:number
 };
 export type InstagramSnapshot={year:number;month:number;stores:InstagramRow[]};
+export type TrainingStep="participou"|"pratica"|"participou,pratica";
 export type TrainingEntry={
   id:string;store_code:string;participant_id:string;participant:string;procedure:string;
   version:string;title:string;instructor:string;happened_on:string;
-  step:"participou"|"pratica";note:string;signed:false;
+  step:TrainingStep;note:string;signed:false;
   revision:number;procedure_id:string|null;procedure_version_id:string|null;
   document_attached:boolean;document:PrivateFileInfo|null
 };
 export type TrainingPayload={
   participant_id:string;procedure?:string;version?:string;procedure_id?:string|null;
   title:string;instructor:string;happened_on:string;
-  step:"participou"|"pratica";note:string
+  step:TrainingStep;note:string
 };
 
 export const routinesApi={
@@ -70,6 +71,22 @@ export const routinesApi={
                 planned:number,completed:number,expected_revision:number)=>
     request<InstagramRow>(token,`/api/v1/routines/instagram/${store}/${year}/${month}`,
       "PUT",{planned,completed,expected_revision}),
+  trainingsMulti:(token:string,stores:string[],filters:{
+    participant_ids?:string[];procedure_ids?:string[];start?:string;end?:string;
+    limit?:number;offset?:number}={})=>{
+    const qs=new URLSearchParams();
+    qs.set("stores",stores.join(","));
+    if(filters.participant_ids?.length)qs.set("participant_ids",filters.participant_ids.join(","));
+    if(filters.procedure_ids?.length)qs.set("procedure_ids",filters.procedure_ids.join(","));
+    if(filters.start)qs.set("start",filters.start);
+    if(filters.end)qs.set("end",filters.end);
+    if(filters.limit)qs.set("limit",String(filters.limit));
+    if(filters.offset)qs.set("offset",String(filters.offset));
+    return request<TrainingEntry[]>(token,`/api/v1/routines/trainings?${qs}`);
+  },
+  trainingProcedures:(token:string,stores:string[])=>
+    request<{procedure_id:string;procedure:string}[]>(token,
+      `/api/v1/routines/trainings/procedures?stores=${stores.join(",")}`),
   trainings:(token:string,store:string,filters:{
     participant_id?:string;procedure_id?:string;start?:string;end?:string}={})=>{
     const qs=new URLSearchParams();

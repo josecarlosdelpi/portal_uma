@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import Base,Store,User,GroupMembership,GroupPermission,StoreGroup,AuditEvent
+from app.models import Base,Store,User,GroupMembership,GroupPermission,StoreGroup,AuditEvent,Procedure,TrainingRecord
 
 
 @pytest.fixture
@@ -192,6 +192,34 @@ def test_training_metadata_never_fabricates_signature(env):
     assert c.post("/api/v1/routines/trainings/JOINVILLE",json=body).status_code==403
 
 
+def test_training_step_accepts_multiple_values(env):
+    """Etapa aceita uma ou ambas as opcoes; ordem canonica; registros antigos intactos."""
+    c,actor,_,_,seller,other=env
+    body={"participant_id":str(seller.id),"procedure":"POP-MULTI",
+          "version":"1.0","instructor":"Gestão","happened_on":"2026-11-10T09:00:00"}
+    # ambas as etapas em um unico registro
+    r=c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":"participou,pratica"})
+    assert r.status_code==201,r.text
+    rec=r.json()
+    assert rec["step"]=="participou,pratica"
+    # ordem canonica independente da ordem enviada
+    r2=c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":"pratica,participou"})
+    assert r2.status_code==201 and r2.json()["step"]=="participou,pratica"
+    # edicao troca para etapa unica e volta para combinada
+    upd=c.put(f"/api/v1/routines/trainings/JOINVILLE/{rec['id']}",json={
+        **body,"step":"pratica","expected_revision":rec["revision"]})
+    assert upd.status_code==200 and upd.json()["step"]=="pratica"
+    upd2=c.put(f"/api/v1/routines/trainings/JOINVILLE/{rec['id']}",json={
+        **body,"step":"participou,pratica","expected_revision":upd.json()["revision"]})
+    assert upd2.status_code==200 and upd2.json()["step"]=="participou,pratica"
+    # valores invalidos seguem rejeitados
+    assert c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":"outra"}).status_code==422
+    assert c.post("/api/v1/routines/trainings/JOINVILLE",json={**body,"step":""}).status_code==422
+    # listagem devolve o valor combinado
+    rows=c.get("/api/v1/routines/trainings/JOINVILLE").json()
+    assert any(x["step"]=="participou,pratica" for x in rows)
+
+
 def test_all_routes_reject_unauthenticated():
     with TestClient(app) as c:
         for route in [
@@ -351,3 +379,136 @@ def test_private_attachments_require_authentication():
             assert client.put(uri+"?expected_revision=0",files={
                 "file":("a.png",SMALL_PNG,"image/png")
             }).status_code==401
+
+
+def _docx() -> bytes:
+    import io, zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml",
+                   '<Types><Override ContentType="application/vnd.openxmlformats'
+                   '-officedocument.wordprocessingml.document.main"/></Types>')
+    return buf.getvalue()
+
+
+SMALL_MP4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 32
+SMALL_WAV = b"RIFF" + b"\x24\x00\x00\x00" + b"WAVEfmt " + b"\x00" * 24
+SMALL_MP3 = b"ID3\x04\x00\x00\x00\x00\x00\x10" + b"\x00" * 16
+
+
+def test_training_attachments_accept_common_media(env):
+    """Novos formatos ate 10 MB sao aceitos; executaveis e excedentes nao."""
+    c, actor, engine, admin, seller, other = env
+    actor["user"] = admin
+    rec = c.post("/api/v1/routines/trainings/JOINVILLE", json={
+        "participant_id": str(seller.id), "procedure": "POP-0001", "version": "1",
+        "title": "", "instructor": "Gestão", "happened_on": "2026-10-21T09:00:00",
+        "step": "participou"})
+    assert rec.status_code == 201
+    link = f"/api/v1/routines/trainings/JOINVILLE/{rec.json()['id']}/document"
+
+    cases = [
+        ("foto.png", SMALL_PNG, "image/png"),
+        ("foto.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 32, "image/jpeg"),
+        ("lista.docx", _docx(), "application/octet-stream"),
+        ("tabela.txt", "conteúdo de texto".encode(), "text/plain"),
+        ("dados.csv", "a;b\n1;2".encode(), "text/csv"),
+        ("video.mp4", SMALL_MP4, "video/mp4"),
+        ("audio.wav", SMALL_WAV, "audio/wav"),
+        ("audio.mp3", SMALL_MP3, "audio/mpeg"),
+    ]
+    revision = 0
+    for name, payload, ctype in cases:
+        up = c.put(link + f"?expected_revision={revision}", files={
+            "file": (name, payload, ctype)})
+        assert up.status_code == 200, (name, up.text)
+        revision = up.json()["revision"]
+    big = c.put(link + f"?expected_revision={revision}", files={
+        "file": ("video.mp4", b"\x00" * (11 * 1024 * 1024), "video/mp4")})
+    assert big.status_code == 413
+    exe = c.put(link + f"?expected_revision={revision}", files={
+        "file": ("virus.exe", b"MZ\x90\x00" + b"\x00" * 32, "application/octet-stream")})
+    assert exe.status_code == 422
+    got = c.get(link)
+    assert got.status_code == 200
+    assert got.headers["content-type"].startswith("audio/mpeg")
+    # vendedor ve metadados do proprio anexo em my-trainings
+    actor["user"] = seller
+    mine = c.get("/api/v1/routines/my-trainings").json()
+    assert mine[0]["document"]["name"] == "audio.mp3"
+    assert mine[0]["document_attached"] is True
+
+
+def test_trainings_multi_store_and_filters(env):
+    """Endpoint consolidado cruza lojas, colaboradores, procedimentos e datas."""
+    c, actor, engine, admin, seller, other = env
+    actor["user"] = admin
+    with Session(engine) as db:
+        for code in ("TUBARAO", "ITAJAI"):
+            grp = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
+            db.add(grp); db.flush()
+            db.add(GroupMembership(user_id=seller.id, group_id=grp.id))
+        db.commit()
+    for store, day in [("JOINVILLE", "2026-10-20T09:00:00"),
+                       ("TUBARAO", "2026-10-22T09:00:00"),
+                       ("ITAJAI", "2026-11-30T09:00:00")]:
+        r = c.post(f"/api/v1/routines/trainings/{store}", json={
+            "participant_id": str(seller.id), "procedure": "POP-0001", "version": "1",
+            "title": "", "instructor": "Gestão", "happened_on": day,
+            "step": "participou"})
+        assert r.status_code == 201, r.text
+    rows = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO").json()
+    assert len(rows) == 2
+    assert rows[0]["happened_on"] > rows[1]["happened_on"]
+    three = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI").json()
+    assert len(three) == 3
+    by_person = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO"
+                      f"&participant_ids={seller.id}").json()
+    assert len(by_person) == 2
+    by_dates = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI"
+                     "&start=2026-11-01").json()
+    assert len(by_dates) == 1 and by_dates[0]["store_code"] == "ITAJAI"
+    unknown = c.get("/api/v1/routines/trainings?stores=JOINVILLE"
+                    f"&participant_ids={uuid4()}").json()
+    assert unknown == []
+    # paginacao progressiva: primeira pagina + offset
+    page1 = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI"
+                  "&limit=2").json()
+    page2 = c.get("/api/v1/routines/trainings?stores=JOINVILLE,TUBARAO,ITAJAI"
+                  "&limit=2&offset=2").json()
+    assert len(page1) == 2 and len(page2) == 1
+    ids = {r["id"] for r in page1 + page2}
+    assert len(ids) == 3
+
+
+def test_trainings_procedures_include_deleted_metadata(env):
+    """Procedimento obsoleto ou excluido continua localizavel no filtro
+    via metadados do historico, sem liberar seu conteudo."""
+    from datetime import datetime
+    c, actor, engine, admin, seller, other = env
+    actor["user"] = admin
+    with Session(engine) as db:
+        deleted = Procedure(id=uuid4(), code="POP-DEL", title="Antigo excluído",
+                            created_by=admin.id, deleted_at=datetime.now())
+        db.add(deleted); db.flush()
+        db.add(TrainingRecord(
+            id=uuid4(), store_code="JOINVILLE", participant_id=seller.id,
+            procedure="POP-DEL — Antigo excluído", version="1", title="",
+            instructor="Gestão", happened_on=datetime(2026, 10, 10, 9, 0),
+            step="participou", note="", procedure_id=deleted.id,
+            procedure_version_id=None, recorded_by=admin.id))
+        db.commit()
+        deleted_id = str(deleted.id)
+    rows = c.get("/api/v1/routines/trainings/procedures?stores=JOINVILLE").json()
+    labels = {r["procedure_id"]: r["procedure"] for r in rows}
+    assert deleted_id in labels
+    assert "POP-DEL" in labels[deleted_id]
+    # o documento continua inacessivel mesmo assim
+    assert c.get(f"/api/v1/procedures/{deleted_id}").status_code == 404
+    # seller enxerga somente metadados dos proprios treinamentos
+    actor["user"] = seller
+    own = c.get("/api/v1/routines/trainings/procedures?stores=JOINVILLE").json()
+    assert deleted_id in {r["procedure_id"] for r in own}
+    actor["user"] = other
+    denied = c.get("/api/v1/routines/trainings/procedures?stores=JOINVILLE")
+    assert denied.status_code == 403

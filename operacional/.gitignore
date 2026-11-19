@@ -25,3 +25,5 @@ coverage/
 *.xls
 *.csv
 *.pdf
+# Artefato incremental do tsc
+tsconfig.tsbuildinfo

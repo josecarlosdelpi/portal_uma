@@ -64,7 +64,7 @@ class TrainingInput(Strict):
     title:str=Field(default="",max_length=140)
     instructor:str=Field(min_length=1,max_length=90)
     happened_on:datetime
-    step:str=Field(pattern=r"^(participou|pratica)$")
+    step:str=Field(pattern=r"^(participou|pratica)(,(participou|pratica))?$")
     note:str=Field(default="",max_length=350)
 
 
@@ -165,6 +165,31 @@ def save_instagram(store_code:str,body:InstagramInput,
 @router.get("/my-trainings")
 def my_trainings(svc:RoutinesService=Depends(service))->list[dict]:
     return checked(lambda:svc.my_trainings())
+
+
+def _csv_uuids(raw:str|None)->list[UUID]|None:
+    if not raw:return None
+    try:return [UUID(x) for x in raw.split(",") if x.strip()]
+    except ValueError:return None
+
+
+@router.get("/trainings")
+def trainings_multi(stores:str="",participant_ids:str|None=None,
+                    procedure_ids:str|None=None,start:date|None=None,
+                    end:date|None=None,limit:int=Query(200,ge=1,le=500),
+                    offset:int=Query(0,ge=0),
+                    svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.trainings_multi(
+        [s.strip() for s in stores.split(",") if s.strip()],
+        _csv_uuids(participant_ids),_csv_uuids(procedure_ids),start,end,
+        limit=limit,offset=offset))
+
+
+@router.get("/trainings/procedures")
+def trainings_procedures(stores:str="",
+                         svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.trainings_procedures(
+        [s.strip() for s in stores.split(",") if s.strip()]))
 
 
 @router.get("/trainings/{store_code}")

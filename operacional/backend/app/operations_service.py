@@ -304,7 +304,9 @@ class OperationsService:
         return self._client(row)
 
     def sellers(self, store: str) -> list[dict]:
-        self.require(store, "telemarketing.view")
+        if not (can_access(self.principal, "telemarketing.view", store)
+                or can_access(self.principal, "training.edit", store)):
+            raise OperationError(403, "Acesso negado")
         rows = self.db.execute(
             select(User.id, User.display_name)
             .join(GroupMembership, GroupMembership.user_id == User.id)
