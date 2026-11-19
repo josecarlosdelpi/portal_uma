@@ -11,9 +11,9 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    AuditEvent, Base, GroupMembership, GroupPermission, MonthlyClosingArchive,
-    Store, StoreGroup, User,
+    AuditEvent, Base, GroupPermission, MonthlyClosingArchive, Store, User,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -34,15 +34,13 @@ def env():
                            active=True, is_superadmin=False)
         session.add_all([admin, seller, no_overview])
         session.flush()
-        group = StoreGroup(id=uuid4(), name="Joinville", store_code="JOINVILLE", active=True)
-        session.add(group)
-        session.flush()
-        session.add_all([
-            GroupMembership(user_id=seller.id, group_id=group.id),
-            GroupMembership(user_id=no_overview.id, group_id=group.id),
-            GroupPermission(group_id=group.id, code="overview.view", granted=True),
-            GroupPermission(group_id=group.id, code="monthly_closing.view", granted=True),
-        ])
+        seed_admin_access(session, admin)
+        # monthly_closing.view concedido ao grupo NAO basta: a permissao e de
+        # escopo completo e o grupo cobre apenas Joinville.
+        seed_group(
+            session, "Vendedores Joinville", ["JOINVILLE"],
+            ["overview.view", "monthly_closing.view"], [seller, no_overview],
+        )
         session.commit()
 
     actor = {"user": admin}

@@ -40,7 +40,8 @@ export function OverviewPage({token, profile}: Props) {
       <p>Seu perfil não possui permissão para consultar este módulo.</p></section>;
   }
   const pilot = snapshot?.source.sales_status === "pilot_unverified";
-  const awaiting = snapshot?.source.sales_status !== "pilot_unverified";
+  const unavailable = snapshot?.source.sales_status === "source_unavailable";
+  const awaiting = snapshot != null && !pilot && !unavailable;
   return <div>
     <div className="page-header"><div className="eyebrow">RESULTADOS DA UMA</div>
       <h1>Visão Geral</h1>
@@ -51,19 +52,43 @@ export function OverviewPage({token, profile}: Props) {
         <input id="overview-period" type="month" min="2020-01" max="2100-12"
           value={period} onChange={(event) => setPeriod(event.target.value)}/></div>
       <span className="chip">{pilot
-        ? "Fonte comercial: ERP (piloto) · " + (snapshot?.source.sales_updated_at
-          ? "atualizado em " + new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR")
-          : "sem registro")
+        ? "Fonte comercial: ERP (piloto)" +
+          (snapshot?.source.data_through
+            ? " · dados até " + new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR")
+            : "") +
+          (snapshot?.source.sales_updated_at
+            ? " · sincronizado em " + new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR")
+            : " · sem registro")
         : "Fonte comercial: integração pendente"}</span>
     </div>
     {awaiting && <div className="notice notice-amber" role="status">
       Os indicadores de faturamento ainda não estão conectados ao ERP. Os campos sem dados
       não representam vendas zeradas. As metas exibidas são as cadastradas no Portal UMA.
     </div>}
+    {unavailable && <div className="notice notice-amber" role="status">
+      Dados de vendas indisponíveis até recebermos um arquivo válido do ERP.
+      As metas exibidas são as cadastradas no Portal UMA.
+    </div>}
     {pilot && <div className="notice notice-amber" role="status">
       Dados do ERP em fase de testes — conferir com os relatórios oficiais antes de decisões.
       As metas exibidas são as cadastradas no Portal UMA.
     </div>}
+    {pilot && snapshot && snapshot.stores.some((s) => s.data_state === "missing") &&
+      <div className="notice notice-amber" role="status">
+        Período sem dados no arquivo atual — a exportação vigente do Vendas.csv cobre até{" "}
+        {snapshot.source.data_through
+          ? new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR")
+          : "data desconhecida"}.
+        Os campos sem dados não representam vendas zeradas.
+      </div>}
+    {pilot && snapshot && !snapshot.stores.some((s) => s.data_state === "missing") &&
+      snapshot.stores.some((s) => s.data_state === "partial") &&
+      <div className="notice notice-amber" role="status">
+        O arquivo Vendas.csv vigente termina em{" "}
+        {snapshot.source.data_through
+          ? new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR")
+          : "data desconhecida"} e não cobre o período inteiro.
+      </div>}
     {loading && <p role="status">Carregando indicadores…</p>}
     {error && <div className="notice notice-error" role="alert">{error}</div>}
     {snapshot && <>
@@ -77,10 +102,13 @@ export function OverviewPage({token, profile}: Props) {
         <div className="panel overview-kpi"><span>Atingimento da meta</span>
           <strong>{percent(snapshot.summary.attainment_percent)}</strong>
           <small>{pilot ? "Faturamento ÷ meta do período" : "Depende das vendas oficiais"}</small></div>
-        <div className="panel overview-kpi"><span>Última atualização de vendas</span>
-          <strong>{snapshot.source.sales_updated_at
-            ? new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR") : "Não disponível"}</strong>
-          <small>{pilot ? "Sincronização do arquivo Vendas.csv" : "Os dados ainda não foram importados"}</small></div>
+        <div className="panel overview-kpi"><span>Última venda no arquivo</span>
+          <strong>{snapshot.source.data_through
+            ? new Date(snapshot.source.data_through + "T12:00:00").toLocaleDateString("pt-BR") : "Não disponível"}</strong>
+          <small>{pilot
+            ? "Sincronizado em " + (snapshot.source.sales_updated_at
+              ? new Date(snapshot.source.sales_updated_at).toLocaleString("pt-BR") : "—")
+            : "Os dados ainda não foram importados"}</small></div>
       </div>
       <section className="panel">
         <div className="panel-head"><div><h2>{snapshot.scope==="consolidated"?
@@ -93,7 +121,14 @@ export function OverviewPage({token, profile}: Props) {
             <h3>{store.name}</h3>
             <div><span>Meta mensal</span><strong>{store.target_visibility==="restricted"?
               "Restrito" : currency(store.target)}</strong></div>
-            <div><span>Faturamento</span><strong>{currency(store.revenue)}</strong></div>
+            <div><span>Faturamento</span><strong>{currency(store.revenue)}</strong>
+              {store.data_state === "unavailable" &&
+                <small className="erp-data-state">dados indisponíveis</small>}
+              {store.data_state === "missing" &&
+                <small className="erp-data-state">sem dados no arquivo atual</small>}
+              {store.data_state === "partial" &&
+                <small className="erp-data-state">arquivo não cobre o período inteiro</small>}
+            </div>
             <div><span>Atingimento</span><strong>{percent(store.attainment_percent)}</strong></div>
             {store.attainment_percent !== null &&
               <div className="store-progress"><i style={{

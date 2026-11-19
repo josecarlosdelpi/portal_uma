@@ -21,7 +21,11 @@ class Store(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("profile IN ('administrator', 'seller')", name="ck_users_profile"),)
+    # Funcao operacional do colaborador (nao concede permissoes):
+    # 'seller' aparece nos cadastros de loja (televendas, treinamentos,
+    # tarefas); 'administrator' e 'staff' nao. Acessos vem do grupo de
+    # acesso e das excecoes individuais.
+    __table_args__ = (CheckConstraint("profile IN ('administrator', 'seller', 'staff')", name="ck_users_profile"),)
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     auth_subject: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
@@ -33,26 +37,56 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class StoreGroup(Base):
-    __tablename__ = "store_groups"
+class AccessGroup(Base):
+    """Grupo de acesso configuravel: nome, abrangencia de lojas e permissoes."""
+    __tablename__ = "access_groups"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
-    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(String(300), nullable=False, default="", server_default="")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class AccessGroupStore(Base):
+    """Abrangencia geografica do grupo: em quais lojas suas permissoes valem."""
+    __tablename__ = "access_group_stores"
+
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+
+
+class UserStoreScope(Base):
+    """Restricao individual de lojas (subconjunto da abrangencia do grupo).
+
+    Sem linhas para o usuario = herda toda a abrangencia do grupo."""
+    __tablename__ = "user_store_scopes"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
 
 
 class GroupMembership(Base):
+    """Vinculo usuario <-> grupo de acesso.
+
+    Um usuario comum pertence a exatamente UM grupo principal: a restricao
+    de unicidade em user_id impede multiplos vinculos mesmo fora do ORM."""
     __tablename__ = "group_memberships"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_group_memberships_user"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    group_id: Mapped[UUID] = mapped_column(ForeignKey("store_groups.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
 
 
 class GroupPermission(Base):
     __tablename__ = "group_permissions"
 
-    group_id: Mapped[UUID] = mapped_column(ForeignKey("store_groups.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
     code: Mapped[str] = mapped_column(String(100), primary_key=True)
     granted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
@@ -599,7 +633,7 @@ class ErpImportBatch(Base):
     """Snapshot de um arquivo ERP recebido; garante auditoria e idempotencia."""
     __tablename__ = "erp_import_batches"
     __table_args__ = (
-        CheckConstraint("kind IN ('VENDAS','DEVOLUCOES')", name="ck_erp_batch_kind"),
+        CheckConstraint("kind IN ('VENDAS','DEVOLUCOES','DESPESAS')", name="ck_erp_batch_kind"),
         CheckConstraint("source IN ('MANUAL_UPLOAD','DRIVE_SYNC')", name="ck_erp_batch_source"),
         CheckConstraint("status IN ('RECEIVED','APPLIED','DUPLICATE','FAILED')", name="ck_erp_batch_status"),
     )
@@ -643,6 +677,11 @@ class ErpSaleRow(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    seller_name: Mapped[str | None] = mapped_column(String(150))
+    product_description: Mapped[str | None] = mapped_column(String(200))
+    product_unit: Mapped[str | None] = mapped_column(String(10))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -666,6 +705,11 @@ class ErpReturnRow(Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    seller_name: Mapped[str | None] = mapped_column(String(150))
+    product_description: Mapped[str | None] = mapped_column(String(200))
+    product_unit: Mapped[str | None] = mapped_column(String(10))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -688,3 +732,44 @@ class ErpSourceFile(Base):
     last_error: Mapped[str | None] = mapped_column(String(500))
     consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+class FinancialObligation(Base):
+    """Obrigacao financeira vinda do ERP (despesa ou compra para revenda).
+
+    Uma linha por linha do arquivo: o ERP nao envia IDs transacionais, entao
+    a cardinalidade e preservada — registros identicos sao lancamentos
+    legitimos e nunca sao deduplicados. Somente o snapshot corrente alimenta
+    as consultas; linhas de lotes anteriores permanecem para auditoria.
+    """
+    __tablename__ = "financial_obligations"
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_obligation_amount"),
+        CheckConstraint("category IN ('despesa','compra_revenda')", name="ck_obligation_category"),
+        CheckConstraint("status IN ('aberto','pago')", name="ck_obligation_status"),
+        CheckConstraint("(status = 'pago') = (paid_at IS NOT NULL)", name="ck_obligation_status_paid"),
+        Index("ix_financial_obligations_batch", "batch_id"),
+        Index("ix_financial_obligations_due", "store_code", "due_date"),
+        Index("ix_financial_obligations_paid", "store_code", "paid_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("erp_import_batches.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_row: Mapped[int] = mapped_column(Integer, nullable=False)
+    supplier_doc: Mapped[str | None] = mapped_column(String(20))
+    supplier_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    due_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    paid_at: Mapped[date | None] = mapped_column(Date())
+    document_number: Mapped[str | None] = mapped_column(String(30))
+    installment_number: Mapped[str | None] = mapped_column(String(10))
+    issued_at: Mapped[date | None] = mapped_column(Date())
+    original_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    additions: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    discounts: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    account_code: Mapped[str | None] = mapped_column(String(20))
+    account_description: Mapped[str | None] = mapped_column(String(150))
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

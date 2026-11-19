@@ -3,10 +3,10 @@ import {
   LayoutDashboard, Phone, Star, Package, ListChecks, CalendarCheck,
   Target, MessageCircle, GraduationCap, ClipboardCheck, Settings,
   Pin, PinOff, GripVertical, ChevronUp, ChevronDown, Menu, ChevronsRight,
-  Settings2, X, ShoppingCart,
+  Settings2, X, ShoppingCart, Wallet,
 } from "lucide-react";
-import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent, type LocalResetPassword, ApiError } from "./api";
-import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
+import { api, type MyProfile, type PortalUser, type AccessGroup, type AuditEvent, ApiError } from "./api";
+import { labelStore } from "./catalog";
 import { TargetsPage } from "./TargetsPage";
 import { OverviewPage } from "./OverviewPage";
 import { SalesPage } from "./SalesPage";
@@ -19,10 +19,12 @@ import { ChecklistPage } from "./ChecklistPage";
 import { DailyTasksPage } from "./DailyTasksPage";
 import { WhatsAppPage } from "./WhatsAppPage";
 import { TrainingPage } from "./TrainingPage";
-import { AccountsManager, TemporaryPasswordNotice } from "./AccountsManager";
+import { FinancePage } from "./FinancePage";
+import { AccountsManager } from "./AccountsManager";
+import { UserDetailPanel, GroupEditor } from "./AccessAdmin";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
-type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training" | "sales";
+type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training" | "sales" | "finance";
 
 /** Identificadores estaveis dos modulos (mesmos chaves do backend /preferences). */
 const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> = [
@@ -37,6 +39,7 @@ const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> 
   { key: "whatsapp", label: "Canais digitais", icon: MessageCircle },
   { key: "training", label: "Padrões e treinamentos", icon: GraduationCap },
   { key: "closing", label: "Fechamento Mensal", icon: ClipboardCheck },
+  { key: "finance", label: "Financeiro", icon: Wallet },
   { key: "access", label: "Configurações", icon: Settings },
 ];
 const navLabel = (key: string) => NAV_ITEMS.find(i => i.key === key)?.label ?? key;
@@ -55,17 +58,12 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   const [tab, setTab] = useState<Tab>("usuarios");
   const [area, setArea] = useState<Area>("overview");
   const [users, setUsers] = useState<PortalUser[]>([]);
-  const [groups, setGroups] = useState<StoreGroup[]>([]);
+  const [groups, setGroups] = useState<AccessGroup[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [auditOffset, setAuditOffset] = useState(0);
   const [hasMoreAudit, setHasMoreAudit] = useState(false);
   const [selectedUser, setSelectedUser] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState("");
-  const [groupDraft, setGroupDraft] = useState<string[]>([]);
-  const [overrideDraft, setOverrideDraft] = useState<Record<string, boolean | null>>({});
-  const [storeDraft, setStoreDraft] = useState("");
   const [working, setWorking] = useState(false);
-  const [resetResult, setResetResult] = useState<LocalResetPassword | null>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -92,21 +90,6 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   }, [token]);
 
   useEffect(() => { void refresh(); }, [refresh]);
-
-  useEffect(() => {
-    const group = groups.find((candidate) => candidate.id === selectedGroup);
-    setGroupDraft(group?.permissions ?? []);
-  }, [groups, selectedGroup]);
-
-  useEffect(() => {
-    const user = users.find((candidate) => candidate.id === selectedUser);
-    const current: Record<string, boolean | null> = {};
-    readPermissionCodes.forEach((permission) => {
-      current[permission] = user?.overrides[permission] ?? null;
-    });
-    setOverrideDraft(current);
-    setStoreDraft(user?.stores[0] ?? "");
-  }, [users, selectedUser]);
 
   useEffect(() => {
     if (tab !== "auditoria" || profile?.profile !== "superadmin" || !token) return;
@@ -145,6 +128,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (previous === "daily" && profile.features.daily_tasks) return previous;
       if (previous === "whatsapp" && (profile.features.whatsapp_status||profile.features.instagram)) return previous;
       if (previous === "training" && profile.features.training) return previous;
+      if (previous === "finance" && profile.features.finance) return previous;
       if (previous === "access" && profile.profile === "superadmin") return previous;
       if (profile.features.overview) return "overview";
       if (profile.features.sales) return "sales";
@@ -157,14 +141,13 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (profile.features.daily_tasks) return "daily";
       if (profile.features.whatsapp_status||profile.features.instagram) return "whatsapp";
       if (profile.features.training) return "training";
+      if (profile.features.finance) return "finance";
       return "access";
     });
   }, [profile]);
 
   const user = users.find((candidate) => candidate.id === selectedUser);
-  const group = groups.find((candidate) => candidate.id === selectedGroup);
   const isSuperAdmin = profile?.profile === "superadmin";
-  const isSeller = user?.profile === "seller";
   const canViewTargets = profile?.features?.targets ?? false;
   const canViewSales = profile?.features?.sales ?? false;
   const canViewOverview = profile?.features?.overview ?? false;
@@ -176,6 +159,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   const canViewDaily = profile?.features?.daily_tasks ?? false;
   const canViewWhatsApp = (profile?.features?.whatsapp_status??false)||(profile?.features?.instagram??false);
   const canViewTraining = profile?.features?.training ?? false;
+  const canViewFinance = profile?.features?.finance ?? false;
 
   // ---- sidebar retratil + favoritos (preferencias por usuario no banco) ----
   const [pinned, setPinned] = useState(true);
@@ -266,6 +250,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   if (canViewSales) allowedAreas.add("sales");
   if (canViewWhatsApp) allowedAreas.add("whatsapp");
   if (canViewTraining) allowedAreas.add("training");
+  if (canViewFinance) allowedAreas.add("finance");
   if (canViewClosing) allowedAreas.add("closing");
   if (isSuperAdmin) allowedAreas.add("access");
   const visibleItems = NAV_ITEMS.filter(item => allowedAreas.has(item.key));
@@ -366,7 +351,8 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
          area === "checklist" && profile ? <ChecklistPage token={token} profile={profile} /> :
          area === "daily" && profile ? <DailyTasksPage token={token} profile={profile} /> :
          area === "whatsapp" && profile ? <WhatsAppPage token={token} profile={profile} /> :
-         area === "training" && profile ? <TrainingPage token={token} profile={profile} /> : <>
+         area === "training" && profile ? <TrainingPage token={token} profile={profile} /> :
+         area === "finance" && profile ? <FinancePage token={token} profile={profile} /> : <>
         <div className="page-header"><div><div className="eyebrow">PORTAL OPERACIONAL</div><h1>{isSuperAdmin ? "Configurações do sistema" : "Meu acesso ao Portal UMA"}</h1><p>Controle de usuários, unidades e permissões com registros de auditoria.</p></div></div>
         <div className="notice notice-amber">A versão operacional está em desenvolvimento. Não utilizar dados comerciais reais até a homologação.</div>
         {error && <div className="notice notice-error" role="alert">{error}</div>}
@@ -376,75 +362,27 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
         {profile && !isSuperAdmin && <section className="panel"><h2>Área administrativa restrita</h2><p>Você está autenticado como {profileLabel(profile.profile)}. A configuração de usuários e permissões é exclusiva do SuperAdmin.</p><p>As telas comerciais serão habilitadas em uma próxima etapa.</p></section>}
         {isSuperAdmin && <div className="tabs" role="tablist" aria-label="Configurações">
           <button role="tab" aria-selected={tab === "usuarios"} className={tab === "usuarios" ? "tab active" : "tab"} onClick={() => setTab("usuarios")}>Usuários</button>
-          <button role="tab" aria-selected={tab === "grupos"} className={tab === "grupos" ? "tab active" : "tab"} onClick={() => setTab("grupos")}>Permissões por loja</button>
+          <button role="tab" aria-selected={tab === "grupos"} className={tab === "grupos" ? "tab active" : "tab"} onClick={() => setTab("grupos")}>Grupos e permissões</button>
           <button role="tab" aria-selected={tab === "auditoria"} className={tab === "auditoria" ? "tab active" : "tab"} onClick={() => {setAuditOffset(0); setTab("auditoria");}}>Auditoria</button>
         </div>}
-        {isSuperAdmin && tab === "usuarios" && <AccountsManager token={token} onCreated={refresh}/>}
+        {isSuperAdmin && tab === "usuarios" && <AccountsManager token={token} groups={groups}
+          onCreated={async (userId) => { await refresh(); setSelectedUser(userId); }}/>}
         {isSuperAdmin && tab === "usuarios" && <div className="columns">
           <section className="panel"><div className="panel-head"><div><h2>Usuários cadastrados</h2><p>Selecione um colaborador para administrar seu acesso.</p></div><span className="count">{users.length} contas</span></div>
             {users.length === 0 ? <p className="empty">Nenhum usuário cadastrado.</p> :
             <div className="user-list">{users.map((person) => <button key={person.id} className={"user-row" + (selectedUser === person.id ? " selected" : "")} onClick={() => setSelectedUser(person.id)}>
-              <span className="user-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span><span className="user-text"><strong>{person.display_name}</strong><small>{profileLabel(person.profile)} · {person.username ? "@" + person.username + " · " : ""}{person.stores.map(labelStore).join(", ") || "Todas as lojas"}</small></span>
+              <span className="user-avatar">{person.display_name.slice(0, 2).toUpperCase()}</span><span className="user-text"><strong>{person.display_name}</strong><small>{profileLabel(person.profile)} · {person.username ? "@" + person.username + " · " : ""}{person.group ? person.group.name : "sem grupo"} · {person.stores.map(labelStore).join(", ") || "—"}</small></span>
               <span className={"pill " + (person.active ? "pill-green" : "pill-grey")}>{person.active ? (person.must_change_password ? "Senha pendente" : "Ativo") : "Suspenso"}</span>
             </button>)}</div>}
-            <p className="small-note">Os pré-cadastros aparecem acima. A ativação real depende do serviço de login.</p>
           </section>
           <section className="panel">
-            {!user ? <div className="empty">Selecione um usuário para visualizar as configurações.</div> : <><div className="panel-head"><div><h2>{user.display_name}</h2><p>{profileLabel(user.profile)}</p></div></div>
-              <div className="form-row"><label htmlFor="user-store">Loja vinculada</label><select id="user-store" value={storeDraft} disabled={!isSeller || working} onChange={(event) => setStoreDraft(event.target.value)}>
-                {!isSeller && <option value="">Todas as lojas</option>}
-                {Object.entries({JOINVILLE:"Joinville", ITAJAI:"Itajaí", TUBARAO:"Tubarão"}).map(([code,name]) => <option key={code} value={code}>{name}</option>)}
-              </select></div>
-              {isSeller && <button className="btn-secondary" disabled={working || storeDraft === user.stores[0]} onClick={() => void update(() => api.setUserStore(token,user.id,storeDraft),"Vínculo de loja atualizado.")}>Salvar loja</button>}
-              {!user.profile.includes("superadmin") && <div className="status-control"><div><strong>Conta {user.active ? "ativa" : "suspensa"}</strong><small>{user.active ? "Usuário pode acessar de acordo com suas permissões." : "A conta está bloqueada no Portal UMA."}</small></div>
-                <button disabled={working} className="btn-secondary" onClick={() => {
-                  if (!window.confirm(user.active ? "Suspender este usuário?" : "Reativar este usuário?")) return;
-                  void update(() => api.setActive(token,user.id,!user.active),"Situação da conta atualizada.");
-                }}>{user.active ? "Suspender acesso" : "Reativar acesso"}</button></div>}
-              {!user.profile.includes("superadmin") && <div className="local-account-actions">
-                {user.username && <button className="btn-secondary" disabled={working}
-                  onClick={() => void update(async () => {
-                    const result = await api.resetLocalPassword(token, user.id);
-                    setResetResult(result);
-                  }, "Nova senha provisória gerada. Entregue somente ao colaborador.")}>
-                  Gerar nova senha provisória</button>}
-                <button className="btn-secondary local-delete-action" disabled={working}
-                  onClick={() => {
-                    if (!window.confirm(
-                      "Excluir o acesso de " + user.display_name +
-                      "? A conta sairá da lista, todas as sessões serão invalidadas e o histórico será preservado."
-                    )) return;
-                    void update(async () => {
-                      await api.deleteUser(token, user.id);
-                      setSelectedUser("");
-                      setResetResult(null);
-                    }, "Usuário excluído da lista; acesso revogado, histórico preservado.");
-                  }}>Excluir usuário</button>
-              </div>}
-              {resetResult?.user_id === user.id && <TemporaryPasswordNotice
-                username={resetResult.username} password={resetResult.temporary_password}
-                onClose={() => setResetResult(null)}/>}
-              <p className="small-note">A exclusão revoga o acesso sem apagar registros históricos.
-                A senha provisória é individual e exige troca no primeiro login.</p>
-              {isSeller && <><h3>Exceções individuais</h3><p className="small-note">Herdar usa a configuração da loja. Permitir e bloquear alteram apenas a leitura deste usuário.</p><div className="permissions">{permissionGroups.map((section) => <div key={section.title}><h4>{section.title}</h4>{section.permissions.map((permission) => <div className="permission-line" key={permission.code}><div>{permission.name}</div>
-                <select aria-label={"Exceção: " + permission.name} disabled={working} value={overrideDraft[permission.code] === null || overrideDraft[permission.code] === undefined ? "inherit" : overrideDraft[permission.code] ? "allow" : "deny"}
-                  onChange={(event) => setOverrideDraft((previous) => ({...previous,[permission.code]:event.target.value === "inherit" ? null : event.target.value === "allow"}))}>
-                  <option value="inherit">Herdar</option><option value="allow">Permitir</option><option value="deny">Bloquear</option>
-                </select></div>)}</div>)}</div>
-                <button className="btn-primary" disabled={working} onClick={() => void update(() => api.saveOverrides(token,user.id,overrideDraft),"Permissões individuais atualizadas.")}>Salvar exceções</button>
-              </>}
-            </>}
+            {!user ? <div className="empty">Selecione um usuário para visualizar as configurações.</div> :
+            <UserDetailPanel token={token} user={user} groups={groups} working={working}
+              update={update} onDeleted={() => setSelectedUser("")}/>}
           </section>
         </div>}
-        {isSuperAdmin && tab === "grupos" && <div className="columns">
-          <section className="panel"><h2>Grupos de lojas</h2><p>As permissões configuradas aqui são herdadas pelos vendedores da respectiva unidade.</p>
-            <div className="user-list">{groups.map((candidate) => <button key={candidate.id} className={"user-row" + (selectedGroup === candidate.id ? " selected" : "")} onClick={() => setSelectedGroup(candidate.id)}><span className="user-avatar">⌂</span><span className="user-text"><strong>{labelStore(candidate.store)}</strong><small>{candidate.permissions.length} permissões de leitura habilitadas</small></span></button>)}</div>
-          </section>
-          <section className="panel">{!group ? <div className="empty">Selecione uma loja para configurar os indicadores.</div> : <><h2>Permissões — {labelStore(group.store)}</h2><p>Marque somente os módulos e indicadores visíveis para os vendedores desta loja.</p>
-            <div className="permissions">{permissionGroups.map((section) => <div key={section.title}><h4>{section.title}</h4><p className="small-note">{section.help}</p>{section.permissions.map((permission) => <label key={permission.code} className="permission-line check-line"><input type="checkbox" checked={groupDraft.includes(permission.code)} disabled={working} onChange={(event) => setGroupDraft((previous) => event.target.checked ? [...previous,permission.code] : previous.filter((code) => code !== permission.code))}/><span>{permission.name}</span></label>)}</div>)}</div>
-            <button className="btn-primary" disabled={working} onClick={() => void update(() => api.saveGroup(token,group.id,groupDraft),"Permissões da loja atualizadas.")}>Salvar permissões</button>
-          </>}</section>
-        </div>}
+        {isSuperAdmin && tab === "grupos" && <GroupEditor token={token} groups={groups}
+          working={working} update={update}/>}
         {isSuperAdmin && tab === "auditoria" && <section className="panel"><div className="panel-head"><div><h2>Histórico administrativo</h2><p>Registro das alterações realizadas no sistema.</p></div><button className="btn-secondary" onClick={() => setAuditOffset(0)}>Atualizar</button></div>
           <div className="table-wrap"><table><thead><tr><th>Data e horário</th><th>Ação</th><th>Objeto</th><th>Identificador</th></tr></thead><tbody>{events.map((event) => <tr key={event.id}><td>{new Date(event.created_at).toLocaleString("pt-BR")}</td><td>{event.action}</td><td>{event.entity_type}</td><td className="mono">{event.entity_id ?? "—"}</td></tr>)}</tbody></table></div>
           {events.length === 0 && <p className="empty">Nenhum registro nesta página.</p>}<div className="paging"><button disabled={auditOffset===0} className="btn-secondary" onClick={() => setAuditOffset((current) => Math.max(0,current-30))}>Anterior</button><span>Página {Math.floor(auditOffset/30)+1}</span><button disabled={!hasMoreAudit} className="btn-secondary" onClick={() => setAuditOffset((current) => current+30)}>Próxima</button></div>

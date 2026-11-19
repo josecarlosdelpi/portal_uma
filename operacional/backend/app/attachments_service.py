@@ -148,7 +148,7 @@ class AttachmentService(RoutinesService):
     def put_whatsapp(self, when: date, kind: str, raw: bytes,
                      filename: str | None, media_type: str | None,
                      expected: int) -> dict:
-        self.require("JOINVILLE", "whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         if kind not in ("art", "evidence"):
             raise OperationError(422, "Tipo de anexo inválido")
         name, mime = validated_file(
@@ -197,7 +197,7 @@ class AttachmentService(RoutinesService):
         return info(item), item.content
 
     def delete_whatsapp(self, when: date, kind: str, expected: int) -> dict:
-        self.require("JOINVILLE", "whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         if kind not in ("art", "evidence"):
             raise OperationError(404, "Anexo não encontrado")
         post = self.db.scalar(select(WhatsAppPost).where(

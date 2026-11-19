@@ -10,9 +10,9 @@ from app.auth import current_user
 from app.db import get_db
 from app.main import app
 from app.models import (
-    Base, GroupMembership, GroupPermission, Procedure, ProcedureVersion, Store,
-    StoreGroup, TrainingRecord, User,
+    Base, Procedure, ProcedureVersion, Store, TrainingRecord, User,
 )
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -32,12 +32,9 @@ def env():
         tub = User(id=uuid4(), auth_subject="proc-tub", display_name="Vendedor Tub",
                    profile="seller", is_superadmin=False, active=True)
         db.add_all([admin, joi, colega, tub]); db.flush()
+        seed_admin_access(db, admin)
         for code, members in (("JOINVILLE", [joi, colega]), ("TUBARAO", [tub])):
-            group = StoreGroup(id=uuid4(), store_code=code, name=code, active=True)
-            db.add(group); db.flush()
-            for member in members:
-                db.add(GroupMembership(user_id=member.id, group_id=group.id))
-            db.add(GroupPermission(group_id=group.id, code="training.view", granted=True))
+            seed_group(db, "Vendedores " + code, [code], ["training.view"], members)
         db.commit()
     actor = {"user": admin}
     def user_override(): return actor["user"]
@@ -339,6 +336,81 @@ def test_seller_sees_only_published_applicable(env):
     ids = {p["id"] for p in c.get("/api/v1/procedures").json()}
     assert tub_only["id"] in ids
 
+
+
+def test_scoped_training_edit_cannot_manage_other_stores(env):
+    """training.edit restrito a JOINVILLE nao autoriza documento global ou
+    de outra loja — em criacao, edicao, publicacao, obsolescencia, exclusao
+    e anexos. Este e o cenario-chave da revisao de seguranca."""
+    c, actor, engine, admin, joi, *_ = env
+    with Session(engine) as db:
+        editor = User(id=uuid4(), auth_subject="proc-ed-joi",
+                      display_name="Editor Joi", profile="staff",
+                      is_superadmin=False, active=True)
+        db.add(editor); db.flush()
+        seed_group(db, "Editores Joinville", ["JOINVILLE"],
+                   ["training.view", "training.edit"], [editor])
+        db.commit(); db.refresh(editor)
+    global_doc = _proc(c, "POP global")
+    c.post(f"/api/v1/procedures/{global_doc['id']}/publish",
+           json={"expected_revision": 1})
+    tub_doc = c.post("/api/v1/procedures", json={
+        "title": "POP Tubarao", "summary": "", "applies_to_all": False,
+        "store_codes": ["TUBARAO"], "content_html": "<p>t</p>"}).json()
+    actor["user"] = editor
+
+    # criacao: nem global, nem loja fora do escopo
+    assert c.post("/api/v1/procedures", json={
+        "title": "Global indevido", "summary": "", "applies_to_all": True,
+        "store_codes": [], "content_html": "x"}).status_code == 403
+    assert c.post("/api/v1/procedures", json={
+        "title": "Tubarao indevido", "summary": "", "applies_to_all": False,
+        "store_codes": ["TUBARAO"], "content_html": "x"}).status_code == 403
+    assert c.post("/api/v1/procedures", json={
+        "title": "Duas lojas indevido", "summary": "", "applies_to_all": False,
+        "store_codes": ["JOINVILLE", "TUBARAO"], "content_html": "x"}
+    ).status_code == 403
+
+    # criacao dentro do escopo funciona
+    mine = c.post("/api/v1/procedures", json={
+        "title": "POP Joinville", "summary": "", "applies_to_all": False,
+        "store_codes": ["JOINVILLE"], "content_html": "<p>j</p>"})
+    assert mine.status_code == 201, mine.text
+    mine_id = mine.json()["id"]
+    assert c.post(f"/api/v1/procedures/{mine_id}/publish",
+                  json={"expected_revision": 1}).status_code == 200
+
+    # operacoes sobre documento global -> 403 em todas
+    gid = global_doc["id"]
+    assert c.put(f"/api/v1/procedures/{gid}", json={
+        "title": "Edicao indevida", "summary": "", "applies_to_all": True,
+        "store_codes": [], "content_html": "<p>x</p>",
+        "expected_revision": 1}).status_code == 403
+    assert c.post(f"/api/v1/procedures/{gid}/obsolete").status_code == 403
+    assert c.delete(f"/api/v1/procedures/{gid}").status_code == 403
+    assert c.put(f"/api/v1/procedures/{gid}/files",
+                 files={"file": ("i.png", b"\x89PNG\r\n\x1a\n" + b"0" * 60, "image/png")}
+                 ).status_code == 403
+    # idem sobre documento de outra loja
+    assert c.put(f"/api/v1/procedures/{tub_doc['id']}", json={
+        "title": "Edicao indevida", "summary": "", "applies_to_all": False,
+        "store_codes": ["TUBARAO"], "content_html": "<p>x</p>",
+        "expected_revision": 1}).status_code == 403
+
+    # nao pode ampliar o escopo do proprio documento para fora da loja
+    assert c.put(f"/api/v1/procedures/{mine_id}", json={
+        "title": "POP Joinville", "summary": "", "applies_to_all": True,
+        "store_codes": [], "content_html": "<p>j</p>",
+        "expected_revision": 1}).status_code == 403
+    # nem reduzir para criar versao global indiretamente: Tubarao segue fora
+    assert c.put(f"/api/v1/procedures/{mine_id}", json={
+        "title": "POP Joinville", "summary": "", "applies_to_all": False,
+        "store_codes": ["TUBARAO"], "content_html": "<p>j</p>",
+        "expected_revision": 1}).status_code == 403
+
+    # publicado: mesmo editor com escopo correto nao exclui (SuperAdmin-only)
+    assert c.delete(f"/api/v1/procedures/{mine_id}").status_code == 403
+    actor["user"] = admin
 
 
 def test_obsolete_blocks_writes(env):

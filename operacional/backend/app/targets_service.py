@@ -4,7 +4,9 @@ from decimal import Decimal
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 
-from app.erp_sales_service import month_bounds, sales_by_date_for_store
+from app.erp_sales_service import (
+    month_bounds, period_states, sales_by_date_for_store,
+)
 from app.models import User
 from app.policy import STORE_CODES, can_access
 from app.repositories import load_principal
@@ -58,14 +60,18 @@ class TargetService:
         target = row.amount if row else None
         daily_base = preview_distribution(target, days)
         first, last = month_bounds(year, month)
-        can_revenue = (
-            self.principal.is_superadmin or self.principal.profile == "administrator"
-            or can_access(self.principal, "sales.revenue.view", store_code)
-        )
+        can_revenue = can_access(self.principal, "sales.revenue.view", store_code)
         sales_by_date = (
             sales_by_date_for_store(self.repo.session, store_code, first, last)
             if can_revenue else {}
         )
+        states, _overall = period_states(
+            self.repo.session, [store_code], first, last
+        )
+        data_state = states[store_code]
+        # Fonte indisponivel: dados vigentes nao representam o arquivo atual.
+        if data_state == "unavailable":
+            sales_by_date = {}
         monthly_revenue = sum(sales_by_date.values(), Decimal("0"))
         has_sales = bool(sales_by_date)
         minimum = settings.minimum_daily if settings else None
@@ -94,7 +100,12 @@ class TargetService:
             "working_day_count": len(days),
             "base_plan": daily_base,
             "sales": {
-                "status": "pilot_unverified" if has_sales else "awaiting_official_import",
+                "status": (
+                    "unavailable" if data_state == "unavailable"
+                    else "pilot_unverified" if has_sales
+                    else "awaiting_official_import"
+                ),
+                "data_state": data_state,
                 "monthly_revenue": str(monthly_revenue) if has_sales else None,
                 "attainment_percent": str(attainment) if attainment is not None else None,
                 "dynamic_day_plan": (

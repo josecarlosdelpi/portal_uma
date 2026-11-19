@@ -32,6 +32,7 @@ DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly"
 EXPECTED_FILES = {
     "VENDAS": "vendas.csv",
     "DEVOLUCOES": "devolucoes.csv",
+    "DESPESAS": "despesas.csv",
 }
 
 

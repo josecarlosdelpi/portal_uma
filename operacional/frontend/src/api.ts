@@ -4,19 +4,21 @@ const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 export type MyProfile = {
   id: string;
   display_name: string;
-  profile: "superadmin" | "administrator" | "seller";
+  profile: "superadmin" | "administrator" | "seller" | "staff";
   stores: string[];
-  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean; checklist: boolean; daily_tasks: boolean; whatsapp_status: boolean; instagram: boolean; training: boolean; sales: boolean };
+  features: { targets: boolean; overview: boolean; monthly_closing: boolean; reviews: boolean; supplies: boolean; telemarketing: boolean; checklist: boolean; daily_tasks: boolean; whatsapp_status: boolean; instagram: boolean; training: boolean; sales: boolean; finance: boolean };
 };
 
 export type PortalUser = {
   id: string;
   display_name: string;
-  profile: "superadmin" | "administrator" | "seller";
+  profile: "superadmin" | "administrator" | "seller" | "staff";
   active: boolean;
   username: string | null;
   must_change_password: boolean;
+  group: { id: string; name: string } | null;
   stores: string[];
+  store_scope: string[];
   overrides: Record<string, boolean>;
 };
 
@@ -39,12 +41,82 @@ export type PrepareAccessInput = {
   store_code: string | null;
 };
 
-export type StoreGroup = {
+export type AccessGroup = {
   id: string;
-  store: string;
   name: string;
+  description: string;
   active: boolean;
+  stores: string[];
   permissions: string[];
+  member_count: number;
+};
+
+export type GroupDetail = AccessGroup & {
+  members: Array<{ id: string; display_name: string; active: boolean }>;
+};
+
+export type PermissionCatalog = {
+  modules: Array<{
+    module: string;
+    permissions: Array<{ code: string; kind: "view" | "edit" | "action"; requires_all_stores?: boolean }>;
+  }>;
+  stores: string[];
+  profiles: string[];
+  non_delegable: string[];
+};
+
+export type EffectivePermissions = {
+  user_id: string;
+  display_name: string;
+  is_superadmin: boolean;
+  profile: string;
+  group: { id: string; name: string } | null;
+  stores: string[];
+  items: Array<{
+    module: string;
+    code: string;
+    kind: string;
+    requires_all_stores: boolean;
+    group_default: boolean;
+    override: boolean | null;
+    stores: string[];
+    effective: boolean;
+  }>;
+};
+
+export type AccessDiffEntry = { code: string; stores: string[] };
+
+export type AccessPreview = {
+  user_id: string;
+  group: { id: string; name: string } | null;
+  stores: string[];
+  store_scope: string[];
+  before: Record<string, string[]>;
+  after: Record<string, string[]>;
+  granted: AccessDiffEntry[];
+  revoked: AccessDiffEntry[];
+};
+
+export type ReassignmentPreview = {
+  group: { id: string; name: string };
+  target: { id: string; name: string };
+  member_count: number;
+  members: Array<{
+    user_id: string;
+    display_name: string;
+    stores_before: string[];
+    stores_after: string[];
+    granted: AccessDiffEntry[];
+    revoked: AccessDiffEntry[];
+  }>;
+};
+
+export type GroupUpdatePreview = {
+  group: { id: string; name: string };
+  proposed: { stores: string[]; permissions: string[] };
+  member_count: number;
+  widens: boolean;
+  members: ReassignmentPreview["members"];
 };
 
 export type AuditEvent = {
@@ -78,7 +150,8 @@ export type TargetSnapshot = {
   working_day_count: number;
   base_plan: DailyBase[];
   sales: {
-    status: "awaiting_official_import" | "pilot_unverified";
+    status: "awaiting_official_import" | "pilot_unverified" | "unavailable";
+    data_state?: SalesDataState;
     monthly_revenue: string | null;
     attainment_percent: string | null;
     dynamic_day_plan: DynamicDayPlan[] | null;
@@ -96,6 +169,7 @@ export type OverviewStore = {
   attainment_percent: string | null;
   previous_month_change_percent: string | null;
   previous_year_change_percent: string | null;
+  data_state?: SalesDataState;
 };
 
 export type OverviewSnapshot = {
@@ -110,7 +184,10 @@ export type OverviewSnapshot = {
     previous_month_change_percent: string | null;
     previous_year_change_percent: string | null;
   };
-  source: { sales_status: string; sales_updated_at: string | null; message: string };
+  source: {
+    sales_status: string; sales_updated_at: string | null; message: string;
+    data_through?: string | null; has_stale_data?: boolean;
+  };
 };
 
 export type ClosingPriority = {
@@ -185,6 +262,8 @@ export type SalesSyncStatus = {
     kind: "VENDAS" | "DEVOLUCOES"; last_applied_at: string | null;
     file_name: string | null; rows_applied: number;
     period_start: string | null; period_end: string | null;
+    coverage?: Array<{store_code: string; first_date: string; last_date: string}>;
+    availability?: "current" | "unavailable" | "never_imported";
   }>;
   drive: {
     enabled: boolean; interval_seconds: number;
@@ -197,19 +276,32 @@ export type SalesSyncStatus = {
   };
 };
 
+export type SalesDataState = "current" | "missing" | "partial" | "unavailable";
+
 export type SalesStoreSummary = {
   code: string; revenue: string | null; revenue_visibility: "allowed" | "restricted";
-  quantity: string; rows: number;
-  returns_revenue: string | null; returns_quantity: string; returns_rows: number;
+  quantity: string | null; rows: number | null;
+  returns_revenue: string | null; returns_quantity: string | null;
+  returns_rows: number | null;
+  data_state?: SalesDataState;
+};
+
+export type SalesSource = {
+  status: string; sales_updated_at: string | null;
+  data_through: string | null; has_stale_data: boolean; message: string;
 };
 
 export type SalesSummary = {
   from: string; to: string;
   stores: SalesStoreSummary[];
   totals: {
-    revenue: string; quantity: string; rows: number;
-    returns_revenue: string; returns_quantity: string; returns_rows: number;
+    revenue: string | null; quantity: string | null; rows: number | null;
+    returns_revenue: string | null; returns_quantity: string | null;
+    returns_rows: number | null;
   };
+  data_state?: SalesDataState;
+  returns_state?: "current" | "missing" | "unavailable";
+  source?: SalesSource;
 };
 
 export type SalesDailyRow = {
@@ -226,6 +318,7 @@ export type SalesTopItem = {
 export type SalesTopResult = {
   dimension: "products" | "sellers" | "customers";
   from: string; to: string; items: SalesTopItem[];
+  data_state?: SalesDataState;
 };
 
 export class ApiError extends Error {
@@ -270,7 +363,9 @@ export type LocalLoginResult = {
 };
 export type LocalCreateAccount = {
   id: string; display_name: string; username: string;
-  profile: "administrator" | "seller"; stores: string[]; active: boolean;
+  profile: "administrator" | "seller" | "staff";
+  group: { id: string; name: string } | null;
+  stores: string[]; active: boolean;
   temporary_password: string; temporary_valid_hours: number;
   must_change_password: true;
 };
@@ -314,8 +409,9 @@ export const api = {
     request<UserPreferences>(token, "/api/v1/me/preferences", "PUT", body),
 
   createLocalUser: (token: string, payload: {
-    username: string; display_name: string; profile: "administrator" | "seller";
-    store_code: string | null;
+    username: string; display_name: string;
+    profile: "administrator" | "seller" | "staff";
+    group_id: string; store_codes?: string[];
   }) => request<LocalCreateAccount>(token, adminPath + "/local-users", "POST", payload),
 
   resetLocalPassword: (token: string, userId: string) =>
@@ -344,27 +440,83 @@ export const api = {
     ),
 
   groups: (token: string) =>
-    request<StoreGroup[]>(token, adminPath + "/groups"),
+    request<AccessGroup[]>(token, adminPath + "/groups"),
+
+  groupDetail: (token: string, groupId: string) =>
+    request<GroupDetail>(token, adminPath + "/groups/" + encodeURIComponent(groupId)),
+
+  catalog: (token: string) =>
+    request<PermissionCatalog>(token, adminPath + "/catalog"),
+
+  createGroup: (token: string, payload: {
+    name: string; description: string; store_codes: string[]; permissions: string[];
+  }) => request<AccessGroup>(token, adminPath + "/groups", "POST", payload),
+
+  updateGroup: (token: string, groupId: string, payload: {
+    name: string; description: string; store_codes: string[]; permissions: string[];
+  }) => request<AccessGroup & { members_affected: number }>(
+    token, adminPath + "/groups/" + encodeURIComponent(groupId), "PUT", payload),
+
+  duplicateGroup: (token: string, groupId: string, name: string) =>
+    request<AccessGroup>(
+      token, adminPath + "/groups/" + encodeURIComponent(groupId) + "/duplicate",
+      "POST", { name },
+    ),
+
+  setGroupActive: (token: string, groupId: string, active: boolean) =>
+    request<AccessGroup>(
+      token, adminPath + "/groups/" + encodeURIComponent(groupId) + "/active",
+      "PATCH", { active },
+    ),
+
+  deleteGroup: (token: string, groupId: string, reassignTo?: string) =>
+    request<{ deleted: boolean; members_moved: number }>(
+      token, adminPath + "/groups/" + encodeURIComponent(groupId) +
+        (reassignTo ? "?reassign_to=" + encodeURIComponent(reassignTo) : ""),
+      "DELETE",
+    ),
 
   audit: (token: string, offset = 0, limit = 30) =>
     request<AuditPage>(token, adminPath + "/audit?offset=" + offset + "&limit=" + limit),
 
-  saveGroup: (token: string, groupId: string, permissions: string[]) =>
-    request<{ store: string; permissions: string[] }>(
-      token, adminPath + "/groups/" + encodeURIComponent(groupId) + "/permissions",
-      "PUT", { permissions },
+  updateUserAccess: (token: string, userId: string, payload: {
+    profile?: string; group_id?: string; store_codes?: string[] | null;
+  }) => request<{ user_id: string; profile: string; group: { id: string; name: string } | null;
+    stores: string[]; store_scope: string[] }>(
+    token, adminPath + "/users/" + encodeURIComponent(userId) + "/access",
+    "PUT", payload,
+  ),
+
+  previewUserAccess: (token: string, userId: string, payload: {
+    group_id: string; store_codes?: string[];
+  }) => request<AccessPreview>(
+    token, adminPath + "/users/" + encodeURIComponent(userId) + "/access-preview",
+    "POST", payload,
+  ),
+
+  reassignmentPreview: (token: string, groupId: string, reassignTo: string) =>
+    request<ReassignmentPreview>(
+      token, adminPath + "/groups/" + encodeURIComponent(groupId) +
+        "/reassignment-preview?reassign_to=" + encodeURIComponent(reassignTo),
+    ),
+
+  groupUpdatePreview: (token: string, groupId: string, payload: {
+    name: string; description: string;
+    store_codes: string[]; permissions: string[];
+  }) => request<GroupUpdatePreview>(
+    token, adminPath + "/groups/" + encodeURIComponent(groupId) + "/update-preview",
+    "POST", payload,
+  ),
+
+  effectivePermissions: (token: string, userId: string) =>
+    request<EffectivePermissions>(
+      token, adminPath + "/users/" + encodeURIComponent(userId) + "/effective",
     ),
 
   saveOverrides: (token: string, userId: string, permissions: Record<string, boolean | null>) =>
     request<{ user_id: string; overrides: Record<string, boolean> }>(
       token, adminPath + "/users/" + encodeURIComponent(userId) + "/overrides",
       "PUT", { permissions },
-    ),
-
-  setUserStore: (token: string, userId: string, storeCode: string) =>
-    request<{ user_id: string; stores: string[] }>(
-      token, adminPath + "/users/" + encodeURIComponent(userId) + "/store",
-      "PUT", { store_code: storeCode },
     ),
 
   setActive: (token: string, userId: string, active: boolean) =>
@@ -423,7 +575,9 @@ export const api = {
       (store ? "&store=" + encodeURIComponent(store) : "")),
 
   salesDaily: (token: string, from: string, to: string, store?: string) =>
-    request<{from: string; to: string; days: SalesDailyRow[]}>(
+    request<{from: string; to: string; days: SalesDailyRow[];
+             data_state?: SalesDataState;
+             returns_state?: "current" | "missing" | "unavailable"}>(
       token, "/api/v1/sales/daily?from=" + from + "&to=" + to +
       (store ? "&store=" + encodeURIComponent(store) : "")),
 

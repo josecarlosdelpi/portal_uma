@@ -1,7 +1,9 @@
 """Procedimentos internos editados no portal, com versoes e imagens privadas.
 
-Permissoes: training.edit (admin/SuperAdmin) gerencia documentos nas tres
-lojas; training.view (vendedor) le apenas publicados aplicaveis a sua loja.
+Permissoes: training.edit gerencia o documento apenas quando a concessao
+cobre TODAS as lojas as quais ele se aplica (documento global exige as
+tres); training.view le apenas publicados vigentes dentro da abrangencia
+efetiva do usuario.
 """
 import re
 from datetime import datetime, timezone
@@ -74,8 +76,37 @@ def _version_dict(row: ProcedureVersion, include_html: bool = True) -> dict:
 class ProceduresService(OperationsService):
     """Operacoes do modulo Padrões/Treinamentos."""
 
-    def is_editor(self) -> bool:
-        return any(can_access(self.principal, "training.edit", store) for store in STORE_CODES)
+    def _edit_stores(self) -> set[str]:
+        """Lojas onde o usuario tem training.edit efetivo (grupo+excecoes)."""
+        return {store for store in STORE_CODES
+                if can_access(self.principal, "training.edit", store)}
+
+    @staticmethod
+    def _required_scope(applies_to_all: bool, stores: list[str]) -> set[str]:
+        return set(STORE_CODES) if applies_to_all else set(stores)
+
+    def _can_manage(self, row: Procedure, stores: list[str]) -> bool:
+        """Edicao exige cobertura de TODAS as lojas do documento.
+
+        Um training.edit valido apenas em Joinville nao autoriza mexer em
+        procedimento aplicavel a Tubarao; documentos globais exigem a
+        abrangencia completa. Documento sem nenhuma loja associada nao pode
+        ser gerenciado por um escopo parcial."""
+        if self.principal.is_superadmin:
+            return True
+        required = self._required_scope(row.applies_to_all, stores)
+        return bool(required) and required <= self._edit_stores()
+
+    def _can_view(self, row: Procedure, stores: list[str]) -> bool:
+        """Leitura respeita a abrangencia efetiva de view e edit."""
+        if self.principal.is_superadmin or self._can_manage(row, stores):
+            return True
+        if row.obsolete_at is not None:
+            return False
+        reachable = set(self.allowed("training.view")) | self._edit_stores()
+        if not reachable:
+            return False
+        return row.applies_to_all or bool(reachable & set(stores))
 
     def _applicable_stores(self, procedure_id: UUID) -> list[str]:
         return [row[0] for row in self.db.execute(
@@ -100,22 +131,8 @@ class ProceduresService(OperationsService):
             "updated_at": row.updated_at.isoformat() if row.updated_at else row.created_at.isoformat(),
         }
 
-    def _seller_can_see(self, row: Procedure, stores: list[str]) -> bool:
-        """Vendedor ve apenas publicados vigentes aplicaveis a sua unica loja."""
-        if self.is_editor():
-            return True
-        if row.obsolete_at is not None:
-            return False
-        viewable = self.allowed("training.view")
-        if not viewable:
-            return False
-        if row.applies_to_all:
-            return True
-        return any(store in viewable for store in stores)
-
     def list_procedures(self, status: str | None, store: str | None, q: str | None) -> list[dict]:
-        editor = self.is_editor()
-        if not editor and not self.allowed("training.view"):
+        if not self.allowed("training.view") and not self._edit_stores():
             raise OperationError(403, "Acesso negado")
         rows = self.db.scalars(
             select(Procedure).where(Procedure.deleted_at.is_(None)).order_by(Procedure.code)
@@ -124,8 +141,10 @@ class ProceduresService(OperationsService):
         for row in rows:
             stores = self._applicable_stores(row.id)
             info = self._proc_dict(row, stores)
-            if not editor:
-                if not self._seller_can_see(row, stores) or info["current_version"] is None:
+            # Gestor do documento ve tudo (incl. rascunhos); demais usuarios
+            # somente o publicado vigente dentro da sua abrangencia.
+            if not self._can_manage(row, stores):
+                if not self._can_view(row, stores) or info["current_version"] is None:
                     continue
             if status and info["status"] != status:
                 continue
@@ -165,10 +184,10 @@ class ProceduresService(OperationsService):
     def get(self, procedure_id: UUID) -> dict:
         row = self._load(procedure_id)
         stores = self._applicable_stores(row.id)
-        if not self._seller_can_see(row, stores):
+        if not self._can_view(row, stores):
             raise OperationError(404, "Documento não está mais disponível para consulta")
         info = self._proc_dict(row, stores)
-        if self.is_editor():
+        if self._can_manage(row, stores):
             version = self._draft(row.id) or self._current(row.id)
         else:
             version = self._current(row.id)
@@ -180,8 +199,10 @@ class ProceduresService(OperationsService):
 
     def create(self, title: str, summary: str, applies_to_all: bool,
                store_codes: list[str], content_html: str) -> dict:
-        if not self.is_editor():
-            raise OperationError(403, "Acesso negado")
+        required = self._required_scope(applies_to_all, store_codes)
+        if not required or not required <= self._edit_stores():
+            raise OperationError(
+                403, "Edição exige autorização em todas as lojas do documento")
         title = title.strip()
         if not 3 <= len(title) <= 140:
             raise OperationError(422, "Título inválido")
@@ -215,9 +236,12 @@ class ProceduresService(OperationsService):
     def save(self, procedure_id: UUID, title: str, summary: str,
              applies_to_all: bool, store_codes: list[str],
              content_html: str, expected: int) -> dict:
-        if not self.is_editor():
-            raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        current_stores = self._applicable_stores(row.id)
+        if (not self._can_manage(row, current_stores)
+                or not self._required_scope(applies_to_all, store_codes) <= self._edit_stores()):
+            raise OperationError(
+                403, "Edição exige autorização em todas as lojas do documento")
         if row.obsolete_at is not None:
             raise OperationError(409, "Procedimento obsoleto não pode ser editado")
         title = title.strip()
@@ -253,9 +277,10 @@ class ProceduresService(OperationsService):
         return self.get(row.id)
 
     def publish(self, procedure_id: UUID, expected: int) -> dict:
-        if not self.is_editor():
-            raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if not self._can_manage(row, self._applicable_stores(row.id)):
+            raise OperationError(
+                403, "Edição exige autorização em todas as lojas do documento")
         if row.obsolete_at is not None:
             raise OperationError(409, "Procedimento obsoleto não pode ser publicado")
         draft = self.db.scalar(select(ProcedureVersion).where(
@@ -278,33 +303,34 @@ class ProceduresService(OperationsService):
     def versions(self, procedure_id: UUID) -> list[dict]:
         row = self._load(procedure_id)
         stores = self._applicable_stores(row.id)
-        if not self._seller_can_see(row, stores):
+        if not self._can_view(row, stores):
             raise OperationError(403, "Acesso negado")
         rows = self.db.scalars(select(ProcedureVersion).where(
             ProcedureVersion.procedure_id == row.id
         ).order_by(ProcedureVersion.created_at.desc())).all()
-        if not self.is_editor():
+        if not self._can_manage(row, stores):
             rows = [v for v in rows if v.status == "publicado"]
         return [_version_dict(v, include_html=False) for v in rows]
 
     def get_version(self, procedure_id: UUID, version_id: UUID) -> dict:
         row = self._load(procedure_id)
         stores = self._applicable_stores(row.id)
-        if not self._seller_can_see(row, stores):
+        if not self._can_view(row, stores):
             raise OperationError(404, "Documento não está mais disponível para consulta")
         version = self.db.scalar(select(ProcedureVersion).where(
             ProcedureVersion.id == version_id,
             ProcedureVersion.procedure_id == row.id))
         if version is None:
             raise OperationError(404, "Versão não encontrada")
-        if version.status != "publicado" and not self.is_editor():
+        if version.status != "publicado" and not self._can_manage(row, stores):
             raise OperationError(403, "Acesso negado")
         return _version_dict(version)
 
     def mark_obsolete(self, procedure_id: UUID) -> dict:
-        if not self.is_editor():
-            raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if not self._can_manage(row, self._applicable_stores(row.id)):
+            raise OperationError(
+                403, "Edição exige autorização em todas as lojas do documento")
         if self._current(row.id) is None:
             raise OperationError(422, "Somente procedimentos publicados podem ser obsoletos")
         if row.obsolete_at is not None:
@@ -317,9 +343,10 @@ class ProceduresService(OperationsService):
         return self.get(row.id)
 
     def delete(self, procedure_id: UUID) -> dict:
-        if not self.is_editor():
-            raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if not self._can_manage(row, self._applicable_stores(row.id)):
+            raise OperationError(
+                403, "Edição exige autorização em todas as lojas do documento")
         published = self.db.scalar(select(ProcedureVersion.id).where(
             ProcedureVersion.procedure_id == row.id,
             ProcedureVersion.status == "publicado"))
@@ -341,9 +368,10 @@ class ProceduresService(OperationsService):
 
     def put_file(self, procedure_id: UUID, raw: bytes, filename: str | None,
                  media_type: str | None) -> dict:
-        if not self.is_editor():
-            raise OperationError(403, "Acesso negado")
         row = self._load(procedure_id)
+        if not self._can_manage(row, self._applicable_stores(row.id)):
+            raise OperationError(
+                403, "Edição exige autorização em todas as lojas do documento")
         if row.obsolete_at is not None:
             raise OperationError(409, "Procedimento obsoleto não recebe novos arquivos")
         name, mime = validated_file(
@@ -367,9 +395,9 @@ class ProceduresService(OperationsService):
             raise OperationError(404, "Imagem não encontrada")
         row = self._load(record.procedure_id)
         stores = self._applicable_stores(row.id)
-        if not self._seller_can_see(row, stores):
+        if not self._can_view(row, stores):
             raise OperationError(404, "Imagem não disponível")
-        if not self.is_editor() and self._current(row.id) is None:
+        if not self._can_manage(row, stores) and self._current(row.id) is None:
             raise OperationError(404, "Procedimento ainda não publicado")
         return {"name": record.original_name, "media_type": record.media_type,
                 "size": record.byte_length}, record.content

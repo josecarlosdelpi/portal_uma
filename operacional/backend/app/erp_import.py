@@ -1,15 +1,21 @@
 """Ingestao de snapshots ERP comerciais com idempotencia e auditoria.
 
-Sem identificadores transacionais no ERP: o arquivo representa o estado da
-janela que cobre. A substituicao ocorre por cobertura (loja x intervalo de
-datas), dentro de uma unica transacao, preservando linhas fora da janela.
-Linhas integralmente iguais sao mantidas — cardinalidade nunca e reduzida.
+O arquivo CSV e a fonte oficial: cada versao validada substitui
+INTEGRALMENTE o conjunto ativo do seu tipo, dentro de uma unica transacao.
+Linhas ausentes no arquivo novo deixam de aparecer nos indicadores —
+refletindo correcoes e cancelamentos feitos no ERP. Periodos sem registros
+significam "sem dados no arquivo atual", nunca zero automatico.
+
+Protecao de historico: linhas substituidas recebem superseded_at (soft-
+delete recuperavel) e continuam no banco para auditoria, sem alimentar os
+paineis. Um arquivo invalido nao toca o conjunto ativo, mas marca a fonte
+como indisponivel ate chegar uma versao valida.
 """
 import hashlib
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.erp_csv import KIND_DEVOLUCOES, KIND_VENDAS, KINDS, ParsedRow, parse_erp_csv
@@ -54,6 +60,38 @@ def _latest_applied(db: Session, kind: str) -> ErpImportBatch | None:
     )
 
 
+def latest_batch(db: Session, kind: str) -> ErpImportBatch | None:
+    """Lote mais recente do tipo, qualquer que seja o status.
+
+    created_at e gravado com precisao de microssegundos pelos importadores
+    (valor do cliente), o que torna a ordenacao deterministica.
+    """
+    return db.scalar(
+        select(ErpImportBatch)
+        .where(ErpImportBatch.kind == kind)
+        .order_by(ErpImportBatch.created_at.desc(), ErpImportBatch.id.desc())
+        .limit(1)
+    )
+
+
+def kind_availability(db: Session, kind: str) -> str:
+    """Disponibilidade da fonte para os paineis.
+
+    unavailable: o arquivo mais recente do tipo falhou na validacao — os
+    dados vigentes nao representam mais o arquivo atual e nao devem ser
+    exibidos como atuais;
+    never_imported: nenhum lote registrado para o tipo;
+    current: o arquivo vigente esta validado e aplicado (DUPLICATE conta
+    como vigente porque o conteudo e identico ao aplicado).
+    """
+    latest = latest_batch(db, kind)
+    if latest is None:
+        return "never_imported"
+    if latest.status == "FAILED":
+        return "unavailable"
+    return "current"
+
+
 def import_erp_file(
     db: Session, *,
     kind: str,
@@ -71,6 +109,7 @@ def import_erp_file(
         id=uuid4(), kind=kind, source=source, status="RECEIVED",
         file_name=(file_name or "arquivo.csv")[:150], file_sha256=digest,
         drive_file_id=drive_file_id, imported_by=actor.id if actor else None,
+        created_at=_utcnow(),
     )
     db.add(batch)
 
@@ -81,7 +120,7 @@ def import_erp_file(
         db.commit()
         return batch
 
-    parsed = parse_erp_csv(content)
+    parsed = parse_erp_csv(content, kind)
     batch.rows_total = parsed.total_lines
     batch.rows_rejected = parsed.total_lines - len(parsed.rows)
     if parsed.errors or not parsed.rows:
@@ -98,14 +137,13 @@ def import_erp_file(
     period_start = min(span["first_date"] for span in coverage)
     period_end = max(span["last_date"] for span in coverage)
 
-    for span in coverage:
-        db.execute(
-            delete(model).where(
-                model.store_code == span["store_code"],
-                model.sale_date >= date.fromisoformat(span["first_date"]),
-                model.sale_date <= date.fromisoformat(span["last_date"]),
-            )
-        )
+    # Substituicao integral e atomica: o arquivo vigente e a unica fonte
+    # ativa do tipo; copias anteriores ficam como superseded (auditoria).
+    superseded = db.execute(
+        update(model)
+        .where(model.superseded_at.is_(None))
+        .values(superseded_at=_utcnow())
+    ).rowcount or 0
     db.add_all(
         model(
             id=uuid4(), batch_id=batch.id, sale_date=row.sale_date,
@@ -113,6 +151,9 @@ def import_erp_file(
             customer_cnpj=row.customer_cnpj, customer_name=row.customer_name,
             product_code=row.product_code, quantity=row.quantity,
             unit_price=row.unit_price, total=row.total, row_hash=row.row_hash,
+            seller_name=row.seller_name,
+            product_description=row.product_description,
+            product_unit=row.product_unit, unit_cost=row.unit_cost,
         )
         for row in parsed.rows
     )
@@ -134,6 +175,7 @@ def import_erp_file(
             "kind": kind, "source": source, "file": batch.file_name,
             "sha256": digest[:16], "rows_applied": len(parsed.rows),
             "rows_rejected": batch.rows_rejected,
+            "rows_superseded": superseded,
             "period": f"{period_start}/{period_end}",
         },
     ))

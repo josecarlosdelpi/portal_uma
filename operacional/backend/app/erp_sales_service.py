@@ -11,13 +11,14 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.erp_csv import KIND_DEVOLUCOES, KIND_VENDAS
+from app.erp_csv import KIND_DESPESAS, KIND_DEVOLUCOES, KIND_VENDAS
+from app.erp_expenses_import import expenses_handlers
 from app.erp_drive import EXPECTED_FILES, DriveClient, DriveError, load_service_account, sync_sources
-from app.erp_import import import_erp_file
+from app.erp_import import import_erp_file, kind_availability
 from app.models import (
     ErpImportBatch, ErpReturnRow, ErpSaleRow, ErpSourceFile, User,
 )
-from app.policy import can_access, visible_stores
+from app.policy import STORE_CODES, can_access, visible_stores
 from app.repositories import load_principal
 
 MAX_RANGE_DAYS = 400
@@ -55,6 +56,7 @@ def store_totals(
             model.store_code.in_(codes),
             model.sale_date >= first,
             model.sale_date <= last,
+            model.superseded_at.is_(None),
         )
         .group_by(model.store_code)
     ).all()
@@ -80,6 +82,7 @@ def daily_totals(
             model.store_code.in_(codes),
             model.sale_date >= first,
             model.sale_date <= last,
+            model.superseded_at.is_(None),
         )
         .group_by(model.sale_date, model.store_code)
     ).all()
@@ -98,18 +101,99 @@ def latest_applied(db: Session, kind: str) -> ErpImportBatch | None:
 
 def pilot_sales_status(db: Session) -> dict:
     """Origem oficial em fase de testes: sempre identificada como piloto."""
+    if kind_availability(db, KIND_VENDAS) == "unavailable":
+        return {
+            "status": "source_unavailable",
+            "sales_updated_at": None,
+            "data_through": None,
+            "has_stale_data": False,
+            "message": (
+                "Dados de vendas indisponíveis até recebermos um arquivo "
+                "válido do ERP."
+            ),
+        }
     batch = latest_applied(db, KIND_VENDAS)
     if batch is None:
         return {
             "status": "awaiting_erp_integration",
             "sales_updated_at": None,
+            "data_through": None,
+            "has_stale_data": False,
             "message": "Faturamento oficial ainda não importado.",
         }
+    coverage = batch.coverage or []
+    data_through = max(
+        (span["last_date"] for span in coverage), default=None
+    )
     return {
         "status": "pilot_unverified",
         "sales_updated_at": batch.applied_at.isoformat() if batch.applied_at else None,
+        "data_through": data_through,
+        "has_stale_data": False,
         "message": "Dados do ERP em fase de testes — conferir com os relatórios oficiais.",
     }
+
+
+def latest_coverage(db: Session, kind: str) -> dict[str, tuple[date, date]]:
+    """Janelas (loja x datas) cobertas pelo lote vigente do arquivo."""
+    batch = latest_applied(db, kind)
+    windows: dict[str, tuple[date, date]] = {}
+    for span in (batch.coverage or []) if batch else []:
+        windows[span["store_code"]] = (
+            date.fromisoformat(span["first_date"]),
+            date.fromisoformat(span["last_date"]),
+        )
+    return windows
+
+
+def period_states(
+    db: Session, codes: list[str], first: date, last: date,
+) -> tuple[dict[str, str], str]:
+    """Estado dos dados por loja no período consultado.
+
+    unavailable: arquivo mais recente de vendas falhou na validacao —
+             dados vigentes nao representam o arquivo atual;
+    current: linhas do período vindas do arquivo vigente e período ate o
+             fim da cobertura declarada;
+    partial: o período se estende alem do fim da cobertura do arquivo
+             vigente (ex.: arquivo termina no meio do mes);
+    missing: sem linhas vigentes no período — "sem dados no arquivo atual".
+    O estado geral prioriza a maior ressalva:
+    unavailable > partial > missing > current.
+    """
+    if kind_availability(db, KIND_VENDAS) == "unavailable":
+        states = {code: "unavailable" for code in codes}
+        return states, ("unavailable" if codes else "missing")
+    coverage = latest_coverage(db, KIND_VENDAS)
+    counts = dict(
+        db.execute(
+            select(ErpSaleRow.store_code, func.count())
+            .where(
+                ErpSaleRow.store_code.in_(codes),
+                ErpSaleRow.sale_date >= first,
+                ErpSaleRow.sale_date <= last,
+                ErpSaleRow.superseded_at.is_(None),
+            )
+            .group_by(ErpSaleRow.store_code)
+        ).all()
+    ) if codes else {}
+    states: dict[str, str] = {}
+    for code in codes:
+        if not counts.get(code):
+            states[code] = "missing"
+            continue
+        win = coverage.get(code)
+        states[code] = (
+            "current" if win is None or last <= win[1] else "partial"
+        )
+    unique = set(states.values())
+    if unique == {"current"}:
+        overall = "current"
+    elif unique == {"missing"}:
+        overall = "missing"
+    else:
+        overall = "partial"
+    return states, overall
 
 
 def sales_by_date_for_store(
@@ -121,6 +205,7 @@ def sales_by_date_for_store(
             ErpSaleRow.store_code == store_code,
             ErpSaleRow.sale_date >= first,
             ErpSaleRow.sale_date <= last,
+            ErpSaleRow.superseded_at.is_(None),
         )
         .group_by(ErpSaleRow.sale_date)
     ).all()
@@ -145,9 +230,11 @@ def run_drive_sync(db: Session) -> list[dict]:
     expected = {
         KIND_VENDAS: settings.erp_drive_vendas_name,
         KIND_DEVOLUCOES: settings.erp_drive_devolucoes_name,
+        KIND_DESPESAS: settings.erp_drive_despesas_name,
     }
+    handlers = {**sales_handlers(db), **expenses_handlers(db)}
     if not settings.erp_sync_enabled or not settings.google_drive_folder_id:
-        return sync_sources(db, handlers=sales_handlers(db), expected_files=expected)
+        return sync_sources(db, handlers=handlers, expected_files=expected)
     try:
         service_account = load_service_account(settings.google_service_account_json)
     except DriveError as exc:
@@ -164,7 +251,7 @@ def run_drive_sync(db: Session) -> list[dict]:
         return [{"file_key": k, "status": "FAILED", "last_error": str(exc)} for k in expected]
     client = DriveClient(service_account, settings.google_drive_folder_id)
     return sync_sources(
-        db, handlers=sales_handlers(db), expected_files=expected, client=client,
+        db, handlers=handlers, expected_files=expected, client=client,
     )
 
 
@@ -214,13 +301,16 @@ class SalesService:
         kinds = []
         for kind in (KIND_VENDAS, KIND_DEVOLUCOES):
             batch = latest_applied(self.db, kind)
+            coverage = (batch.coverage or []) if batch else []
             kinds.append({
                 "kind": kind,
+                "availability": kind_availability(self.db, kind),
                 "last_applied_at": batch.applied_at.isoformat() if batch and batch.applied_at else None,
                 "file_name": batch.file_name if batch else None,
                 "rows_applied": batch.rows_applied if batch else 0,
                 "period_start": batch.period_start.isoformat() if batch and batch.period_start else None,
                 "period_end": batch.period_end.isoformat() if batch and batch.period_end else None,
+                "coverage": coverage,
             })
         sources = self.db.scalars(select(ErpSourceFile)).all()
         settings = get_settings()
@@ -277,42 +367,91 @@ class SalesService:
         self._range(first, last)
         codes = self._scope(store_code)
         revenue_ok = self._revenue_map(codes)
-        sales = store_totals(self.db, ErpSaleRow, codes, first, last)
-        returns = store_totals(self.db, ErpReturnRow, codes, first, last)
+        states, overall = period_states(self.db, codes, first, last)
+        devol_state = kind_availability(self.db, KIND_DEVOLUCOES)
+        returns_state = "missing" if devol_state == "never_imported" else devol_state
+        # Fonte indisponivel ou periodo sem dados: os paineis nao exibem
+        # numeros de versoes anteriores nem zero automatico.
+        sales_visible = overall not in ("unavailable",)
+        sales = (
+            store_totals(self.db, ErpSaleRow, codes, first, last)
+            if sales_visible else {}
+        )
+        returns = (
+            store_totals(self.db, ErpReturnRow, codes, first, last)
+            if devol_state == "current" else {}
+        )
         stores = []
         totals = {"revenue": Decimal("0"), "quantity": Decimal("0"), "rows": 0,
                   "returns_revenue": Decimal("0"), "returns_quantity": Decimal("0"), "returns_rows": 0}
         for code in codes:
+            state = states[code]
+            has_rows = state in ("current", "partial")
             sale = sales.get(code, {"revenue": Decimal(0), "quantity": Decimal(0), "rows": 0})
             ret = returns.get(code, {"revenue": Decimal(0), "quantity": Decimal(0), "rows": 0})
-            can_revenue = revenue_ok[code]
+            can_revenue = revenue_ok[code] and has_rows
             stores.append({
                 "code": code,
+                "data_state": state,
                 "revenue": str(sale["revenue"]) if can_revenue else None,
-                "revenue_visibility": "allowed" if can_revenue else "restricted",
-                "quantity": str(sale["quantity"]),
-                "rows": sale["rows"],
-                "returns_revenue": str(ret["revenue"]) if can_revenue else None,
-                "returns_quantity": str(ret["quantity"]),
-                "returns_rows": ret["rows"],
+                "revenue_visibility": "allowed" if revenue_ok[code] else "restricted",
+                "quantity": str(sale["quantity"]) if has_rows else None,
+                "rows": sale["rows"] if has_rows else None,
+                "returns_revenue": (
+                    str(ret["revenue"]) if can_revenue and ret["rows"] else None
+                ),
+                "returns_quantity": (
+                    str(ret["quantity"]) if devol_state == "current" and ret["rows"]
+                    else None
+                ),
+                "returns_rows": ret["rows"] if devol_state == "current" else None,
             })
-            totals["revenue"] += sale["revenue"] if can_revenue else Decimal(0)
-            totals["quantity"] += sale["quantity"]
-            totals["rows"] += sale["rows"]
-            totals["returns_revenue"] += ret["revenue"] if can_revenue else Decimal(0)
-            totals["returns_quantity"] += ret["quantity"]
-            totals["returns_rows"] += ret["rows"]
+            if has_rows:
+                totals["revenue"] += sale["revenue"] if can_revenue else Decimal(0)
+                totals["quantity"] += sale["quantity"]
+                totals["rows"] += sale["rows"]
+            if devol_state == "current":
+                totals["returns_revenue"] += ret["revenue"] if can_revenue else Decimal(0)
+                totals["returns_quantity"] += ret["quantity"]
+                totals["returns_rows"] += ret["rows"]
+        has_sales = any(s in ("current", "partial") for s in states.values())
         return {
             "from": first.isoformat(), "to": last.isoformat(), "stores": stores,
-            "totals": {key: str(value) for key, value in totals.items()},
+            "totals": {
+                "revenue": str(totals["revenue"]) if has_sales else None,
+                "quantity": str(totals["quantity"]) if has_sales else None,
+                "rows": totals["rows"] if has_sales else None,
+                "returns_revenue": (
+                    str(totals["returns_revenue"])
+                    if devol_state == "current" else None
+                ),
+                "returns_quantity": (
+                    str(totals["returns_quantity"])
+                    if devol_state == "current" else None
+                ),
+                "returns_rows": (
+                    totals["returns_rows"] if devol_state == "current" else None
+                ),
+            },
+            "data_state": overall,
+            "returns_state": returns_state,
+            "source": pilot_sales_status(self.db),
         }
 
     def daily(self, first: date, last: date, store_code: str | None) -> dict:
         self._range(first, last)
         codes = self._scope(store_code)
         revenue_ok = self._revenue_map(codes)
-        sales = daily_totals(self.db, ErpSaleRow, codes, first, last)
-        returns = daily_totals(self.db, ErpReturnRow, codes, first, last)
+        _, overall = period_states(self.db, codes, first, last)
+        devol_state = kind_availability(self.db, KIND_DEVOLUCOES)
+        sales = (
+            daily_totals(self.db, ErpSaleRow, codes, first, last)
+            if overall != "unavailable" else {}
+        )
+        returns = (
+            daily_totals(self.db, ErpReturnRow, codes, first, last)
+            if devol_state == "current" else {}
+        )
         days: dict[tuple[str, str], dict] = {}
         for (code, day), sale in sales.items():
             entry = days.setdefault((day.isoformat(), code), {
@@ -335,6 +474,10 @@ class SalesService:
         return {
             "from": first.isoformat(), "to": last.isoformat(),
             "days": [days[key] for key in sorted(days)],
+            "data_state": overall,
+            "returns_state": (
+                "missing" if devol_state == "never_imported" else devol_state
+            ),
         }
 
     def top(
@@ -347,7 +490,20 @@ class SalesService:
         limit = max(1, min(limit, TOP_LIMIT))
         if sort not in ("revenue", "quantity"):
             raise SalesError(422, "Ordenação desconhecida.")
-        is_admin = self.principal.is_superadmin or self.principal.profile == "administrator"
+        _, overall = period_states(self.db, codes, first, last)
+        if overall == "unavailable":
+            return {
+                "dimension": dimension,
+                "from": first.isoformat(), "to": last.isoformat(),
+                "data_state": "unavailable",
+                "items": [],
+            }
+        # Documento fiscal do cliente so aparece para quem visualiza o
+        # faturamento das tres lojas (gestao consolidada ou SuperAdmin).
+        is_admin = self.principal.is_superadmin or all(
+            can_access(self.principal, "sales.revenue.view", code)
+            for code in STORE_CODES
+        )
 
         if dimension == "products":
             group_col = ErpSaleRow.product_code
@@ -369,6 +525,7 @@ class SalesService:
                 ErpSaleRow.store_code.in_(codes),
                 ErpSaleRow.sale_date >= first,
                 ErpSaleRow.sale_date <= last,
+                ErpSaleRow.superseded_at.is_(None),
             )
             .group_by(group_col, ErpSaleRow.store_code)
         ).all()
@@ -398,6 +555,7 @@ class SalesService:
                     ErpSaleRow.store_code.in_(codes),
                     ErpSaleRow.sale_date >= first,
                     ErpSaleRow.sale_date <= last,
+                    ErpSaleRow.superseded_at.is_(None),
                 )
                 .distinct()
             ).all()
@@ -413,6 +571,7 @@ class SalesService:
         return {
             "dimension": dimension,
             "from": first.isoformat(), "to": last.isoformat(),
+            "data_state": overall,
             "items": [
                 {
                     "key": item["key"],

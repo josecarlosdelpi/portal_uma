@@ -8,7 +8,11 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.erp_sales_service import month_bounds, pilot_sales_status, store_totals
+from app.erp_import import kind_availability
+from app.erp_csv import KIND_VENDAS
+from app.erp_sales_service import (
+    month_bounds, period_states, pilot_sales_status, store_totals,
+)
 from app.models import ErpSaleRow, MonthlySalesTarget, User
 from app.policy import STORE_CODES, can_access, visible_stores
 from app.repositories import load_principal
@@ -54,20 +58,26 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
     first, last = month_bounds(year, month)
     prev_first, prev_last = month_bounds(year if month > 1 else year - 1,
                                          month - 1 if month > 1 else 12)
-    revenue = store_totals(db, ErpSaleRow, stores, first, last)
-    previous = store_totals(db, ErpSaleRow, stores, prev_first, prev_last)
+    states, _overall = period_states(db, stores, first, last)
+    sales_available = kind_availability(db, KIND_VENDAS) == "current"
+    revenue = (
+        store_totals(db, ErpSaleRow, stores, first, last)
+        if sales_available else {}
+    )
+    previous = (
+        store_totals(db, ErpSaleRow, stores, prev_first, prev_last)
+        if sales_available else {}
+    )
     result = []
     for code in stores:
         # Permissao do modulo nao autoriza automaticamente os indicadores.
-        is_manager = principal.profile == "administrator" or principal.is_superadmin
         can_target = (
-            is_manager
-            or can_access(principal, "sales.target.view", code)
+            can_access(principal, "sales.target.view", code)
             or can_access(principal, "targets.view", code)
         )
-        can_revenue = is_manager or can_access(principal, "sales.revenue.view", code)
-        can_attainment = is_manager or can_access(principal, "sales.attainment.view", code)
-        can_previous = is_manager or can_access(principal, "sales.previous_month.view", code)
+        can_revenue = can_access(principal, "sales.revenue.view", code)
+        can_attainment = can_access(principal, "sales.attainment.view", code)
+        can_previous = can_access(principal, "sales.previous_month.view", code)
         store_revenue = revenue.get(code, {}).get("revenue") if can_revenue else None
         target = Decimal(amounts[code]) if can_target and amounts[code] is not None else None
         attainment = (
@@ -84,6 +94,7 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
         result.append({
             "code": code,
             "name": STORE_NAMES[code],
+            "data_state": states[code],
             "target": amounts[code] if can_target else None,
             "target_visibility": "allowed" if can_target else "restricted",
             "revenue": str(store_revenue) if store_revenue is not None else None,
@@ -91,7 +102,9 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
             "previous_month_change_percent": str(change) if change is not None else None,
             "previous_year_change_percent": None,
         })
-    full_consolidation = (principal.is_superadmin or principal.profile == "administrator") and set(stores) == STORE_CODES
+    # Consolidado somente quando o usuario esta autorizado nas tres lojas;
+    # cada indicador continua exigindo sua propria concessao.
+    full_consolidation = set(stores) == STORE_CODES
     all_targets = all(x["target_visibility"] == "allowed" and x["target"] is not None for x in result)
     goal = (
         str(sum((Decimal(x["target"]) for x in result), start=Decimal("0.00")))
@@ -121,6 +134,8 @@ def overview_for_user(db: Session, user: User, year: int, month: int) -> dict:
         "source": {
             "sales_status": status["status"],
             "sales_updated_at": status["sales_updated_at"],
+            "data_through": status["data_through"],
+            "has_stale_data": status["has_stale_data"],
             "message": status["message"],
         },
     }
@@ -131,7 +146,11 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
     amounts = store_targets(db, year, month, STORE_CODES)
     all_goals = all(amounts[code] is not None for code in STORE_CODES)
     first, last = month_bounds(year, month)
-    revenue = store_totals(db, ErpSaleRow, STORE_CODES, first, last)
+    states, _overall = period_states(db, STORE_CODES, first, last)
+    revenue = (
+        store_totals(db, ErpSaleRow, STORE_CODES, first, last)
+        if kind_availability(db, KIND_VENDAS) == "current" else {}
+    )
     status = pilot_sales_status(db)
     stores = []
     total_revenue = Decimal("0")
@@ -148,6 +167,7 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
             has_revenue = True
         stores.append({
             "code": code, "name": STORE_NAMES[code], "target": amounts[code],
+            "data_state": states[code],
             "revenue": str(store_revenue) if store_revenue is not None else None,
             "attainment_percent": str(attainment) if attainment is not None else None,
             "change_percent": None,
@@ -166,5 +186,10 @@ def consolidated_target_snapshot(db: Session, year: int, month: int) -> dict:
         ),
         "previous_month_change_percent": None,
         "previous_year_change_percent": None,
-        "source": {"status": status["status"], "sales_updated_at": status["sales_updated_at"]},
+        "source": {
+            "status": status["status"],
+            "sales_updated_at": status["sales_updated_at"],
+            "data_through": status["data_through"],
+            "has_stale_data": status["has_stale_data"],
+        },
     }
