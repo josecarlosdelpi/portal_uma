@@ -30,7 +30,7 @@ type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplie
 const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> = [
   { key: "overview", label: "Visão geral", icon: LayoutDashboard },
   { key: "sales", label: "Vendas", icon: ShoppingCart },
-  { key: "contacts", label: "Telemarketing", icon: Phone },
+  { key: "contacts", label: "Televendas", icon: Phone },
   { key: "reviews", label: "Avaliações Google", icon: Star },
   { key: "supplies", label: "Materiais e insumos", icon: Package },
   { key: "checklist", label: "Checklist semanal", icon: ListChecks },

@@ -57,11 +57,12 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
   },
   {
     module: "telemarketing",
-    title: "Telemarketing",
+    title: "Televendas",
     help: "Carteira de clientes e registros de contato.",
     permissions: [
-      { code: "telemarketing.view", name: "Ver telemarketing", kind: "view" },
+      { code: "telemarketing.view", name: "Ver televendas", kind: "view" },
       { code: "telemarketing.edit", name: "Registrar contatos", kind: "edit" },
+      { code: "telemarketing.admin", name: "Administrar televendas", kind: "action" },
     ],
   },
   {

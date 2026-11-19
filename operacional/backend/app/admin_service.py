@@ -52,6 +52,7 @@ PERMISSION_CATALOG: list[dict] = [
     {"module": "telemarketing", "permissions": [
         {"code": "telemarketing.view", "kind": "view"},
         {"code": "telemarketing.edit", "kind": "edit"},
+        {"code": "telemarketing.admin", "kind": "action"},
     ]},
     {"module": "monthly_closing", "permissions": [
         {"code": "monthly_closing.view", "kind": "view", "requires_all_stores": True},

@@ -43,6 +43,7 @@ WRITE_PERMISSIONS = frozenset({
     "monthly_closing.edit",
     "monthly_closing.archive",
     "telemarketing.edit",
+    "telemarketing.admin",
     "reviews.edit",
     "supplies.edit",
     "checklist.edit",
