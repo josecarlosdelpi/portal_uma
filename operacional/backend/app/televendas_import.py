@@ -170,8 +170,10 @@ def _parse_rows(grid: list[list[Any]], sheet: str, default_city: str | None,
             index += 1
             record["index"] = index
             records.append(record)
-        if len(records) >= MAX_ROWS:
-            break
+        if len(records) > MAX_ROWS:
+            raise ValueError(
+                f"A aba '{sheet}' excede o limite de {MAX_ROWS} registros. "
+                "Divida o arquivo e reenvie — nenhum registro foi importado.")
     return records
 
 
@@ -203,10 +205,34 @@ def parse_csv(data: bytes, default_city: str | None) -> list[dict]:
     return _parse_rows(grid, default_city or "CSV", default_city, 0)
 
 
+def _flag_intra_duplicates(records: list[dict]) -> None:
+    """Sinaliza duplicidades dentro do proprio arquivo (nunca decide sozinho)."""
+    seen_phones: set[str] = set()
+    seen_names: set[tuple[str, str]] = set()
+    for record in records:
+        flagged = False
+        numbers = (digits(record.get("phone")), digits(record.get("cellphone")))
+        if any(len(num) >= 8 and num in seen_phones for num in numbers):
+            flagged = True
+        name_key = _key((record.get("name") or "").lower())
+        city_key = _key((record.get("city") or "").lower())
+        pair = (name_key, city_key)
+        if name_key and pair in seen_names:
+            flagged = True
+        if flagged and "duplicado_no_arquivo" not in record["warnings"]:
+            record["warnings"].append("duplicado_no_arquivo")
+        seen_phones.update(num for num in numbers if len(num) >= 8)
+        if name_key:
+            seen_names.add(pair)
+
+
 def parse_file(filename: str, data: bytes, default_city: str | None = None) -> list[dict]:
     lower = filename.lower()
     if lower.endswith(".xlsx"):
-        return parse_xlsx(data)
-    if lower.endswith(".csv"):
-        return parse_csv(data, default_city)
-    raise ValueError("Formato não suportado. Envie um arquivo .xlsx ou .csv")
+        records = parse_xlsx(data)
+    elif lower.endswith(".csv"):
+        records = parse_csv(data, default_city)
+    else:
+        raise ValueError("Formato não suportado. Envie um arquivo .xlsx ou .csv")
+    _flag_intra_duplicates(records)
+    return records

@@ -30,7 +30,8 @@ export type ClientPage = {
 export type ClientFilters = {cities:string[];statuses:string[];tags:string[]};
 export type ClientDetail = ClientRow & {
   inactivity_days:number;days_since_purchase:number|null;
-  history:ContactRow[];pending_followups:ContactRow[]
+  history:{items:ContactRow[];total:number;page:number;page_size:number};
+  pending_followups:ContactRow[]
 };
 export type ClientWarning = {code:string;message:string};
 export type ClientSaveResult = {
@@ -50,7 +51,8 @@ export type ContactRow = {
   next_on:string|null;followup_done_at:string|null;
   note:string;revision:number;overdue?:boolean
 };
-export type CallsSnapshot = {store_code:string;year:number;month:number;items:ContactRow[]};
+export type CallsSnapshot = {store_code:string;year:number;month:number;
+  total:number;page:number;page_size:number;items:ContactRow[]};
 export type FollowupPage = {
   store_code:string;total:number;page:number;page_size:number;items:ContactRow[]
 };
@@ -73,7 +75,7 @@ export type ImportRow = {
   suggested:"import"|"update"
 };
 export type ImportPreview = {
-  session_id:string;filename:string;rows_total:number;
+  session_id:string;filename:string;rows_total:number;expires_at:string;
   cities:{city:string;total:number}[];rows:ImportRow[];
   summary:{with_warnings:number;possible_duplicates:number}
 };
@@ -119,8 +121,11 @@ export const operationsApi = {
   },
   clientFilters:(token:string,store:string) =>
     request<ClientFilters>(token,`/api/v1/operations/contacts/${store}/clients/filters`),
-  clientDetail:(token:string,store:string,id:string) =>
-    request<ClientDetail>(token,`/api/v1/operations/contacts/${store}/clients/${id}`),
+  clientDetail:(token:string,store:string,id:string,
+                historyPage:number=1,historySize:number=50) =>
+    request<ClientDetail>(token,
+      `/api/v1/operations/contacts/${store}/clients/${id}`+
+      `?history_page=${historyPage}&history_size=${historySize}`),
   addClient:(token:string,store:string,body:ClientInput) =>
     request<ClientSaveResult>(token,`/api/v1/operations/contacts/${store}/clients`,"POST",body),
   updateClient:(token:string,store:string,id:string,body:Partial<ClientInput>&{
@@ -170,8 +175,41 @@ export const operationsApi = {
     `/api/v1/operations/contacts/${store}/import/${sessionId}/commit`,"POST",body),
   team:(token:string,store:string) =>
     request<TeamMember[]>(token,`/api/v1/operations/contacts/${store}/team`),
-  calls:(token:string,store:string,year:number,month:number) =>
-    request<CallsSnapshot>(token,`/api/v1/operations/contacts/${store}/${year}/${month}/calls`),
+  calls:(token:string,store:string,year:number,month:number,
+         page:number=1,pageSize:number=100) =>
+    request<CallsSnapshot>(token,
+      `/api/v1/operations/contacts/${store}/${year}/${month}/calls`+
+      `?page=${page}&page_size=${pageSize}`),
+  discardImport:(token:string,store:string,sessionId:string) =>
+    request<{result:string}>(token,
+      `/api/v1/operations/contacts/${store}/import/${sessionId}`,"DELETE"),
+  exportClients:(token:string,store:string,format:"csv"|"xlsx",params?:{
+    q?:string;city?:string;status?:string;tag?:string;phone?:string;
+    inactive?:string
+  }) => {
+    const search=new URLSearchParams();
+    if(params)for(const [key,value] of Object.entries(params))
+      if(value)search.set(key,value);
+    return fetch(
+      (import.meta.env.VITE_API_BASE_URL??"").replace(/\/$/,"")+
+      `/api/v1/operations/contacts/${store}/export?format=${format}&`+
+      search.toString(),
+      {headers:{Authorization:"Bearer "+token}}
+    ).then(async response=>{
+      if(!response.ok){
+        const detail=await response.json().catch(()=>({}));
+        throw new ApiError(response.status,
+          (detail as {detail?:string}).detail??"Falha ao exportar a carteira.");
+      }
+      const blob=await response.blob();
+      const name=(response.headers.get("Content-Disposition")??"")
+        .split("filename=")[1]?.replace(/"/g,"")??`carteira.${format}`;
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");
+      link.href=url;link.download=name;link.click();
+      URL.revokeObjectURL(url);
+    });
+  },
   addCall:(token:string,store:string,body:{
     client_id:string;seller_id:string;date:string;channel:string;
     outcome:string;next_on:string|null;note:string

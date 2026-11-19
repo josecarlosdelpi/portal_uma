@@ -31,6 +31,7 @@ const warningName=(code:string)=>({
   aniversario_nao_reconhecido:"Aniversário não reconhecido",
   data_contato_nao_reconhecida:"Data de contato não reconhecida",
   status_desconhecido:"Status não reconhecido",
+  duplicado_no_arquivo:"Possível duplicidade dentro do arquivo",
 }[code]??code);
 
 type Tab="carteira"|"contatos"|"retornos"|"indicadores"|"importar"|"admin";
@@ -198,6 +199,14 @@ function CarteiraTab({token,store,canWrite,working,setError,askWarnings,perform}
         <option value="sim">Inativos por compras</option>
         <option value="nao">Dentro do prazo</option></select></label>
       <button className="btn-secondary" onClick={()=>void load(1)}>Filtrar</button>
+      <button className="btn-secondary" disabled={working}
+        onClick={()=>void perform(()=>operationsApi.exportClients(
+          token,store,"csv",filters),"Carteira exportada em CSV.")}>
+        Exportar CSV</button>
+      <button className="btn-secondary" disabled={working}
+        onClick={()=>void perform(()=>operationsApi.exportClients(
+          token,store,"xlsx",filters),"Carteira exportada em Excel.")}>
+        Exportar Excel</button>
     </div>
     <article className="panel routine-form-panel">
       <div className="panel-head"><div><h2>Carteira da loja</h2>
@@ -236,17 +245,23 @@ function CarteiraTab({token,store,canWrite,working,setError,askWarnings,perform}
         setDetail(await operationsApi.clientDetail(token,store,detail.id));
         await load(page);
       }}
+      onMoreHistory={async()=>{
+        const next=detail.history.page+1;
+        const more=await operationsApi.clientDetail(token,store,detail.id,next);
+        setDetail(prev=>prev?{...prev,history:{...more.history,
+          items:[...prev.history.items,...more.history.items]}}:prev);
+      }}
       onClose={()=>setDetail(null)} perform={perform}/>}
   </>;
 }
 
 /* ---------------- Ficha do cliente ---------------- */
 
-function ClientFicha({token,store,detail,canWrite,working,options,askWarnings,onSaved,onClose,perform}:{
+function ClientFicha({token,store,detail,canWrite,working,options,askWarnings,onSaved,onMoreHistory,onClose,perform}:{
   token:string;store:string;detail:ClientDetail;canWrite:boolean;working:boolean;
   options:ClientFilters;
   askWarnings:(w:ClientWarning[],proceed:()=>void)=>void;
-  onSaved:()=>Promise<void>;onClose:()=>void;
+  onSaved:()=>Promise<void>;onMoreHistory:()=>Promise<void>;onClose:()=>void;
   perform:(a:()=>Promise<unknown>,s:string|((r:unknown)=>string))=>Promise<void>;
 }){
   const [editing,setEditing]=useState(false);
@@ -325,12 +340,17 @@ function ClientFicha({token,store,detail,canWrite,working,options,askWarnings,on
         <h3>Histórico de atendimentos</h3>
         <div className="table-wrap"><table><thead><tr><th>Data</th><th>Canal</th>
           <th>Responsável</th><th>Resultado</th><th>Retorno</th><th>Obs.</th></tr></thead>
-          <tbody>{detail.history.map(h=><tr key={h.id}>
+          <tbody>{detail.history.items.map(h=><tr key={h.id}>
             <td>{h.date}</td><td>{channelName(h.channel)}</td><td>{h.seller}</td>
             <td>{outcomeName(h.outcome)}</td>
             <td>{h.next_on?h.next_on+(h.followup_done_at?" (realizado)":""):"—"}</td>
             <td>{h.note||"—"}</td></tr>)}</tbody></table></div>
-        {detail.history.length===0&&<p className="empty">Nenhum contato registrado.</p>}
+        {detail.history.items.length===0&&<p className="empty">Nenhum contato registrado.</p>}
+        {detail.history.items.length<detail.history.total&&
+          <button className="btn-secondary" disabled={working}
+            onClick={onMoreHistory}>
+            Carregar mais ({detail.history.total-detail.history.items.length} restantes)
+          </button>}
         <div className="modal-actions">
           <button className="btn-secondary" onClick={onClose}>Fechar</button>
           {canWrite&&<button className="btn-primary" onClick={()=>setEditing(true)}>
@@ -393,6 +413,7 @@ function ContatosTab({token,store,year,month,period,canWrite,working,perform,set
   const [options,setOptions]=useState<ClientFilters>({cities:[],statuses:[],tags:[]});
   const [sellers,setSellers]=useState<TeamMember[]>([]);
   const [calls,setCalls]=useState<ContactRow[]>([]);
+  const [callsTotal,setCallsTotal]=useState(0);
   const [clientQuery,setClientQuery]=useState("");
   const [clientOptions,setClientOptions]=useState<ClientRow[]>([]);
   const [clientId,setClientId]=useState("");
@@ -414,7 +435,8 @@ function ContatosTab({token,store,year,month,period,canWrite,working,perform,set
         operationsApi.calls(token,store,year,month),
         operationsApi.clientFilters(token,store),
       ]);
-      setSellers(teamRows);setCalls(log.items);setOptions(opts);
+      setSellers(teamRows);setCalls(log.items);
+      setCallsTotal(log.total);setOptions(opts);
     }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível carregar os contatos.");}
     finally{setLoading(false);}
   },[token,store,year,month,setError]);
@@ -586,6 +608,13 @@ function ContatosTab({token,store,year,month,period,canWrite,working,perform,set
           <td>{c.note||"—"}</td>{canWrite&&<td><button className="btn-secondary"
             onClick={()=>startCorrection(c)}>Corrigir</button></td>}</tr>)}</tbody>
       </table></div>
+      {calls.length<callsTotal&&<button className="btn-secondary" disabled={working}
+        onClick={()=>void perform(async()=>{
+          const next=Math.floor(calls.length/100)+1;
+          const more=await operationsApi.calls(token,store,year,month,next);
+          setCalls(prev=>[...prev,...more.items]);
+        },"")}>
+        Carregar mais ({callsTotal-calls.length} restantes)</button>}
       {calls.length===0&&<p className="empty">Nenhum contato registrado no mês.</p>}
       <p className="small-note">Alterações anteriores são registradas na auditoria.
         O sistema ainda não importa automaticamente carteiras ou vendas.</p>
@@ -751,8 +780,14 @@ function ImportarTab({token,store,perform,working,askWarnings}:{
   }
   async function commit(confirm:boolean){
     if(!preview)return;
+    const effective={...decisions};
+    for(const row of preview.rows){
+      const current=effective[String(row.index)]??{action:row.suggested};
+      if(current.action==="update"&&!current.client_id&&row.matches.length===1)
+        effective[String(row.index)]={...current,client_id:row.matches[0].id};
+    }
     const result=await operationsApi.importCommit(token,store,preview.session_id,{
-      decisions,confirm});
+      decisions:effective,confirm});
     if(result.result==="review"){
       askWarnings([{code:"dados_incompletos",message:result.message}],
         ()=>void perform(()=>commit(true),"Importação concluída."));
@@ -811,11 +846,12 @@ function ImportarTab({token,store,perform,working,askWarnings}:{
                 <option value="update">Atualizar existente</option>
                 <option value="skip">Ignorar</option>
               </select>
-              {decision.action==="update"&&row.matches.length>1&&
+              {decision.action==="update"&&
                 <select value={decision.client_id??""}
                   onChange={e=>setDecision(row,{client_id:e.target.value||undefined})}>
                   <option value="">Escolher cadastro…</option>
-                  {row.matches.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                  {row.matches.map(m=><option key={m.id} value={m.id}>
+                    {m.name}{m.city?` — ${m.city}`:""}</option>)}
                 </select>}
             </td>
           </tr>;
@@ -826,7 +862,10 @@ function ImportarTab({token,store,perform,working,askWarnings}:{
             done=>done?"Importação concluída.":"")}>
           Confirmar importação</button>
         <button className="btn-secondary" disabled={working}
-          onClick={()=>{setPreview(null);setDecisions({});}}>Descartar prévia</button>
+          onClick={()=>void perform(async()=>{
+            await operationsApi.discardImport(token,store,preview.session_id);
+            setPreview(null);setDecisions({});
+          },"Prévia descartada.")}>Descartar prévia</button>
       </div>
       <p className="small-note">A data de contato da planilha não é tratada como
         última compra e não gera registros de ligação.</p>

@@ -3,6 +3,8 @@
 Authorization, store boundaries and audit are checked inside each use case.
 Seller accounts remain read-only as approved for operational v1.
 """
+import csv
+import io
 from datetime import date, datetime, time, timedelta
 from uuid import UUID, uuid4
 
@@ -35,8 +37,17 @@ def phone_digits(value: str | None) -> str:
     return "".join(ch for ch in (value or "") if ch.isdigit())
 
 
+def _safe_cell(value) -> str:
+    """Escapa valores que planilhas interpretariam como formula."""
+    text = "" if value is None else str(value)
+    if text[:1] in ("=", "+", "-", "@"):
+        return "'" + text
+    return text
+
+
 CLIENT_STATUSES = ("ativo", "inativo", "prospect")
 CALL_CHANNELS = ("ligacao", "whatsapp")
+IMPORT_PREVIEW_TTL = timedelta(hours=24)
 
 
 def date_time(day: date | None) -> datetime | None:
@@ -332,6 +343,23 @@ class OperationsService:
                      page: int = 1, page_size: int = 50) -> dict:
         self.require(store, "telemarketing.view")
         days = self._settings().inactivity_days
+        conditions = self._client_conditions(
+            store, q=q, city=city, status=status, tag=tag, phone=phone,
+            inactive=inactive, days=days)
+        total = self.db.scalar(
+            select(func.count()).select_from(ContactClient).where(*conditions))
+        rows = self.db.scalars(
+            select(ContactClient).where(*conditions)
+            .order_by(ContactClient.name)
+            .offset((page - 1) * page_size).limit(page_size)
+        ).all()
+        return {"store_code": store, "total": total or 0, "page": page,
+                "page_size": page_size,
+                "items": [self._client(row, days) for row in rows]}
+
+    @staticmethod
+    def _client_conditions(store: str, *, q, city, status, tag, phone,
+                           inactive, days) -> list:
         conditions = [ContactClient.store_code == store]
         if q:
             conditions.append(or_(
@@ -359,16 +387,54 @@ class OperationsService:
             limit = date.today() - timedelta(days=days)
             conditions.append(ContactClient.last_purchase_on.is_not(None))
             conditions.append(ContactClient.last_purchase_on >= date_time(limit))
-        total = self.db.scalar(
-            select(func.count()).select_from(ContactClient).where(*conditions))
-        rows = self.db.scalars(
-            select(ContactClient).where(*conditions)
-            .order_by(ContactClient.name)
-            .offset((page - 1) * page_size).limit(page_size)
-        ).all()
-        return {"store_code": store, "total": total or 0, "page": page,
-                "page_size": page_size,
-                "items": [self._client(row, days) for row in rows]}
+        return conditions
+
+    def export_clients(self, store: str, *, q=None, city=None, status=None,
+                       tag=None, phone=None, inactive=None,
+                       fmt: str = "csv") -> tuple[bytes, str, str]:
+        """Exporta a carteira filtrada completa (todas as linhas, sem limite)."""
+        self.require(store, "telemarketing.view")
+        days = self._settings().inactivity_days
+        conditions = self._client_conditions(
+            store, q=q, city=city, status=status, tag=tag, phone=phone,
+            inactive=inactive, days=days)
+        rows = self.db.scalars(select(ContactClient).where(*conditions)
+                               .order_by(ContactClient.name)).all()
+        header = ["Empresa", "Telefone", "Celular", "Cidade", "Contato",
+                  "Aniversário", "Status", "Tag", "Último contato",
+                  "Última compra", "Origem", "Observações"]
+        def birthday(row):
+            if row.birthday_day and row.birthday_month:
+                return f"{row.birthday_day:02d}/{row.birthday_month:02d}"
+            return ""
+        body = [[_safe_cell(c) for c in [
+            row.name, row.phone or "", row.cellphone or "", row.city or "",
+            row.contact_person or "", birthday(row), row.status or "",
+            row.tag or "",
+            row.last_contact_on.strftime("%d/%m/%Y") if row.last_contact_on else "",
+            row.last_purchase_on.strftime("%d/%m/%Y") if row.last_purchase_on else "",
+            row.origin or "", row.notes or ""]] for row in rows]
+        stamp = date.today().isoformat()
+        self.audit("telemarketing.wallet.exported", "contact_client", store,
+                   {"store": store, "format": fmt, "rows": len(body)})
+        if fmt == "xlsx":
+            import openpyxl
+            book = openpyxl.Workbook()
+            sheet = book.active
+            sheet.title = "Carteira"
+            sheet.append(header)
+            for entry in body:
+                sheet.append(entry)
+            buffer = io.BytesIO()
+            book.save(buffer)
+            return (buffer.getvalue(), f"carteira_{store}_{stamp}.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=";", lineterminator="\r\n")
+        writer.writerow(header)
+        writer.writerows(body)
+        return (buffer.getvalue().encode("utf-8-sig"),
+                f"carteira_{store}_{stamp}.csv", "text/csv; charset=utf-8")
 
     def client_filters(self, store: str) -> dict:
         self.require(store, "telemarketing.view")
@@ -380,34 +446,47 @@ class OperationsService:
                 "statuses": list(CLIENT_STATUSES),
                 "tags": self.tags(store)}
 
-    def client_detail(self, store: str, client_id: UUID) -> dict:
+    def client_detail(self, store: str, client_id: UUID, *,
+                      history_page: int = 1, history_size: int = 50) -> dict:
         self.require(store, "telemarketing.view")
         row = self.db.scalar(select(ContactClient).where(
             ContactClient.id == client_id, ContactClient.store_code == store))
         if not row:
             raise OperationError(404, "Cliente não encontrado nesta loja")
         days = self._settings().inactivity_days
+        hist_total = self.db.scalar(
+            select(func.count()).select_from(ContactAttempt)
+            .where(ContactAttempt.client_id == row.id)) or 0
         attempts = self.db.execute(
             select(ContactAttempt, User.display_name)
             .join(User, User.id == ContactAttempt.seller_id)
             .where(ContactAttempt.client_id == row.id)
             .order_by(ContactAttempt.contacted_on.desc(),
-                      ContactAttempt.created_at.desc()).limit(200)
+                      ContactAttempt.created_at.desc())
+            .offset((history_page - 1) * history_size).limit(history_size)
+        ).all()
+        pending_rows = self.db.execute(
+            select(ContactAttempt, User.display_name)
+            .join(User, User.id == ContactAttempt.seller_id)
+            .where(ContactAttempt.client_id == row.id,
+                   ContactAttempt.next_on.is_not(None),
+                   ContactAttempt.followup_done_at.is_(None))
+            .order_by(ContactAttempt.next_on)
         ).all()
         today = date.today()
-        pending = [
-            self._call(attempt, row.name, seller)
-            for attempt, seller in attempts
-            if attempt.next_on and attempt.followup_done_at is None
-        ]
         return {**self._client(row, days),
                 "inactivity_days": days,
                 "days_since_purchase": (
                     (today - row.last_purchase_on.date()).days
                     if row.last_purchase_on else None),
-                "history": [self._call(attempt, row.name, seller)
-                            for attempt, seller in attempts],
-                "pending_followups": pending}
+                "history": {"items": [self._call(attempt, row.name, seller)
+                                      for attempt, seller in attempts],
+                            "total": hist_total,
+                            "page": history_page,
+                            "page_size": history_size},
+                "pending_followups": [
+                    self._call(attempt, row.name, seller)
+                    for attempt, seller in pending_rows]}
 
     def _client_warnings(self, store: str, *, name: str, phone: str | None,
                          cellphone: str | None, city: str | None,
@@ -430,7 +509,10 @@ class OperationsService:
         wanted = {digits for digits in
                   (phone_digits(phone), phone_digits(cellphone)) if len(digits) >= 8}
         if wanted:
-            rows = self.db.scalars(select(ContactClient).where(*scope).limit(2000)).all()
+            rows = self.db.scalars(select(ContactClient).where(
+                *scope,
+                or_(ContactClient.phone_norm.in_(wanted),
+                    ContactClient.cellphone_norm.in_(wanted)))).all()
             for other in rows:
                 known = {phone_digits(other.phone), phone_digits(other.cellphone)} - {""}
                 if known & wanted:
@@ -790,7 +872,8 @@ class OperationsService:
             matches = self._import_matches(store, record, clients)
             record["matches"] = matches
             record["suggested"] = "update" if any(
-                "nome" in m["kinds"] for m in matches) else "import"
+                {"telefone", "erp"} & set(m["kinds"]) for m in matches
+            ) else "import"
             if record["warnings"]:
                 warnings_total += 1
             if matches:
@@ -805,11 +888,25 @@ class OperationsService:
         self.commit()
         return {"session_id": str(session.id), "filename": filename,
                 "rows_total": len(records),
+                "expires_at": (session.created_at
+                               + IMPORT_PREVIEW_TTL).isoformat(),
                 "cities": [{"city": c, "total": n}
                            for c, n in sorted(cities.items())],
                 "rows": records,
                 "summary": {"with_warnings": warnings_total,
                             "possible_duplicates": duplicated}}
+
+    def _expire_preview(self, session: ClientImportSession) -> None:
+        """Descarta previa vencida, purgando dados brutos da planilha."""
+        if session.state == "preview" and (
+                session.created_at + IMPORT_PREVIEW_TTL < datetime.now()):
+            session.state = "discarded"
+            session.payload = {}
+            self.audit("telemarketing.import.expired", "client_import_session",
+                       str(session.id),
+                       {"store": session.store_code,
+                        "filename": session.filename})
+            self.commit()
 
     def import_commit(self, store: str, session_id: UUID, *,
                       decisions: dict[str, dict], confirm: bool) -> dict:
@@ -819,8 +916,10 @@ class OperationsService:
             ClientImportSession.store_code == store).with_for_update())
         if not session:
             raise OperationError(404, "Prévia de importação não encontrada")
+        self._expire_preview(session)
         if session.state != "preview":
-            raise OperationError(409, "Esta importação já foi concluída ou descartada")
+            raise OperationError(409, "Esta importação já foi concluída, "
+                                      "descartada ou expirou")
         rows = session.payload.get("rows", [])
         warned = [r for r in rows
                   if decisions.get(str(r["index"]), {}).get(
@@ -834,7 +933,6 @@ class OperationsService:
         clients = self.db.scalars(select(ContactClient).where(
             ContactClient.store_code == store)).all()
         by_id = {str(c.id): c for c in clients}
-        by_name = {c.name_key: c for c in clients}
         report = {"imported": 0, "updated": 0, "skipped": 0, "warnings": 0,
                   "details": []}
         for record in rows:
@@ -847,11 +945,12 @@ class OperationsService:
                 report["skipped"] += 1
                 continue
             if action == "update":
-                target = by_id.get(decision.get("client_id") or "")
+                wanted_id = decision.get("client_id")
+                target = by_id.get(str(wanted_id)) if wanted_id else None
                 if target is None:
-                    target = by_name.get(normalize(record["name"]))
-                if target is None:
-                    action = "import"
+                    raise OperationError(422, (
+                        f"Linha {index}: 'Atualizar existente' exige a seleção "
+                        "explícita de um cadastro válido desta loja."))
                 else:
                     before = self._client(target)
                     self._apply_import(target, record)
@@ -887,16 +986,25 @@ class OperationsService:
                 revision=1, created_by=self.actor.id)
             self.db.add(row)
             self.db.flush()
-            by_name[row.name_key] = row
             by_id[str(row.id)] = row
             report["imported"] += 1
             report["warnings"] += bool(record["warnings"])
             report["details"].append({"index": record["index"],
                                       "action": "imported",
                                       "client": row.name})
+        for entry in report["details"]:
+            record = next(r for r in rows if r["index"] == entry["index"])
+            raws = {key: record[key] for key in
+                    ("birthday_raw", "last_contact_raw", "status_raw")
+                    if record.get(key) is not None}
+            if record.get("warnings"):
+                entry["warnings"] = list(record["warnings"])
+            if raws:
+                entry["raw_values"] = raws
         session.state = "applied"
         session.applied_at = datetime.now()
-        session.report = {k: v for k, v in report.items() if k != "details"}
+        session.report = report
+        session.payload = {}
         self.audit("telemarketing.import.applied", "client_import_session",
                    str(session.id),
                    {"store": store, "filename": session.filename,
@@ -905,6 +1013,25 @@ class OperationsService:
         return {"result": "saved", "report": {k: v for k, v in report.items()
                                               if k != "details"},
                 "details": report["details"][:50]}
+
+    def import_discard(self, store: str, session_id: UUID) -> dict:
+        self.require(store, "telemarketing.admin")
+        session = self.db.scalar(select(ClientImportSession).where(
+            ClientImportSession.id == session_id,
+            ClientImportSession.store_code == store).with_for_update())
+        if not session:
+            raise OperationError(404, "Prévia de importação não encontrada")
+        self._expire_preview(session)
+        if session.state != "preview":
+            raise OperationError(409, "Esta importação já foi concluída, "
+                                      "descartada ou expirou")
+        session.state = "discarded"
+        session.payload = {}
+        self.audit("telemarketing.import.discarded", "client_import_session",
+                   str(session.id),
+                   {"store": store, "filename": session.filename})
+        self.commit()
+        return {"result": "discarded"}
 
     @staticmethod
     def _apply_import(client: ContactClient, record: dict) -> None:
@@ -972,23 +1099,29 @@ class OperationsService:
             .where(User.id == seller_id, *self._seller_store_filter(store))
         ) is not None
 
-    def calls(self, store: str, year: int, month: int) -> dict:
+    def calls(self, store: str, year: int, month: int, *,
+              page: int = 1, page_size: int = 100) -> dict:
         self.require(store, "telemarketing.view")
         self.period(year, month)
+        scope = [ContactAttempt.store_code == store,
+                 ContactAttempt.contacted_on >= datetime(year, month, 1),
+                 ContactAttempt.contacted_on < datetime(
+                     year + (1 if month == 12 else 0),
+                     1 if month == 12 else month + 1, 1)]
+        total = self.db.scalar(select(func.count()).select_from(
+            ContactAttempt).where(*scope)) or 0
         rows = self.db.execute(
             select(ContactAttempt, ContactClient.name, User.display_name)
             .join(ContactClient, ContactClient.id == ContactAttempt.client_id)
             .join(User, User.id == ContactAttempt.seller_id)
-            .where(ContactAttempt.store_code == store)
-            .where(ContactAttempt.contacted_on >= datetime(year, month, 1))
-            .where(ContactAttempt.contacted_on < datetime(year + (1 if month == 12 else 0),
-                                                         1 if month == 12 else month + 1, 1))
+            .where(*scope)
             .order_by(ContactAttempt.contacted_on.desc(), ContactAttempt.created_at.desc())
-            .limit(500)
+            .offset((page - 1) * page_size).limit(page_size)
         ).all()
-        return {"store_code": store, "year": year, "month": month, "items": [
-            self._call(row, name, seller) for row, name, seller in rows
-        ]}
+        return {"store_code": store, "year": year, "month": month,
+                "total": total, "page": page, "page_size": page_size,
+                "items": [self._call(row, name, seller)
+                          for row, name, seller in rows]}
 
     @staticmethod
     def _call(row: ContactAttempt, client_name: str, seller_name: str) -> dict:
@@ -1019,6 +1152,11 @@ class OperationsService:
             revision=1, created_by=self.actor.id, updated_by=self.actor.id,
         )
         self.db.add(row)
+        if (client.last_contact_on is None
+                or row.contacted_on > client.last_contact_on):
+            client.last_contact_on = row.contacted_on
+            client.revision += 1
+            client.updated_by = self.actor.id
         self.audit("telemarketing.call.created", "contact_attempt", str(row.id),
                    {"store": store, "date": contacted_on.isoformat(),
                     "client_id": str(client_id), "seller_id": str(seller_id),
@@ -1040,6 +1178,7 @@ class OperationsService:
         before = {"date": day_iso(row.contacted_on), "outcome": row.outcome,
                   "channel": row.channel,
                   "next_on": day_iso(row.next_on), "note": row.note}
+        previous_on = row.contacted_on
         row.contacted_on = date_time(contacted_on)
         row.outcome = outcome
         row.channel = channel
@@ -1047,6 +1186,21 @@ class OperationsService:
         row.note = note
         row.revision += 1
         row.updated_by = self.actor.id
+        self.db.flush()
+        client = self.db.get(ContactClient, row.client_id)
+        if client:
+            if client.last_contact_on is not None and (
+                    client.last_contact_on == previous_on):
+                client.last_contact_on = self.db.scalar(
+                    select(func.max(ContactAttempt.contacted_on)).where(
+                        ContactAttempt.client_id == client.id))
+                client.revision += 1
+                client.updated_by = self.actor.id
+            elif client.last_contact_on is None or (
+                    row.contacted_on > client.last_contact_on):
+                client.last_contact_on = row.contacted_on
+                client.revision += 1
+                client.updated_by = self.actor.id
         self.audit("telemarketing.call.corrected", "contact_attempt", str(row.id),
                    {"before": before,
                     "after": {"date": contacted_on.isoformat(), "outcome": outcome,

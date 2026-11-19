@@ -2,7 +2,8 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile
+from fastapi import (APIRouter, Depends, File, HTTPException, Path, Query,
+                     Response, UploadFile)
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -208,8 +209,30 @@ def client_filters(store_code: str,
 
 @router.get("/contacts/{store_code}/clients/{client_id}")
 def client_detail(store_code: str, client_id: UUID,
+                  history_page: int = Query(1, ge=1),
+                  history_size: int = Query(50, ge=1, le=200),
                   svc: OperationsService = Depends(service)) -> dict:
-    return checked(lambda: svc.client_detail(store_code, client_id))
+    return checked(lambda: svc.client_detail(
+        store_code, client_id,
+        history_page=history_page, history_size=history_size))
+
+
+@router.get("/contacts/{store_code}/export")
+def export_wallet(store_code: str,
+                  format: str = Query("csv", pattern=r"^(csv|xlsx)$"),
+                  q: str | None = Query(default=None, max_length=80),
+                  city: str | None = Query(default=None, max_length=60),
+                  status: str | None = Query(default=None),
+                  tag: str | None = Query(default=None, max_length=60),
+                  phone: str | None = Query(default=None, max_length=40),
+                  inactive: str | None = Query(default=None,
+                                               pattern=r"^(sim|nao)$"),
+                  svc: OperationsService = Depends(service)) -> Response:
+    content, filename, media = checked(lambda: svc.export_clients(
+        store_code, q=q, city=city, status=status, tag=tag, phone=phone,
+        inactive=inactive, fmt=format))
+    return Response(content=content, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.post("/contacts/{store_code}/clients", status_code=201)
@@ -300,6 +323,12 @@ def import_commit(store_code: str, session_id: UUID, body: ImportCommit,
         confirm=body.confirm))
 
 
+@router.delete("/contacts/{store_code}/import/{session_id}")
+def import_discard(store_code: str, session_id: UUID,
+                   svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.import_discard(store_code, session_id))
+
+
 @router.get("/contacts/{store_code}/team")
 def seller_team(store_code: str, svc: OperationsService = Depends(service)) -> list[dict]:
     return checked(lambda: svc.sellers(store_code))
@@ -308,8 +337,11 @@ def seller_team(store_code: str, svc: OperationsService = Depends(service)) -> l
 @router.get("/contacts/{store_code}/{year}/{month}/calls")
 def calls(store_code: str, year: int = Path(ge=2020, le=2100),
           month: int = Path(ge=1, le=12),
+          page: int = Query(1, ge=1),
+          page_size: int = Query(100, ge=1, le=500),
           svc: OperationsService = Depends(service)) -> dict:
-    return checked(lambda: svc.calls(store_code, year, month))
+    return checked(lambda: svc.calls(store_code, year, month,
+                                     page=page, page_size=page_size))
 
 
 @router.post("/contacts/{store_code}/calls", status_code=201)

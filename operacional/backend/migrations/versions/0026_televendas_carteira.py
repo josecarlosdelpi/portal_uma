@@ -98,6 +98,19 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    duplicates = op.get_bind().execute(sa.text(
+        "SELECT count(*) FROM ("
+        "SELECT 1 FROM contact_clients "
+        "GROUP BY store_code, name_key "
+        "HAVING count(*) > 1) homonymos"
+    )).scalar()
+    if duplicates:
+        raise RuntimeError(
+            "Downgrade da revisão 0026 bloqueado: existem "
+            f"{duplicates} grupo(s) de clientes homônimos por loja, "
+            "legítimos nesta versão. A reversão recriaria a unicidade de "
+            "nome e destruiria essa distinção. Revise os cadastros "
+            "manualmente antes de tentar o downgrade novamente.")
     op.drop_table("client_import_sessions")
     op.drop_table("contact_settings")
     op.drop_table("contact_tags")
