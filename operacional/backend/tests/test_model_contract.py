@@ -19,6 +19,8 @@ def test_schema_has_expected_core_tables():
         "user_preferences",
         "erp_import_batches", "erp_sale_rows", "erp_return_rows", "erp_source_files",
         "financial_obligations", "dre_classification_rules",
+        "expense_categories", "supplier_category_rules",
+        "expense_line_classifications",
     }
 
 

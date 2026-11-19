@@ -70,10 +70,16 @@ FINANCIAL_READ_PERMISSIONS = frozenset({"finance.view"})
 # fica reservada a etapa de edicao de regras e nunca e delegavel neste ciclo.
 DRE_READ_PERMISSIONS = frozenset({"dre.view"})
 CASHFLOW_READ_PERMISSIONS = frozenset({"cashflow.view"})
+# Gestao de Despesas: leitura concedivel por concessao explicita; edicao
+# (categorias, regras e classificacao manual) exige 'expenses.manage',
+# limitada ao escopo de lojas do usuario.
+EXPENSES_READ_PERMISSIONS = frozenset({"expenses.view"})
+EXPENSES_MANAGE_PERMISSIONS = frozenset({"expenses.manage"})
 SUPERADMIN_ONLY_PERMISSIONS = frozenset({"finance.import", "dre.classify"})
 FINANCIAL_PERMISSIONS = (
     FINANCIAL_READ_PERMISSIONS | DRE_READ_PERMISSIONS
-    | CASHFLOW_READ_PERMISSIONS | SUPERADMIN_ONLY_PERMISSIONS
+    | CASHFLOW_READ_PERMISSIONS | EXPENSES_READ_PERMISSIONS
+    | EXPENSES_MANAGE_PERMISSIONS | SUPERADMIN_ONLY_PERMISSIONS
 )
 
 KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS | FINANCIAL_PERMISSIONS
@@ -95,6 +101,7 @@ FULL_SCOPE_PERMISSIONS = frozenset({
 GRANTABLE_PERMISSIONS = (
     OPERATIONAL_PERMISSIONS | FINANCIAL_READ_PERMISSIONS
     | DRE_READ_PERMISSIONS | CASHFLOW_READ_PERMISSIONS
+    | EXPENSES_READ_PERMISSIONS | EXPENSES_MANAGE_PERMISSIONS
 )
 
 USER_PROFILES = frozenset({"administrator", "seller", "staff"})
