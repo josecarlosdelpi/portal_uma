@@ -65,7 +65,14 @@ OPERATIONAL_PERMISSIONS = READ_PERMISSIONS | MANAGEMENT_READ_PERMISSIONS | WRITE
 # explicita via grupo/excecao. 'finance.import' permanece exclusivo do
 # SuperAdmin e nao pode ser concedido a grupos.
 FINANCIAL_READ_PERMISSIONS = frozenset({"finance.view"})
-FINANCIAL_PERMISSIONS = FINANCIAL_READ_PERMISSIONS | frozenset({"finance.import"})
+# DRE gerencial preliminar: leitura concedivel apenas por concessao
+# explicita (padrao: somente SuperAdmin). 'dre.classify' fica reservada a
+# etapa de edicao de regras e nunca e delegavel neste ciclo.
+DRE_READ_PERMISSIONS = frozenset({"dre.view"})
+SUPERADMIN_ONLY_PERMISSIONS = frozenset({"finance.import", "dre.classify"})
+FINANCIAL_PERMISSIONS = (
+    FINANCIAL_READ_PERMISSIONS | DRE_READ_PERMISSIONS | SUPERADMIN_ONLY_PERMISSIONS
+)
 
 KNOWN_PERMISSIONS = OPERATIONAL_PERMISSIONS | GOVERNANCE_PERMISSIONS | FINANCIAL_PERMISSIONS
 
@@ -80,10 +87,11 @@ FULL_SCOPE_PERMISSIONS = frozenset({
     "sales.import",
 })
 
-# Concediveis a grupos/usuarios; governanca e importacao financeira ficam
-# restritas ao SuperAdmin independentemente de concessoes.
+# Concediveis a grupos/usuarios; governanca, importacao financeira e a
+# edicao de regras da DRE ficam restritas ao SuperAdmin independentemente
+# de concessoes.
 GRANTABLE_PERMISSIONS = (
-    OPERATIONAL_PERMISSIONS | FINANCIAL_READ_PERMISSIONS
+    OPERATIONAL_PERMISSIONS | FINANCIAL_READ_PERMISSIONS | DRE_READ_PERMISSIONS
 )
 
 USER_PROFILES = frozenset({"administrator", "seller", "staff"})
@@ -110,7 +118,8 @@ def can_access(principal: Principal, permission: str, store_code: str | None = N
     if principal.is_superadmin:
         return True
 
-    if permission in GOVERNANCE_PERMISSIONS or permission == "finance.import":
+    if (permission in GOVERNANCE_PERMISSIONS
+            or permission in SUPERADMIN_ONLY_PERMISSIONS):
         return False
 
     if permission in FULL_SCOPE_PERMISSIONS:

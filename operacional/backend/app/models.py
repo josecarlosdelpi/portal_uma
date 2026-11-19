@@ -773,3 +773,42 @@ class FinancialObligation(Base):
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
     status: Mapped[str] = mapped_column(String(10), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class DreClassificationRule(Base):
+    """Regra de classificacao gerencial das obrigacoes do ERP (DRE preliminar).
+
+    Somente leitura nesta etapa: a edicao com auditoria fica reservada a
+    permissao 'dre.classify'. O mapeamento inicial e semeado pela migration;
+    quando a tabela esta vazia a avaliacao recorre aos padroes embutidos —
+    uma linha aqui nunca e tratada como verdade contabil por si so.
+    """
+    __tablename__ = "dre_classification_rules"
+    __table_args__ = (
+        CheckConstraint(
+            "bucket IN ('despesa_comercial','despesa_operacional',"
+            "'das_identificado','compra_revenda','financiamento',"
+            "'imobilizado','a_classificar')",
+            name="ck_dre_rule_bucket"),
+        CheckConstraint(
+            "allocation IN ('erp_store','shared','pending_review')",
+            name="ck_dre_rule_allocation"),
+        CheckConstraint(
+            "account_code IS NOT NULL OR supplier_pattern IS NOT NULL",
+            name="ck_dre_rule_matcher"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    # Codigo de conta normalizado (ex.: '67'); NULL = vale para qualquer conta.
+    account_code: Mapped[str | None] = mapped_column(String(20))
+    # Trecho normalizado do nome do fornecedor; NULL = regra so por conta.
+    supplier_pattern: Mapped[str | None] = mapped_column(String(200))
+    bucket: Mapped[str] = mapped_column(String(30), nullable=False)
+    allocation: Mapped[str] = mapped_column(String(20), nullable=False, default="erp_store")
+    note: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

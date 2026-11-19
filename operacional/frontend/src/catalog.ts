@@ -144,6 +144,8 @@ export const permissionGroups: ReadonlyArray<PermissionGroup> = [
     help: "Despesas e pagamentos importados do ERP. Nunca é concedido por padrão.",
     permissions: [
       { code: "finance.view", name: "Consultar módulo financeiro", kind: "view" },
+      { code: "dre.view", name: "Consultar DRE gerencial — prévia", kind: "view",
+        note: "Somente SuperAdmin por padrão; conceder apenas com aval da gestão." },
     ],
   },
 ];
