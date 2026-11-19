@@ -5,9 +5,10 @@ import {financeApi,type FinanceBatch,type FinanceOverview,type FinanceSyncStatus
   type ObligationItem,type ObligationPage,type PaymentsPage,type PurchasesView} from "./financeApi";
 import {DrePanel} from "./DrePanel";
 import {CashflowPanel} from "./CashflowPanel";
+import {ExpensesPanel} from "./ExpensesPanel";
 
 type Props={token:string;profile:MyProfile};
-type FinTab="overview"|"payables"|"payments"|"purchases"|"dre"|"cashflow";
+type FinTab="overview"|"payables"|"payments"|"purchases"|"dre"|"cashflow"|"expenses";
 
 const brl=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
 const fmt=(v?:string|null)=>v==null||v===""?"—":brl.format(Number(v));
@@ -308,6 +309,9 @@ export function FinancePage({token,profile}:Props){
       {profile.features.cashflow&&<button role="tab" aria-selected={tab==="cashflow"}
         className={"tab"+(tab==="cashflow"?" active":"")}
         onClick={()=>setTab("cashflow")}>Fluxo de Caixa</button>}
+      {profile.features.expenses&&<button role="tab" aria-selected={tab==="expenses"}
+        className={"tab"+(tab==="expenses"?" active":"")}
+        onClick={()=>setTab("expenses")}>Gestão de Despesas</button>}
     </div>
 
     {tab==="overview"&&<>
@@ -506,6 +510,7 @@ export function FinancePage({token,profile}:Props){
 
     {tab==="dre"&&profile.features.dre&&<DrePanel token={token} profile={profile}/>}
     {tab==="cashflow"&&profile.features.cashflow&&<CashflowPanel token={token} profile={profile}/>}
+    {tab==="expenses"&&profile.features.expenses&&<ExpensesPanel token={token} profile={profile}/>}
   </section>;
 }
 

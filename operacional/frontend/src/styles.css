@@ -596,3 +596,84 @@
 .dre-drill-table td.fin-num{text-align:right;white-space:nowrap}
 .dre-excluded{margin-top:20px}
 .dre-shared-memo{margin:12px 0 0}
+
+/* ===== Gestao de Despesas ===== */
+.exp-toolbar{display:flex;justify-content:space-between;align-items:center;
+  gap:12px;flex-wrap:wrap;margin:4px 0 0}
+.exp-toolbar .tabs{margin:0}
+.exp-cats-btn{white-space:nowrap}
+.exp-month-nav{display:flex;align-items:center;gap:8px}
+.exp-month-arrow{padding:8px 12px;font-weight:800}
+.exp-month-name{min-width:150px;text-align:center;font-weight:700;
+  font-size:13px;color:#1a3841}
+.exp-save{display:block;font-size:10px;margin-top:3px}
+.exp-save-saving{color:#6d838c}
+.exp-save-saved{color:#187a58}
+.exp-save-error{color:#9f3030}
+.exp-row-none td{background:#fffdf6}
+.exp-cat-select{border:1px solid #dbe5e9;background:white;border-radius:8px;
+  padding:7px 9px;font-size:12px;color:#203a44;min-width:170px;max-width:220px}
+.exp-lines-table td:nth-child(1){min-width:180px}
+.exp-cat-bars{display:flex;flex-direction:column;gap:6px;margin-bottom:18px}
+.exp-cat-bar{display:grid;grid-template-columns:190px 1fr auto;gap:12px;
+  align-items:center;border:0;background:transparent;padding:5px 6px;
+  text-align:left;border-radius:8px;cursor:pointer}
+.exp-cat-bar:hover{background:#f4f9f9}
+.exp-cat-bar-name{font-size:12px;font-weight:700;color:#354f59;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-cat-bar.exp-cat-none .exp-cat-bar-name{color:#a4551c}
+.exp-cat-bar-track{height:16px;background:#eef3f5;border-radius:8px;overflow:hidden}
+.exp-cat-bar-fill{display:block;height:100%;border-radius:8px;
+  background:linear-gradient(90deg,#20bfc1,#14767e)}
+.exp-cat-bar.exp-cat-none .exp-cat-bar-fill{background:#d8b46a}
+.exp-cat-bar-value{font-size:12px;font-variant-numeric:tabular-nums;
+  color:#354f59;white-space:nowrap}
+.dre-methodology{list-style:none;margin:0;padding:0;display:flex;
+  flex-direction:column;gap:7px}
+.dre-methodology li{font-size:12px;color:#58737c;padding-left:16px;position:relative}
+.dre-methodology li::before{content:"•";position:absolute;left:2px;color:#00a7a6}
+.exp-cat-modal{max-width:780px;width:94%;max-height:88vh;overflow:auto}
+.exp-cat-modal h2{font-size:17px;margin:0 0 6px}
+.exp-cat-section{margin-top:22px}
+.exp-cat-section h3{font-size:14px;margin:0 0 10px}
+.exp-cat-new{display:flex;gap:8px;margin-bottom:12px}
+.exp-cat-new input{flex:1;border:1px solid #dbe5e9;border-radius:9px;padding:10px}
+.exp-cat-list{list-style:none;margin:0;padding:0;display:flex;
+  flex-direction:column;gap:2px}
+.exp-cat-list li{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  border-radius:8px;font-size:13px}
+.exp-cat-list li:hover{background:#f4f9f9}
+.exp-cat-list li span{flex:1;font-weight:600;color:#354f59}
+.exp-cat-list li input{flex:1;border:1px solid #dbe5e9;border-radius:8px;padding:7px}
+.exp-cat-list .btn-ghost{padding:6px 10px;font-size:11px}
+.exp-cat-off{opacity:.55}
+.exp-rule-new{display:grid;grid-template-columns:minmax(220px,1.4fr)
+  minmax(160px,1fr) minmax(140px,.8fr) auto;gap:8px;margin-bottom:14px;
+  align-items:start}
+.exp-sup-picker{position:relative}
+.exp-sup-picker input{width:100%;border:1px solid #dbe5e9;border-radius:9px;
+  padding:10px;font-size:12px}
+.exp-sup-sel{display:flex;align-items:center;justify-content:space-between;
+  gap:8px;background:#e4f6f2;border:1px solid #c6e4e2;border-radius:9px;
+  padding:9px 10px;font-size:12px;margin-top:6px}
+.exp-sup-results{position:absolute;top:100%;left:0;right:0;z-index:5;
+  list-style:none;margin:4px 0 0;padding:4px;background:#fff;
+  border:1px solid #dbe5e9;border-radius:9px;box-shadow:0 12px 30px
+  rgba(20,44,52,.15);max-height:240px;overflow:auto}
+.exp-sup-results button{display:block;width:100%;text-align:left;border:0;
+  background:transparent;padding:8px 10px;font-size:12px;border-radius:6px}
+.exp-sup-results button:hover{background:#f0fbf8}
+.exp-rule-new select{border:1px solid #dbe5e9;border-radius:9px;padding:10px;
+  font-size:12px;background:#fff;color:#203a44;width:100%}
+.exp-rules-table td select{border:1px solid #dbe5e9;border-radius:7px;
+  padding:6px 8px;font-size:12px;background:#fff}
+@media(max-width:700px){
+  .exp-cat-bar{grid-template-columns:1fr;gap:4px;padding:8px 4px}
+  .exp-cat-bar-value{text-align:left}
+  .exp-rule-new{grid-template-columns:1fr}
+  .exp-month-nav{width:100%;justify-content:center}
+  .exp-toolbar{flex-direction:column;align-items:stretch}
+  .exp-toolbar .tabs{width:100%}
+  .exp-toolbar .tab{flex:1}
+  .exp-cats-btn{width:100%}
+}

@@ -812,3 +812,105 @@ class DreClassificationRule(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class ExpenseCategory(Base):
+    """Categoria gerencial de despesas (Gestao de Despesas).
+
+    Dimensao adicional e independente: nao substitui a categoria do ERP,
+    o codigo de conta nem as regras homologadas da DRE. Compartilhada
+    entre as tres lojas. Desativar preserva historico — nunca exclui.
+    """
+    __tablename__ = "expense_categories"
+    __table_args__ = (
+        UniqueConstraint("name_norm", name="uq_expense_category_norm"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Nome normalizado (casefold + espacos colapsados) — impede duplicatas.
+    name_norm: Mapped[str] = mapped_column(String(80), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class SupplierCategoryRule(Base):
+    """Regra automatica: fornecedor -> categoria gerencial padrao.
+
+    supplier_key = 'doc:<digitos>' quando ha CNPJ/CPF confiavel, senao
+    'name:<nome normalizado>' — jamais correspondencia aproximada.
+    store_code NULL = regra valida para toda a UMA; uma regra por
+    (supplier_key, escopo de loja). Aplicada retroativamente a todos os
+    lancamentos elegiveis sem classificacao manual — regras nunca
+    sobrescrevem escolha manual.
+    """
+    __tablename__ = "supplier_category_rules"
+    __table_args__ = (
+        Index("ix_supplier_rule_key", "supplier_key"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    supplier_key: Mapped[str] = mapped_column(String(220), nullable=False)
+    # Rotulo legivel para exibicao (documento ou nome como veio do ERP).
+    supplier_label: Mapped[str] = mapped_column(String(220), nullable=False)
+    # NULL = regra geral da UMA; senao regra especifica da loja.
+    store_code: Mapped[str | None] = mapped_column(
+        ForeignKey("stores.code", ondelete="RESTRICT"))
+    category_id: Mapped[UUID] = mapped_column(
+        ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ExpenseLineClassification(Base):
+    """Classificacao manual de um lancamento financeiro (Gestao de Despesas).
+
+    Persistencia independente dos snapshots do ERP: a chave e o
+    'fingerprint' — hash dos campos identitarios do lancamento (loja,
+    fornecedor, documento, parcela, emissao, vencimento e valor), que
+    sobrevive a novas importacoes do arquivo. O id interno da linha NUNCA
+    e usado, pois muda a cada lote.
+
+    Linhas identicas em todos os campos identitarios sao
+    indistinguiveis entre si e compartilham a mesma classificacao —
+    registrado em matched_rows para diagnostico. Se o fingerprint deixa
+    de existir no snapshot vigente (lancamento alterado/removido pelo
+    ERP), o registro permanece com status 'orphan' e e sinalizado para
+    revisao — nunca e transferido para outro lancamento por aproximacao.
+    """
+    __tablename__ = "expense_line_classifications"
+    __table_args__ = (
+        CheckConstraint("status IN ('active','orphan')",
+                        name="ck_expense_line_class_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    category_id: Mapped[UUID] = mapped_column(
+        ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    store_code: Mapped[str] = mapped_column(
+        ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    supplier_key: Mapped[str] = mapped_column(String(220), nullable=False)
+    supplier_label: Mapped[str] = mapped_column(String(220), nullable=False)
+    # Copia dos campos identitarios no momento da gravacao (diagnostico).
+    document_number: Mapped[str | None] = mapped_column(String(30))
+    installment_number: Mapped[str | None] = mapped_column(String(10))
+    issued_at: Mapped[date | None] = mapped_column(Date())
+    due_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # Linhas do snapshot vigente cobertas na ultima verificacao.
+    matched_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
