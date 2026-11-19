@@ -544,6 +544,19 @@
 .dre-tech .dre-sources{margin-top:12px}
 .dre-tech .dre-warnings{margin-top:12px}
 .dre-tech .dre-basis{margin:14px 0 2px}
+.cf-section{margin-top:18px}
+.cf-methodology{margin:14px 0 2px;padding-left:18px;font-size:11px;color:#6d838c;
+  display:flex;flex-direction:column;gap:5px}
+.cf-methodology strong{color:#4a636d}
+.cf-warn{color:#a4551c!important}
+/* tabela principal do Fluxo de Caixa: avisos quebram linha sem espremer
+   a coluna Movimento; valores seguem em uma linha, alinhados a direita;
+   sem espaco, o table-wrap rola horizontalmente */
+.cf-main-table{min-width:820px}
+.cf-main-table th:first-child,.cf-main-table td:first-child{min-width:190px}
+.cf-main-table td.fin-num{min-width:120px}
+.cf-main-table td.fin-num .dre-note,.cf-main-table td.fin-num .dre-pct{
+  white-space:normal}
 @media(max-width:900px){.dre-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.dre-kpis{grid-template-columns:1fr}}
 .dre-sources{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 14px}

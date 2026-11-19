@@ -4,9 +4,10 @@ import {labelStore} from "./catalog";
 import {financeApi,type FinanceBatch,type FinanceOverview,type FinanceSyncStatus,
   type ObligationItem,type ObligationPage,type PaymentsPage,type PurchasesView} from "./financeApi";
 import {DrePanel} from "./DrePanel";
+import {CashflowPanel} from "./CashflowPanel";
 
 type Props={token:string;profile:MyProfile};
-type FinTab="overview"|"payables"|"payments"|"purchases"|"dre";
+type FinTab="overview"|"payables"|"payments"|"purchases"|"dre"|"cashflow";
 
 const brl=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"});
 const fmt=(v?:string|null)=>v==null||v===""?"—":brl.format(Number(v));
@@ -304,6 +305,9 @@ export function FinancePage({token,profile}:Props){
       {profile.features.dre&&<button role="tab" aria-selected={tab==="dre"}
         className={"tab"+(tab==="dre"?" active":"")}
         onClick={()=>setTab("dre")}>DRE Gerencial — Prévia</button>}
+      {profile.features.cashflow&&<button role="tab" aria-selected={tab==="cashflow"}
+        className={"tab"+(tab==="cashflow"?" active":"")}
+        onClick={()=>setTab("cashflow")}>Fluxo de Caixa</button>}
     </div>
 
     {tab==="overview"&&<>
@@ -501,6 +505,7 @@ export function FinancePage({token,profile}:Props){
     </>}
 
     {tab==="dre"&&profile.features.dre&&<DrePanel token={token} profile={profile}/>}
+    {tab==="cashflow"&&profile.features.cashflow&&<CashflowPanel token={token} profile={profile}/>}
   </section>;
 }
 

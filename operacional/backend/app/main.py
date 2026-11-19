@@ -21,6 +21,7 @@ from app.preferences_routes import router as preferences_router
 from app.erp_sales_routes import router as erp_sales_router
 from app.finance_routes import router as finance_router
 from app.dre_routes import router as dre_router
+from app.cashflow_routes import router as cashflow_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
@@ -58,6 +59,7 @@ app.include_router(preferences_router)
 app.include_router(erp_sales_router)
 app.include_router(finance_router)
 app.include_router(dre_router)
+app.include_router(cashflow_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
@@ -106,6 +108,9 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
             ),
             "dre": any(
                 can_access(principal, "dre.view", s) for s in visible_stores(principal)
+            ),
+            "cashflow": any(
+                can_access(principal, "cashflow.view", s) for s in visible_stores(principal)
             ),
             "monthly_closing": can_access(principal, "monthly_closing.view"),
         },
