@@ -1,9 +1,9 @@
 """Modelo inicial de persistencia. Schema mantido por migrations Alembic."""
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -21,7 +21,11 @@ class Store(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("profile IN ('administrator', 'seller')", name="ck_users_profile"),)
+    # Funcao operacional do colaborador (nao concede permissoes):
+    # 'seller' aparece nos cadastros de loja (televendas, treinamentos,
+    # tarefas); 'administrator' e 'staff' nao. Acessos vem do grupo de
+    # acesso e das excecoes individuais.
+    __table_args__ = (CheckConstraint("profile IN ('administrator', 'seller', 'staff')", name="ck_users_profile"),)
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     auth_subject: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
@@ -33,26 +37,56 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
-class StoreGroup(Base):
-    __tablename__ = "store_groups"
+class AccessGroup(Base):
+    """Grupo de acesso configuravel: nome, abrangencia de lojas e permissoes."""
+    __tablename__ = "access_groups"
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
-    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(String(300), nullable=False, default="", server_default="")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class AccessGroupStore(Base):
+    """Abrangencia geografica do grupo: em quais lojas suas permissoes valem."""
+    __tablename__ = "access_group_stores"
+
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+
+
+class UserStoreScope(Base):
+    """Restricao individual de lojas (subconjunto da abrangencia do grupo).
+
+    Sem linhas para o usuario = herda toda a abrangencia do grupo."""
+    __tablename__ = "user_store_scopes"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
 
 
 class GroupMembership(Base):
+    """Vinculo usuario <-> grupo de acesso.
+
+    Um usuario comum pertence a exatamente UM grupo principal: a restricao
+    de unicidade em user_id impede multiplos vinculos mesmo fora do ORM."""
     __tablename__ = "group_memberships"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_group_memberships_user"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    group_id: Mapped[UUID] = mapped_column(ForeignKey("store_groups.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
 
 
 class GroupPermission(Base):
     __tablename__ = "group_permissions"
 
-    group_id: Mapped[UUID] = mapped_column(ForeignKey("store_groups.id", ondelete="CASCADE"), primary_key=True)
+    group_id: Mapped[UUID] = mapped_column(ForeignKey("access_groups.id", ondelete="CASCADE"), primary_key=True)
     code: Mapped[str] = mapped_column(String(100), primary_key=True)
     granted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
@@ -232,18 +266,46 @@ class SupplyMovement(Base):
 
 
 class ContactClient(Base):
-    """Carteira por loja, independente das vendas e sem distribuicao individual."""
+    """Carteira por loja, independente das vendas e sem distribuicao individual.
+
+    Duplicidades de nome ou telefone sao avisadas, nao bloqueadas: a
+    confirmacao explicita do usuario decide entre manter os dois registros.
+    """
     __tablename__ = "contact_clients"
-    __table_args__ = (UniqueConstraint("store_code", "name_key", name="uq_client_name_store"),)
+    __table_args__ = (
+        CheckConstraint("status IS NULL OR status IN ('ativo','inativo','prospect')",
+                        name="ck_client_status"),
+        CheckConstraint("birthday_day IS NULL OR birthday_day BETWEEN 1 AND 31",
+                        name="ck_client_birthday_day"),
+        CheckConstraint("birthday_month IS NULL OR birthday_month BETWEEN 1 AND 12",
+                        name="ck_client_birthday_month"),
+        CheckConstraint("revision >= 1", name="ck_client_revision"),
+        Index("ix_contact_clients_store_city", "store_code", "city"),
+        Index("ix_contact_clients_store_status", "store_code", "status"),
+        Index("ix_contact_clients_store_name", "store_code", "name_key"),
+    )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     name_key: Mapped[str] = mapped_column(String(120), nullable=False)
     erp_code: Mapped[str | None] = mapped_column(String(50))
     phone: Mapped[str | None] = mapped_column(String(40))
+    phone_norm: Mapped[str | None] = mapped_column(String(40))
+    cellphone: Mapped[str | None] = mapped_column(String(40))
+    cellphone_norm: Mapped[str | None] = mapped_column(String(40))
+    city: Mapped[str | None] = mapped_column(String(60))
+    contact_person: Mapped[str | None] = mapped_column(String(100))
+    birthday_day: Mapped[int | None] = mapped_column(Integer)
+    birthday_month: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str | None] = mapped_column(String(12))
+    tag: Mapped[str | None] = mapped_column(String(60))
+    last_contact_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    notes: Mapped[str | None] = mapped_column(String(2000))
     origin: Mapped[str] = mapped_column(String(25), nullable=False)
     last_purchase_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -252,20 +314,63 @@ class ContactAttempt(Base):
     __tablename__ = "contact_attempts"
     __table_args__ = (
         CheckConstraint("outcome IN ('apresentacao','sem_resposta','whatsapp','outro')", name="ck_call_outcome"),
+        CheckConstraint("channel IN ('ligacao','whatsapp')", name="ck_call_channel"),
         CheckConstraint("revision >= 1", name="ck_call_revision"),
+        Index("ix_calls_store_next_on", "store_code", "next_on"),
     )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
     client_id: Mapped[UUID] = mapped_column(ForeignKey("contact_clients.id", ondelete="RESTRICT"), nullable=False)
     seller_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     contacted_on: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
+    channel: Mapped[str] = mapped_column(String(12), nullable=False, default="ligacao")
     outcome: Mapped[str] = mapped_column(String(25), nullable=False)
     next_on: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
+    followup_done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     note: Mapped[str] = mapped_column(String(240), nullable=False, default="")
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     updated_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ContactTag(Base):
+    """Catalogo de classificacoes comerciais reutilizaveis entre clientes."""
+    __tablename__ = "contact_tags"
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ContactSetting(Base):
+    """Parametros do modulo de televendas (linha unica, chave 'global')."""
+    __tablename__ = "contact_settings"
+    __table_args__ = (
+        CheckConstraint("inactivity_days BETWEEN 1 AND 365", name="ck_settings_inactivity"),
+    )
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    inactivity_days: Mapped[int] = mapped_column(Integer, nullable=False, default=45)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ClientImportSession(Base):
+    """Previa de importacao de carteira aguardando decisao do gestor."""
+    __tablename__ = "client_import_sessions"
+    __table_args__ = (
+        CheckConstraint("state IN ('preview','applied','discarded')", name="ck_import_state"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    filename: Mapped[str] = mapped_column(String(160), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    state: Mapped[str] = mapped_column(String(12), nullable=False, default="preview")
+    report: Mapped[dict | None] = mapped_column(JSON)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 
@@ -356,7 +461,8 @@ class TrainingRecord(Base):
     """Metadados de participacao. Assinaturas e PDFs exigem armazenamento privado futuro."""
     __tablename__ = "training_records"
     __table_args__ = (
-        CheckConstraint("step IN ('participou','pratica')", name="ck_training_step"),
+        CheckConstraint("step IN ('participou','pratica','participou,pratica')",
+                      name="ck_training_step"),
     )
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
@@ -366,10 +472,16 @@ class TrainingRecord(Base):
     title: Mapped[str] = mapped_column(String(140), nullable=False, default="")
     instructor: Mapped[str] = mapped_column(String(90), nullable=False)
     happened_on: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
-    step: Mapped[str] = mapped_column(String(15), nullable=False)
+    step: Mapped[str] = mapped_column(String(31), nullable=False)
     note: Mapped[str] = mapped_column(String(350), nullable=False, default="")
+    procedure_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedures.id", ondelete="RESTRICT"))
+    procedure_version_id: Mapped[UUID | None] = mapped_column(ForeignKey("procedure_versions.id", ondelete="RESTRICT"))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     recorded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AccessInvitation(Base):
@@ -474,14 +586,14 @@ class TrainingDocument(Base):
     """Small private PDF attached to training record; does NOT constitute e-signature."""
     __tablename__ = "training_documents"
     __table_args__ = (
-        CheckConstraint("byte_length BETWEEN 1 AND 5242880", name="ck_training_pdf_size"),
+        CheckConstraint("byte_length BETWEEN 1 AND 10485760", name="ck_training_pdf_size"),
         CheckConstraint("revision >= 1", name="ck_training_pdf_revision"),
     )
     training_id: Mapped[UUID] = mapped_column(
         ForeignKey("training_records.id", ondelete="RESTRICT"), primary_key=True
     )
     original_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    media_type: Mapped[str] = mapped_column(String(30), nullable=False, default="application/pdf")
+    media_type: Mapped[str] = mapped_column(String(120), nullable=False, default="application/pdf")
     byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
     digest: Mapped[str] = mapped_column(String(64), nullable=False)
     content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
@@ -515,3 +627,361 @@ class DailyTask(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Procedure(Base):
+    """Documento interno da UMA, editado no portal e publicado por versao."""
+    __tablename__ = "procedures"
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(140), nullable=False)
+    summary: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    applies_to_all: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    obsolete_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    obsolete_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class UserPreference(Base):
+    """Preferencias de navegacao do proprio usuario; nunca localStorage."""
+    __tablename__ = "user_preferences"
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    sidebar_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    favorites: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    ui_prefs: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ProcedureStore(Base):
+    """Lojas as quais o procedimento se aplica (quando nao e global)."""
+    __tablename__ = "procedure_stores"
+    procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="CASCADE"), primary_key=True)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), primary_key=True)
+
+
+class ProcedureVersion(Base):
+    """Versao de conteudo do procedimento; rascunho editavel, publicado imutavel."""
+    __tablename__ = "procedure_versions"
+    __table_args__ = (
+        UniqueConstraint("procedure_id", "version_label", name="uq_procedure_version_label"),
+        CheckConstraint("status IN ('rascunho','publicado')", name="ck_procedure_version_status"),
+        CheckConstraint("revision >= 1", name="ck_procedure_version_revision"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_label: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="rascunho")
+    content_html: Mapped[str] = mapped_column(String(), nullable=False, default="")
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    published_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProcedureFile(Base):
+    """Imagem privada embutida no documento; nunca URL publica."""
+    __tablename__ = "procedure_files"
+    __table_args__ = (
+        CheckConstraint("byte_length BETWEEN 1 AND 3145728", name="ck_procedure_file_size"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    procedure_id: Mapped[UUID] = mapped_column(ForeignKey("procedures.id", ondelete="CASCADE"), nullable=False, index=True)
+    original_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
+    uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpImportBatch(Base):
+    """Snapshot de um arquivo ERP recebido; garante auditoria e idempotencia."""
+    __tablename__ = "erp_import_batches"
+    __table_args__ = (
+        CheckConstraint("kind IN ('VENDAS','DEVOLUCOES','DESPESAS')", name="ck_erp_batch_kind"),
+        CheckConstraint("source IN ('MANUAL_UPLOAD','DRIVE_SYNC')", name="ck_erp_batch_source"),
+        CheckConstraint("status IN ('RECEIVED','APPLIED','DUPLICATE','FAILED')", name="ck_erp_batch_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(15), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="RECEIVED")
+    file_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    drive_file_id: Mapped[str | None] = mapped_column(String(120))
+    rows_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rows_applied: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rows_rejected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    period_start: Mapped[date | None] = mapped_column(Date)
+    period_end: Mapped[date | None] = mapped_column(Date)
+    coverage: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    error_summary: Mapped[dict | None] = mapped_column(JSON)
+    imported_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ErpSaleRow(Base):
+    """Linha comercial do snapshot vigente; substituida por cobertura loja+periodo."""
+    __tablename__ = "erp_sale_rows"
+    __table_args__ = (
+        Index("ix_erp_sale_rows_store_date", "store_code", "sale_date"),
+        Index("ix_erp_sale_rows_date", "sale_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(ForeignKey("erp_import_batches.id", ondelete="CASCADE"), nullable=False, index=True)
+    sale_date: Mapped[date] = mapped_column(Date, nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    seller_code: Mapped[str] = mapped_column(String(30), nullable=False)
+    customer_cnpj: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    customer_name: Mapped[str] = mapped_column(String(150), nullable=False, default="")
+    product_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    seller_name: Mapped[str | None] = mapped_column(String(150))
+    product_description: Mapped[str | None] = mapped_column(String(200))
+    product_unit: Mapped[str | None] = mapped_column(String(10))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpReturnRow(Base):
+    """Devolucao registrada pelo ERP; nunca abatida automaticamente das vendas."""
+    __tablename__ = "erp_return_rows"
+    __table_args__ = (
+        Index("ix_erp_return_rows_store_date", "store_code", "sale_date"),
+        Index("ix_erp_return_rows_date", "sale_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(ForeignKey("erp_import_batches.id", ondelete="CASCADE"), nullable=False, index=True)
+    sale_date: Mapped[date] = mapped_column(Date, nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    seller_code: Mapped[str] = mapped_column(String(30), nullable=False, default="0")
+    customer_cnpj: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    customer_name: Mapped[str] = mapped_column(String(150), nullable=False, default="")
+    product_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    seller_name: Mapped[str | None] = mapped_column(String(150))
+    product_description: Mapped[str | None] = mapped_column(String(200))
+    product_unit: Mapped[str | None] = mapped_column(String(10))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpSourceFile(Base):
+    """Estado da aquisicao remota (Drive); contrato unico das frentes de integracao."""
+    __tablename__ = "erp_source_files"
+    __table_args__ = (
+        CheckConstraint("last_status IN ('PENDING','OK','SKIPPED','FAILED','DISABLED')",
+                        name="ck_erp_source_status"),
+    )
+
+    file_key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    drive_file_id: Mapped[str | None] = mapped_column(String(120))
+    drive_file_name: Mapped[str | None] = mapped_column(String(150))
+    drive_md5: Mapped[str | None] = mapped_column(String(64))
+    remote_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str] = mapped_column(String(12), nullable=False, default="PENDING")
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+class FinancialObligation(Base):
+    """Obrigacao financeira vinda do ERP (despesa ou compra para revenda).
+
+    Uma linha por linha do arquivo: o ERP nao envia IDs transacionais, entao
+    a cardinalidade e preservada — registros identicos sao lancamentos
+    legitimos e nunca sao deduplicados. Somente o snapshot corrente alimenta
+    as consultas; linhas de lotes anteriores permanecem para auditoria.
+    """
+    __tablename__ = "financial_obligations"
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_obligation_amount"),
+        CheckConstraint("category IN ('despesa','compra_revenda')", name="ck_obligation_category"),
+        CheckConstraint("status IN ('aberto','pago')", name="ck_obligation_status"),
+        CheckConstraint("(status = 'pago') = (paid_at IS NOT NULL)", name="ck_obligation_status_paid"),
+        Index("ix_financial_obligations_batch", "batch_id"),
+        Index("ix_financial_obligations_due", "store_code", "due_date"),
+        Index("ix_financial_obligations_paid", "store_code", "paid_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(
+        ForeignKey("erp_import_batches.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_row: Mapped[int] = mapped_column(Integer, nullable=False)
+    supplier_doc: Mapped[str | None] = mapped_column(String(20))
+    supplier_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    due_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    paid_at: Mapped[date | None] = mapped_column(Date())
+    document_number: Mapped[str | None] = mapped_column(String(30))
+    installment_number: Mapped[str | None] = mapped_column(String(10))
+    issued_at: Mapped[date | None] = mapped_column(Date())
+    original_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    additions: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    discounts: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    account_code: Mapped[str | None] = mapped_column(String(20))
+    account_description: Mapped[str | None] = mapped_column(String(150))
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class DreClassificationRule(Base):
+    """Regra de classificacao gerencial das obrigacoes do ERP (DRE preliminar).
+
+    Somente leitura nesta etapa: a edicao com auditoria fica reservada a
+    permissao 'dre.classify'. O mapeamento inicial e semeado pela migration;
+    quando a tabela esta vazia a avaliacao recorre aos padroes embutidos —
+    uma linha aqui nunca e tratada como verdade contabil por si so.
+    """
+    __tablename__ = "dre_classification_rules"
+    __table_args__ = (
+        CheckConstraint(
+            "bucket IN ('despesa_comercial','despesa_operacional',"
+            "'das_identificado','compra_revenda','financiamento',"
+            "'imobilizado','a_classificar')",
+            name="ck_dre_rule_bucket"),
+        CheckConstraint(
+            "allocation IN ('erp_store','shared','pending_review')",
+            name="ck_dre_rule_allocation"),
+        CheckConstraint(
+            "account_code IS NOT NULL OR supplier_pattern IS NOT NULL",
+            name="ck_dre_rule_matcher"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    # Codigo de conta normalizado (ex.: '67'); NULL = vale para qualquer conta.
+    account_code: Mapped[str | None] = mapped_column(String(20))
+    # Trecho normalizado do nome do fornecedor; NULL = regra so por conta.
+    supplier_pattern: Mapped[str | None] = mapped_column(String(200))
+    bucket: Mapped[str] = mapped_column(String(30), nullable=False)
+    allocation: Mapped[str] = mapped_column(String(20), nullable=False, default="erp_store")
+    note: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ExpenseCategory(Base):
+    """Categoria gerencial de despesas (Gestao de Despesas).
+
+    Dimensao adicional e independente: nao substitui a categoria do ERP,
+    o codigo de conta nem as regras homologadas da DRE. Compartilhada
+    entre as tres lojas. Desativar preserva historico — nunca exclui.
+    """
+    __tablename__ = "expense_categories"
+    __table_args__ = (
+        UniqueConstraint("name_norm", name="uq_expense_category_norm"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Nome normalizado (casefold + espacos colapsados) — impede duplicatas.
+    name_norm: Mapped[str] = mapped_column(String(80), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class SupplierCategoryRule(Base):
+    """Regra automatica: fornecedor -> categoria gerencial padrao.
+
+    supplier_key = 'doc:<digitos>' quando ha CNPJ/CPF confiavel, senao
+    'name:<nome normalizado>' — jamais correspondencia aproximada.
+    store_code NULL = regra valida para toda a UMA; uma regra por
+    (supplier_key, escopo de loja). Aplicada retroativamente a todos os
+    lancamentos elegiveis sem classificacao manual — regras nunca
+    sobrescrevem escolha manual.
+    """
+    __tablename__ = "supplier_category_rules"
+    __table_args__ = (
+        Index("ix_supplier_rule_key", "supplier_key"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    supplier_key: Mapped[str] = mapped_column(String(220), nullable=False)
+    # Rotulo legivel para exibicao (documento ou nome como veio do ERP).
+    supplier_label: Mapped[str] = mapped_column(String(220), nullable=False)
+    # NULL = regra geral da UMA; senao regra especifica da loja.
+    store_code: Mapped[str | None] = mapped_column(
+        ForeignKey("stores.code", ondelete="RESTRICT"))
+    category_id: Mapped[UUID] = mapped_column(
+        ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ExpenseLineClassification(Base):
+    """Classificacao manual de um lancamento financeiro (Gestao de Despesas).
+
+    Persistencia independente dos snapshots do ERP: a chave e o
+    'fingerprint' — hash dos campos identitarios do lancamento (loja,
+    fornecedor, documento, parcela, emissao, vencimento e valor), que
+    sobrevive a novas importacoes do arquivo. O id interno da linha NUNCA
+    e usado, pois muda a cada lote.
+
+    Linhas identicas em todos os campos identitarios sao
+    indistinguiveis entre si e compartilham a mesma classificacao —
+    registrado em matched_rows para diagnostico. Se o fingerprint deixa
+    de existir no snapshot vigente (lancamento alterado/removido pelo
+    ERP), o registro permanece com status 'orphan' e e sinalizado para
+    revisao — nunca e transferido para outro lancamento por aproximacao.
+    """
+    __tablename__ = "expense_line_classifications"
+    __table_args__ = (
+        CheckConstraint("status IN ('active','orphan')",
+                        name="ck_expense_line_class_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    category_id: Mapped[UUID] = mapped_column(
+        ForeignKey("expense_categories.id", ondelete="RESTRICT"), nullable=False)
+    store_code: Mapped[str] = mapped_column(
+        ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    supplier_key: Mapped[str] = mapped_column(String(220), nullable=False)
+    supplier_label: Mapped[str] = mapped_column(String(220), nullable=False)
+    # Copia dos campos identitarios no momento da gravacao (diagnostico).
+    document_number: Mapped[str | None] = mapped_column(String(30))
+    installment_number: Mapped[str | None] = mapped_column(String(10))
+    issued_at: Mapped[date | None] = mapped_column(Date())
+    due_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    # Linhas do snapshot vigente cobertas na ultima verificacao.
+    matched_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

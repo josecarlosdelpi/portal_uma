@@ -1,4 +1,8 @@
 """Minimal API: sem dados reais ou rotas desprotegidas."""
+import asyncio
+import contextlib
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -12,14 +16,36 @@ from app.attachments_routes import router as attachments_router
 from app.overview_routes import router as overview_router
 from app.closing_routes import router as closing_router
 from app.targets_routes import router as targets_router
+from app.procedures_routes import router as procedures_router
+from app.preferences_routes import router as preferences_router
+from app.erp_sales_routes import router as erp_sales_router
+from app.finance_routes import router as finance_router
+from app.dre_routes import router as dre_router
+from app.cashflow_routes import router as cashflow_router
+from app.expense_routes import router as expense_router
 from app.auth import current_user
 from app.config import get_settings
 from app.db import get_db
-from app.models import User
+from app.models import AccessGroup, GroupMembership, User
 from app.policy import can_access, visible_stores
 from app.repositories import load_principal
 
-app = FastAPI(title="Portal UMA - API operacional", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app import erp_scheduler
+
+    task = erp_scheduler.start()
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+
+app = FastAPI(title="Portal UMA - API operacional", version="0.1.0", lifespan=lifespan)
 app.include_router(admin_router)
 app.include_router(targets_router)
 app.include_router(overview_router)
@@ -29,6 +55,13 @@ app.include_router(routines_router)
 app.include_router(daily_tasks_router)
 app.include_router(local_router)
 app.include_router(attachments_router)
+app.include_router(procedures_router)
+app.include_router(preferences_router)
+app.include_router(erp_sales_router)
+app.include_router(finance_router)
+app.include_router(dre_router)
+app.include_router(cashflow_router)
+app.include_router(expense_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().allowed_origins(),
@@ -47,10 +80,18 @@ def health() -> dict[str, str]:
 @app.get("/api/v1/me", tags=["identity"])
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict:
     principal = load_principal(db, user)
+    from sqlalchemy import select
+    group = db.scalar(
+        select(AccessGroup)
+        .join(GroupMembership, GroupMembership.group_id == AccessGroup.id)
+        .where(GroupMembership.user_id == user.id, AccessGroup.active.is_(True))
+        .order_by(AccessGroup.name).limit(1)
+    )
     return {
         "id": str(user.id),
         "display_name": user.display_name,
         "profile": "superadmin" if principal.is_superadmin else principal.profile,
+        "group": group.name if group is not None else None,
         "stores": sorted(visible_stores(principal)),
         "features": {
             "targets": any(can_access(principal, "targets.view", store) for store in visible_stores(principal)),
@@ -63,10 +104,24 @@ def me(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dic
             "whatsapp_status": any(can_access(principal, "whatsapp_status.view", s) for s in visible_stores(principal)),
             "instagram": any(can_access(principal, "instagram.view", s) for s in visible_stores(principal)),
             "training": any(can_access(principal, "training.view", s) for s in visible_stores(principal)),
-            "monthly_closing": (
-                (principal.is_superadmin or principal.profile == "administrator")
-                and can_access(principal, "monthly_closing.view")
+            "sales": any(can_access(principal, "sales.view", s) for s in visible_stores(principal)),
+            "finance": any(
+                can_access(principal, "finance.view", s) for s in visible_stores(principal)
             ),
+            "dre": any(
+                can_access(principal, "dre.view", s) for s in visible_stores(principal)
+            ),
+            "cashflow": any(
+                can_access(principal, "cashflow.view", s) for s in visible_stores(principal)
+            ),
+            "expenses": any(
+                can_access(principal, "expenses.view", s) for s in visible_stores(principal)
+            ),
+            "expenses_manage": (user.is_superadmin
+                or user.profile == "administrator") and any(
+                can_access(principal, "expenses.manage", s) for s in visible_stores(principal)
+            ),
+            "monthly_closing": can_access(principal, "monthly_closing.view"),
         },
     }
 

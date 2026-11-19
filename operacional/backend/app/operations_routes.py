@@ -2,7 +2,8 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import (APIRouter, Depends, File, HTTPException, Path, Query,
+                     Response, UploadFile)
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -46,18 +47,49 @@ class MovementInput(Strict):
     expected_revision: int = Field(ge=1)
 
 
-class ClientInput(Strict):
-    name: str = Field(min_length=1, max_length=100)
+ORIGINS = r"^(google|inativo60|inativo90|carteira|planilha|indicacao|outro)$"
+
+
+class ClientFields(BaseModel):
+    name: str | None = Field(default=None, max_length=100)
     phone: str | None = Field(default=None, max_length=40)
+    cellphone: str | None = Field(default=None, max_length=40)
     erp_code: str | None = Field(default=None, max_length=50)
-    origin: str = Field(pattern=r"^(google|inativo60|inativo90|carteira)$")
+    origin: str | None = Field(default=None, pattern=ORIGINS)
+    city: str | None = Field(default=None, max_length=60)
+    contact_person: str | None = Field(default=None, max_length=100)
+    birthday_day: int | None = Field(default=None, ge=1, le=31)
+    birthday_month: int | None = Field(default=None, ge=1, le=12)
+    status: str | None = Field(default=None,
+                               pattern=r"^(ativo|inativo|prospect)$")
+    tag: str | None = Field(default=None, max_length=60)
+    last_contact_on: date | None = None
     last_purchase_on: date | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class ClientInput(ClientFields):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=100)
+    origin: str = Field(default="outro", pattern=ORIGINS)
+    confirm: bool = False
+
+
+class ClientUpdate(ClientFields):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=1)
+    confirm: bool = False
+
+
+class SettingsInput(Strict):
+    inactivity_days: int = Field(ge=1, le=365)
 
 
 class CallInput(Strict):
     client_id: UUID
     seller_id: UUID
     date: date
+    channel: str = Field(default="ligacao", pattern=r"^(ligacao|whatsapp)$")
     outcome: str = Field(pattern=r"^(apresentacao|sem_resposta|whatsapp|outro)$")
     next_on: date | None = None
     note: str = Field(default="", max_length=240)
@@ -65,10 +97,31 @@ class CallInput(Strict):
 
 class CallCorrection(Strict):
     date: date
+    channel: str = Field(default="ligacao", pattern=r"^(ligacao|whatsapp)$")
     outcome: str = Field(pattern=r"^(apresentacao|sem_resposta|whatsapp|outro)$")
     next_on: date | None = None
     note: str = Field(default="", max_length=240)
     expected_revision: int = Field(ge=1)
+
+
+class FollowupComplete(Strict):
+    expected_revision: int = Field(ge=1)
+
+
+class FollowupReschedule(Strict):
+    next_on: date
+    expected_revision: int = Field(ge=1)
+
+
+class ImportDecision(Strict):
+    action: str = Field(pattern=r"^(import|update|skip)$")
+    client_id: UUID | None = None
+    city: str | None = Field(default=None, max_length=60)
+
+
+class ImportCommit(Strict):
+    decisions: dict[str, ImportDecision] = Field(default_factory=dict)
+    confirm: bool = False
 
 
 def service(user: User = Depends(current_user), db: Session = Depends(get_db)) -> OperationsService:
@@ -135,17 +188,145 @@ def movements(store_code: str, limit: int = Query(100, ge=1, le=500),
 
 
 @router.get("/contacts/{store_code}/clients")
-def clients(store_code: str, svc: OperationsService = Depends(service)) -> list[dict]:
-    return checked(lambda: svc.clients(store_code))
+def clients(store_code: str, q: str | None = Query(default=None, max_length=80),
+            city: str | None = Query(default=None, max_length=60),
+            status: str | None = Query(default=None),
+            tag: str | None = Query(default=None, max_length=60),
+            phone: str | None = Query(default=None, max_length=40),
+            inactive: str | None = Query(default=None, pattern=r"^(sim|nao)$"),
+            page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
+            svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.clients_page(
+        store_code, q=q, city=city, status=status, tag=tag, phone=phone,
+        inactive=inactive, page=page, page_size=page_size))
+
+
+@router.get("/contacts/{store_code}/clients/filters")
+def client_filters(store_code: str,
+                   svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.client_filters(store_code))
+
+
+@router.get("/contacts/{store_code}/clients/{client_id}")
+def client_detail(store_code: str, client_id: UUID,
+                  history_page: int = Query(1, ge=1),
+                  history_size: int = Query(50, ge=1, le=200),
+                  svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.client_detail(
+        store_code, client_id,
+        history_page=history_page, history_size=history_size))
+
+
+@router.get("/contacts/{store_code}/export")
+def export_wallet(store_code: str,
+                  format: str = Query("csv", pattern=r"^(csv|xlsx)$"),
+                  q: str | None = Query(default=None, max_length=80),
+                  city: str | None = Query(default=None, max_length=60),
+                  status: str | None = Query(default=None),
+                  tag: str | None = Query(default=None, max_length=60),
+                  phone: str | None = Query(default=None, max_length=40),
+                  inactive: str | None = Query(default=None,
+                                               pattern=r"^(sim|nao)$"),
+                  svc: OperationsService = Depends(service)) -> Response:
+    content, filename, media = checked(lambda: svc.export_clients(
+        store_code, q=q, city=city, status=status, tag=tag, phone=phone,
+        inactive=inactive, fmt=format))
+    return Response(content=content, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @router.post("/contacts/{store_code}/clients", status_code=201)
 def add_client(store_code: str, body: ClientInput,
                svc: OperationsService = Depends(service)) -> dict:
     return checked(lambda: svc.add_client(
-        store_code, name=body.name, phone=body.phone, erp_code=body.erp_code,
-        origin=body.origin, last_purchase_on=body.last_purchase_on
+        store_code, name=body.name, phone=body.phone, cellphone=body.cellphone,
+        erp_code=body.erp_code, origin=body.origin, city=body.city,
+        contact_person=body.contact_person, birthday_day=body.birthday_day,
+        birthday_month=body.birthday_month, status=body.status, tag=body.tag,
+        last_contact_on=body.last_contact_on, notes=body.notes,
+        last_purchase_on=body.last_purchase_on, confirm=body.confirm
     ))
+
+
+@router.put("/contacts/{store_code}/clients/{client_id}")
+def update_client(store_code: str, client_id: UUID, body: ClientUpdate,
+                  svc: OperationsService = Depends(service)) -> dict:
+    fields = body.model_dump(exclude_unset=True,
+                             exclude={"expected_revision", "confirm"})
+    return checked(lambda: svc.update_client(
+        store_code, client_id, expected=body.expected_revision,
+        confirm=body.confirm, **fields))
+
+
+@router.get("/contacts/{store_code}/settings")
+def get_settings(store_code: str,
+                 svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.contact_settings(store_code))
+
+
+@router.put("/contacts/{store_code}/settings")
+def put_settings(store_code: str, body: SettingsInput,
+                 svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.save_settings(store_code, body.inactivity_days))
+
+
+@router.get("/contacts/{store_code}/metrics/{year}/{month}")
+def contact_metrics(store_code: str, year: int = Path(ge=2020, le=2100),
+                    month: int = Path(ge=1, le=12),
+                    svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.metrics(store_code, year, month))
+
+
+@router.get("/contacts/{store_code}/followups")
+def followups(store_code: str,
+              state: str = Query("abertos",
+                                 pattern=r"^(abertos|atrasados|realizados|todos)$"),
+              page: int = Query(1, ge=1), page_size: int = Query(100, ge=1, le=200),
+              svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.followups(store_code, state=state, page=page,
+                                         page_size=page_size))
+
+
+@router.post("/contacts/{store_code}/followups/{call_id}/done")
+def followup_done(store_code: str, call_id: UUID, body: FollowupComplete,
+                  svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.complete_followup(
+        store_code, call_id, body.expected_revision))
+
+
+@router.post("/contacts/{store_code}/followups/{call_id}/reschedule")
+def followup_reschedule(store_code: str, call_id: UUID, body: FollowupReschedule,
+                        svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.reschedule_followup(
+        store_code, call_id, next_on=body.next_on,
+        expected=body.expected_revision))
+
+
+@router.post("/contacts/{store_code}/import/preview", status_code=201)
+def import_preview(store_code: str, file: UploadFile = File(...),
+                   default_city: str | None = Query(default=None, max_length=60),
+                   svc: OperationsService = Depends(service)) -> dict:
+    data = file.file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail="Arquivo maior que 10 MB")
+    return checked(lambda: svc.import_preview(
+        store_code, filename=file.filename or "carteira",
+        data=data, default_city=default_city))
+
+
+@router.post("/contacts/{store_code}/import/{session_id}/commit")
+def import_commit(store_code: str, session_id: UUID, body: ImportCommit,
+                  svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.import_commit(
+        store_code, session_id,
+        decisions={key: value.model_dump() for key, value in body.decisions.items()},
+        confirm=body.confirm))
+
+
+@router.delete("/contacts/{store_code}/import/{session_id}")
+def import_discard(store_code: str, session_id: UUID,
+                   svc: OperationsService = Depends(service)) -> dict:
+    return checked(lambda: svc.import_discard(store_code, session_id))
 
 
 @router.get("/contacts/{store_code}/team")
@@ -156,8 +337,11 @@ def seller_team(store_code: str, svc: OperationsService = Depends(service)) -> l
 @router.get("/contacts/{store_code}/{year}/{month}/calls")
 def calls(store_code: str, year: int = Path(ge=2020, le=2100),
           month: int = Path(ge=1, le=12),
+          page: int = Query(1, ge=1),
+          page_size: int = Query(100, ge=1, le=500),
           svc: OperationsService = Depends(service)) -> dict:
-    return checked(lambda: svc.calls(store_code, year, month))
+    return checked(lambda: svc.calls(store_code, year, month,
+                                     page=page, page_size=page_size))
 
 
 @router.post("/contacts/{store_code}/calls", status_code=201)
@@ -165,7 +349,7 @@ def create_call(store_code: str, body: CallInput,
                 svc: OperationsService = Depends(service)) -> dict:
     return checked(lambda: svc.add_call(
         store_code, client_id=body.client_id, seller_id=body.seller_id,
-        contacted_on=body.date, outcome=body.outcome,
+        contacted_on=body.date, outcome=body.outcome, channel=body.channel,
         next_on=body.next_on, note=body.note
     ))
 
@@ -175,6 +359,7 @@ def correct_call(store_code: str, call_id: UUID, body: CallCorrection,
                  svc: OperationsService = Depends(service)) -> dict:
     return checked(lambda: svc.update_call(
         store_code, call_id, contacted_on=body.date,
-        outcome=body.outcome, next_on=body.next_on, note=body.note,
+        outcome=body.outcome, channel=body.channel,
+        next_on=body.next_on, note=body.note,
         expected=body.expected_revision
     ))

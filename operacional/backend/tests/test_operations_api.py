@@ -9,9 +9,8 @@ from sqlalchemy.pool import StaticPool
 from app.auth import current_user
 from app.db import get_db
 from app.main import app
-from app.models import (
-    AuditEvent, Base, GroupMembership, GroupPermission, Store, StoreGroup, User,
-)
+from app.models import AuditEvent, Base, Store, User
+from tests.access_helpers import seed_admin_access, seed_group
 
 
 @pytest.fixture
@@ -29,16 +28,10 @@ def env():
         other=User(id=uuid4(),auth_subject="ops-other",display_name="Vendedor Tubarao",
                    profile="seller",is_superadmin=False,active=True)
         db.add_all([admin,seller,other]);db.flush()
-        j=StoreGroup(id=uuid4(),store_code="JOINVILLE",name="Joinville",active=True)
-        t=StoreGroup(id=uuid4(),store_code="TUBARAO",name="Tubarao",active=True)
-        db.add_all([j,t]);db.flush()
-        db.add_all([
-            GroupMembership(user_id=seller.id,group_id=j.id),
-            GroupMembership(user_id=other.id,group_id=t.id),
-            GroupPermission(group_id=j.id,code="reviews.view",granted=True),
-            GroupPermission(group_id=j.id,code="supplies.view",granted=True),
-            GroupPermission(group_id=j.id,code="telemarketing.view",granted=True),
-        ])
+        seed_admin_access(db, admin)
+        seed_group(db, "Vendedores Joinville", ["JOINVILLE"],
+                   ["reviews.view", "supplies.view", "telemarketing.view"], [seller])
+        seed_group(db, "Vendedores Tubarao", ["TUBARAO"], [], [other])
         db.commit()
     identity={"actor":admin}
     def override_user():return identity["actor"]
@@ -139,13 +132,18 @@ def test_stock_movement_is_transactional_and_has_no_negative_balance(env):
 def test_contact_log_requires_client_and_active_seller_same_store(env):
     client,identity,engine,_,seller,other=env
     customer=client.post("/api/v1/operations/contacts/JOINVILLE/clients",json={
-        "name":"Oficina Teste","origin":"google","phone":"0000000"
+        "name":"Oficina Teste","origin":"google","phone":"0000000",
+        "city":"Joinville","contact_person":"Dono","tag":"Linha Leve",
+        "status":"ativo","confirm":True
     })
     assert customer.status_code==201,customer.text
-    cid=customer.json()["id"]
-    assert client.post("/api/v1/operations/contacts/JOINVILLE/clients",json={
+    cid=customer.json()["client"]["id"]
+    twin=client.post("/api/v1/operations/contacts/JOINVILLE/clients",json={
         "name":"  OFICINA    TESTE ","origin":"google"
-    }).status_code==409
+    })
+    assert twin.status_code==201,twin.text
+    assert twin.json()["result"]=="review"
+    assert any(w["code"]=="nome_duplicado" for w in twin.json()["warnings"])
     assert len(client.get("/api/v1/operations/contacts/JOINVILLE/team").json())==1
     call={"client_id":cid,"seller_id":str(seller.id),"date":"2026-10-20",
           "outcome":"sem_resposta","next_on":"2026-10-28","note":"Primeira tentativa"}

@@ -58,13 +58,22 @@ class InstagramInput(Strict):
 
 class TrainingInput(Strict):
     participant_id:UUID
-    procedure:str=Field(min_length=1,max_length=40)
-    version:str=Field(min_length=1,max_length=45)
+    procedure:str=Field(default="",max_length=40)
+    version:str=Field(default="",max_length=45)
+    procedure_id:UUID|None=None
     title:str=Field(default="",max_length=140)
     instructor:str=Field(min_length=1,max_length=90)
     happened_on:datetime
-    step:str=Field(pattern=r"^(participou|pratica)$")
+    step:str=Field(pattern=r"^(participou|pratica)(,(participou|pratica))?$")
     note:str=Field(default="",max_length=350)
+
+
+class TrainingUpdate(TrainingInput):
+    expected_revision:int=Field(ge=1)
+
+
+class TrainingDelete(Strict):
+    expected_revision:int=Field(ge=1)
 
 
 def service(user:User=Depends(current_user),db:Session=Depends(get_db))->RoutinesService:
@@ -153,10 +162,43 @@ def save_instagram(store_code:str,body:InstagramInput,
     ))
 
 
+@router.get("/my-trainings")
+def my_trainings(svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.my_trainings())
+
+
+def _csv_uuids(raw:str|None)->list[UUID]|None:
+    if not raw:return None
+    try:return [UUID(x) for x in raw.split(",") if x.strip()]
+    except ValueError:return None
+
+
+@router.get("/trainings")
+def trainings_multi(stores:str="",participant_ids:str|None=None,
+                    procedure_ids:str|None=None,start:date|None=None,
+                    end:date|None=None,limit:int=Query(200,ge=1,le=500),
+                    offset:int=Query(0,ge=0),
+                    svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.trainings_multi(
+        [s.strip() for s in stores.split(",") if s.strip()],
+        _csv_uuids(participant_ids),_csv_uuids(procedure_ids),start,end,
+        limit=limit,offset=offset))
+
+
+@router.get("/trainings/procedures")
+def trainings_procedures(stores:str="",
+                         svc:RoutinesService=Depends(service))->list[dict]:
+    return checked(lambda:svc.trainings_procedures(
+        [s.strip() for s in stores.split(",") if s.strip()]))
+
+
 @router.get("/trainings/{store_code}")
 def trainings(store_code:str,limit:int=Query(100,ge=1,le=500),
+              participant_id:UUID|None=None,procedure_id:UUID|None=None,
+              start:date|None=None,end:date|None=None,
               svc:RoutinesService=Depends(service))->list[dict]:
-    return checked(lambda:svc.training(store_code,limit))
+    return checked(lambda:svc.training(store_code,limit,participant_id,
+                                       procedure_id,start,end))
 
 
 @router.post("/trainings/{store_code}",status_code=201)
@@ -164,5 +206,22 @@ def add_training(store_code:str,body:TrainingInput,
                  svc:RoutinesService=Depends(service))->dict:
     return checked(lambda:svc.add_training(
         store_code,body.participant_id,body.procedure,body.version,
-        body.title,body.instructor,body.happened_on,body.step,body.note
+        body.title,body.instructor,body.happened_on,body.step,body.note,
+        procedure_id=body.procedure_id,
     ))
+
+
+@router.put("/trainings/{store_code}/{record_id}")
+def edit_training(store_code:str,record_id:UUID,body:TrainingUpdate,
+                  svc:RoutinesService=Depends(service))->dict:
+    return checked(lambda:svc.update_training(
+        store_code,record_id,body.participant_id,body.procedure,body.version,
+        body.title,body.instructor,body.happened_on,body.step,body.note,
+        body.expected_revision,procedure_id=body.procedure_id,
+    ))
+
+
+@router.delete("/trainings/{store_code}/{record_id}")
+def remove_training(store_code:str,record_id:UUID,body:TrainingDelete,
+                    svc:RoutinesService=Depends(service))->dict:
+    return checked(lambda:svc.delete_training(store_code,record_id,body.expected_revision))

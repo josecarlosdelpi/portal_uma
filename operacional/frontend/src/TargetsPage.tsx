@@ -119,8 +119,9 @@ export function TargetsPage({token, profile}: Props) {
       <p>Metas mensais, dias sem expediente e distribuição inicial por loja.</p>
     </div></div>
     <div className="notice notice-amber">
-      As vendas oficiais ainda não estão integradas. O quadro abaixo é uma previsão de distribuição da meta,
-      não uma apuração do faturamento ou a meta diária dinâmica.
+      {snapshot?.sales.status === "pilot_unverified"
+        ? "Vendas do ERP em fase de testes. A meta diária ajustada usa o faturamento acumulado do piloto — conferir antes de usar como referência oficial."
+        : "As vendas oficiais ainda não estão integradas. O quadro abaixo é uma previsão de distribuição da meta, não uma apuração do faturamento ou a meta diária dinâmica."}
     </div>
     {error && <div className="notice notice-error" role="alert">{error}</div>}
     {message && <div className="notice notice-success" role="status">{message}</div>}
@@ -149,8 +150,12 @@ export function TargetsPage({token, profile}: Props) {
           <small>Segunda a sexta, descontados os dias fechados</small></div>
         <div className="panel target-kpi"><span>Mínimo após atingir a meta</span><strong>{money(snapshot.minimum.amount)}</strong>
           <small>Configurado por loja para todos os meses</small></div>
-        <div className="panel target-kpi"><span>Faturamento realizado</span><strong>Sem dados</strong>
-          <small>Aguardando a importação comercial</small></div>
+        <div className="panel target-kpi"><span>Faturamento realizado</span>
+          <strong>{money(snapshot.sales.monthly_revenue)}</strong>
+          <small>{snapshot.sales.status === "pilot_unverified"
+            ? "ERP (piloto) · atingimento " + (snapshot.sales.attainment_percent
+              ? Number(snapshot.sales.attainment_percent).toLocaleString("pt-BR", {maximumFractionDigits:1}) + "%" : "sem meta")
+            : "Aguardando a importação comercial"}</small></div>
       </div>
 
       <div className="columns">
@@ -214,20 +219,44 @@ export function TargetsPage({token, profile}: Props) {
       </div>
 
       <article className="panel target-plan">
-        <div className="panel-head"><div><h2>Distribuição inicial da meta</h2>
-          <p>Prévia orientativa antes da integração dos valores de vendas.</p></div>
+        <div className="panel-head"><div><h2>{snapshot.sales.dynamic_day_plan
+          ? "Meta do dia ajustada pelo faturamento" : "Distribuição inicial da meta"}</h2>
+          <p>{snapshot.sales.dynamic_day_plan
+            ? "Saldo restante dividido pelos dias de expediente que faltam (dados em fase de testes)."
+            : "Prévia orientativa antes da integração dos valores de vendas."}</p></div>
           <span className="count">{snapshot.working_day_count} dias</span>
         </div>
         <div className="table-wrap"><table><thead><tr>
-          <th>Data</th><th>Dia da semana</th><th>Meta diária-base</th><th>Faturamento</th>
-        </tr></thead><tbody>{snapshot.base_plan.map((day) => <tr key={day.date}>
-          <td>{day.date.split("-").reverse().join("/")}</td>
-          <td>{weekdays[day.weekday]}</td>
-          <td>{money(day.base_daily_target)}</td>
-          <td><span className="target-no-data">Aguardando importação</span></td>
-        </tr>)}</tbody></table></div>
+          <th>Data</th><th>Dia da semana</th>
+          {snapshot.sales.dynamic_day_plan ? <>
+            <th>Meta do dia</th><th>Acumulado até ontem</th>
+          </> : <th>Meta diária-base</th>}
+          <th>Faturamento</th>
+        </tr></thead><tbody>{snapshot.sales.dynamic_day_plan
+          ? snapshot.sales.dynamic_day_plan.map((day) => {
+            const realized = snapshot.sales.daily_sales.find(s => s.date === day.date)?.revenue ?? null;
+            const weekday = (new Date(day.date + "T12:00:00").getDay() + 6) % 7;
+            return <tr key={day.date}>
+              <td>{day.date.split("-").reverse().join("/")}</td>
+              <td>{weekdays[weekday]}</td>
+              <td>{money(day.daily_target)}</td>
+              <td>{money(day.sales_before)}</td>
+              <td>{realized === null ? <span className="target-no-data">Sem venda registrada</span> : money(realized)}</td>
+            </tr>;
+          })
+          : snapshot.base_plan.map((day) => {
+            const realized = snapshot.sales.daily_sales.find(s => s.date === day.date)?.revenue ?? null;
+            return <tr key={day.date}>
+              <td>{day.date.split("-").reverse().join("/")}</td>
+              <td>{weekdays[day.weekday]}</td>
+              <td>{money(day.base_daily_target)}</td>
+              <td>{realized === null
+                ? <span className="target-no-data">Aguardando importação</span>
+                : money(realized)}</td>
+            </tr>;
+          })}</tbody></table></div>
         {snapshot.base_plan.length === 0 && <p className="empty">Não há dias de expediente para esta competência.</p>}
-        <p className="small-note">Quando as vendas oficiais estiverem disponíveis, a meta do dia passará a considerar o faturamento acumulado até o dia anterior e os dias de funcionamento restantes. Após atingir a meta mensal, utilizará o mínimo diário da loja.</p>
+        <p className="small-note">A meta do dia considera o faturamento acumulado até o dia anterior e os dias de funcionamento restantes. Após atingir a meta mensal, utiliza o mínimo diário da loja.</p>
       </article>
     </>}
   </section>;

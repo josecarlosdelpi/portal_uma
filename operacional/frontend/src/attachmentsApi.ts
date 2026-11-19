@@ -37,6 +37,16 @@ async function remove(token:string,route:string):Promise<void>{
   await parse(response);
 }
 
+async function preview(token:string,route:string):Promise<string>{
+  const response=await fetch(base+route,{
+    method:"GET",cache:"no-store",mode:"cors",
+    headers:{Authorization:"Bearer "+token},
+  });
+  await parse(response);
+  const blob=await response.blob();
+  return URL.createObjectURL(blob);
+}
+
 async function download(token:string,route:string,filename:string):Promise<void>{
   const response=await fetch(base+route,{
     method:"GET",cache:"no-store",mode:"cors",
@@ -66,6 +76,8 @@ export const attachmentsApi={
   uploadTraining:(token:string,store:string,id:string,file:File,expected:number)=>
     upload(token,`/api/v1/routines/trainings/${store}/${id}/document?expected_revision=${expected}`,
       file,5*1024*1024),
+  previewTraining:(token:string,store:string,id:string)=>
+    preview(token,`/api/v1/routines/trainings/${store}/${id}/document`),
   downloadTraining:(token:string,store:string,id:string,name:string)=>
     download(token,`/api/v1/routines/trainings/${store}/${id}/document`,name),
   deleteTraining:(token:string,store:string,id:string,expected:number)=>

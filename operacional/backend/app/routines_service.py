@@ -1,5 +1,5 @@
 """Checklist, WhatsApp status, Instagram and training metadata; no ERP or public file uploads."""
-from datetime import date, datetime, timedelta, time
+from datetime import date, datetime, timedelta, time, timezone
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -13,7 +13,7 @@ from app.models import (
 from app.operations_service import (
     OperationError, OperationsService, date_time, day_iso, normalize,
 )
-from app.policy import STORE_CODES
+from app.policy import STORE_CODES, can_access
 
 DEFAULT_CALL_GOALS={"JOINVILLE":20,"TUBARAO":12,"ITAJAI":10}
 SAO_PAULO=ZoneInfo("America/Sao_Paulo")
@@ -29,6 +29,17 @@ def start_of(day:date)->datetime:
 
 def can_verify(week:date)->bool:
     return monday(week)<=monday(datetime.now(SAO_PAULO).date())
+
+
+STEP_VALUES=("participou","pratica")
+
+
+def canon_step(step:str)->str:
+    """Normaliza a(s) etapa(s): deduplica e ordena de forma canonica."""
+    parts=sorted({p for p in step.split(",") if p in STEP_VALUES},key=STEP_VALUES.index)
+    if not parts:
+        raise OperationError(422,"Etapa inválida")
+    return ",".join(parts)
 
 
 class RoutinesService(OperationsService):
@@ -205,7 +216,7 @@ class RoutinesService(OperationsService):
                 "has_evidence_file":"evidence" in attached}
 
     def delete_marketing(self, when: date, expected: int) -> dict:
-        self.require("JOINVILLE", "whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         row = self.db.scalar(
             select(WhatsAppPost).where(
                 WhatsAppPost.post_date == start_of(when)
@@ -229,7 +240,7 @@ class RoutinesService(OperationsService):
 
     def save_marketing(self,when:date,code:str,category:str,note:str,
                        status:str,expected:int)->dict:
-        self.require("JOINVILLE","whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         if when.weekday()>=5:
             raise OperationError(422,"O calendário está programado de segunda a sexta")
         if self.db.get(WhatsAppDayOff,start_of(when)):
@@ -271,7 +282,7 @@ class RoutinesService(OperationsService):
         return self._post(row)
 
     def set_day_off(self,when:date,off:bool,reason:str)->dict:
-        self.require("JOINVILLE","whatsapp_status.edit")
+        self.require_global("whatsapp_status.edit")
         if when.weekday()>=5:
             raise OperationError(422,"Sábados e domingos não possuem postagens programadas")
         key=start_of(when)
@@ -330,13 +341,89 @@ class RoutinesService(OperationsService):
         return {"store_code":store,"year":year,"month":month,
                 "planned":planned,"completed":completed,"revision":row.revision}
 
-    def training(self,store:str,limit:int=100)->list[dict]:
-        self.require(store,"training.view")
-        rows=self.db.execute(
-            select(TrainingRecord,User.display_name)
+    def trainings_multi(self,stores:list[str],participant_ids:list[UUID]|None=None,
+                        procedure_ids:list[UUID]|None=None,start:date|None=None,
+                        end:date|None=None,limit:int=200,offset:int=0)->list[dict]:
+        """Historico consolidado por lojas autorizadas, com filtros multiplos."""
+        allowed=[s for s in stores if s in STORE_CODES
+                 and can_access(self.principal,"training.view",s)]
+        if not allowed:
+            raise OperationError(403,"Acesso negado")
+        query=(select(TrainingRecord,User.display_name)
             .join(User,User.id==TrainingRecord.participant_id)
-            .where(TrainingRecord.store_code==store)
-            .order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
+            .where(TrainingRecord.store_code.in_(allowed),
+                   TrainingRecord.deleted_at.is_(None)))
+        for s in allowed:
+            if not can_access(self.principal,"training.edit",s):
+                query=query.where(TrainingRecord.participant_id==self.actor.id)
+                break
+        else:
+            if participant_ids:
+                query=query.where(TrainingRecord.participant_id.in_(participant_ids))
+        if procedure_ids:
+            query=query.where(TrainingRecord.procedure_id.in_(procedure_ids))
+        if start:
+            query=query.where(TrainingRecord.happened_on>=start_of(start))
+        if end:
+            query=query.where(TrainingRecord.happened_on<start_of(end)+timedelta(days=1))
+        rows=self.db.execute(
+            query.order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
+            .offset(offset).limit(limit)
+        ).all()
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]
+
+    def trainings_procedures(self,stores:list[str])->list[dict]:
+        """Procedimentos distintos presentes no historico de treinamentos.
+
+        Inclui procedimentos obsoletos e excluidos logicamente (somente
+        metadados id+rotulo), independentemente da paginacao.
+        """
+        allowed=[s for s in stores if s in STORE_CODES
+                 and can_access(self.principal,"training.view",s)]
+        if not allowed:
+            raise OperationError(403,"Acesso negado")
+        query=(select(TrainingRecord.procedure_id,TrainingRecord.procedure)
+            .where(TrainingRecord.store_code.in_(allowed),
+                   TrainingRecord.deleted_at.is_(None),
+                   TrainingRecord.procedure_id.is_not(None))
+            .distinct())
+        for s in allowed:
+            if not can_access(self.principal,"training.edit",s):
+                query=query.where(TrainingRecord.participant_id==self.actor.id)
+                break
+        rows=self.db.execute(query).all()
+        return [{"procedure_id":str(pid),"procedure":name} for pid,name in rows]
+
+    def training(self,store:str,limit:int=100,participant_id:UUID|None=None,
+                 procedure_id:UUID|None=None,start:date|None=None,
+                 end:date|None=None)->list[dict]:
+        self.require(store,"training.view")
+        # Vendedor so consulta os proprios registros; gestao ve a loja inteira.
+        manager=can_access(self.principal,"training.edit",store)
+        query=(select(TrainingRecord,User.display_name)
+            .join(User,User.id==TrainingRecord.participant_id)
+            .where(TrainingRecord.store_code==store,
+                   TrainingRecord.deleted_at.is_(None)))
+        if not manager:
+            query=query.where(TrainingRecord.participant_id==self.actor.id)
+        elif participant_id:
+            query=query.where(TrainingRecord.participant_id==participant_id)
+        if procedure_id:
+            query=query.where(TrainingRecord.procedure_id==procedure_id)
+        if start:
+            query=query.where(TrainingRecord.happened_on>=start_of(start))
+        if end:
+            query=query.where(TrainingRecord.happened_on<start_of(end)+timedelta(days=1))
+        rows=self.db.execute(
+            query.order_by(TrainingRecord.happened_on.desc(),TrainingRecord.created_at.desc())
             .limit(limit)
         ).all()
         document_data=self.db.execute(
@@ -356,28 +443,135 @@ class RoutinesService(OperationsService):
             "participant_id":str(row.participant_id),"participant":name,
             "procedure":row.procedure,"version":row.version,"title":row.title,
             "instructor":row.instructor,"happened_on":row.happened_on.isoformat(),
-            "step":row.step,"note":row.note,
+            "step":row.step,"note":row.note,"revision":row.revision,
+            "procedure_id":str(row.procedure_id) if row.procedure_id else None,
+            "procedure_version_id":str(row.procedure_version_id) if row.procedure_version_id else None,
             "signed":False,"document_attached":document is not None,
             "document":document,
         }
 
+    def _procedure_snapshot(self, procedure_id: UUID | None) -> tuple[UUID | None, UUID | None, str, str]:
+        """Resolve procedure_id para versao publicada vigente; devolve ids + rotulos."""
+        if procedure_id is None:
+            return None, None, "", ""
+        from app.models import Procedure, ProcedureVersion
+        proc = self.db.scalar(select(Procedure).where(
+            Procedure.id == procedure_id, Procedure.deleted_at.is_(None)))
+        if proc is None:
+            raise OperationError(422, "Procedimento não encontrado")
+        if proc.obsolete_at is not None:
+            raise OperationError(422, "Procedimento obsoleto não pode receber novos treinamentos")
+        version = self.db.scalars(select(ProcedureVersion).where(
+            ProcedureVersion.procedure_id == proc.id,
+            ProcedureVersion.status == "publicado",
+        ).order_by(ProcedureVersion.published_at.desc())).first()
+        if version is None:
+            raise OperationError(422, "Procedimento ainda não publicado")
+        return proc.id, version.id, proc.code, version.version_label
+
     def add_training(self,store:str,participant_id:UUID,procedure:str,version:str,
                      title:str,instructor:str,happened_on:datetime,
-                     step:str,note:str)->dict:
+                     step:str,note:str,procedure_id:UUID|None=None)->dict:
         self.require(store,"training.edit")
         if not self._seller_in_store(store,participant_id):
             raise OperationError(422,"Colaborador não cadastrado na loja selecionada")
+        proc_id,ver_id,p_code,p_label=self._procedure_snapshot(procedure_id)
+        if proc_id is not None:
+            procedure,version=p_code,p_label
+        step=canon_step(step)
         entry=TrainingRecord(
             id=uuid4(),store_code=store,participant_id=participant_id,
             procedure=procedure.strip(),version=version.strip(),
+            procedure_id=proc_id,procedure_version_id=ver_id,
             title=title,instructor=instructor.strip(),happened_on=happened_on,
-            step=step,note=note,recorded_by=self.actor.id,
+            step=step,note=note,recorded_by=self.actor.id,updated_by=self.actor.id,
         )
         self.db.add(entry)
         self.audit("training.registered","training_record",str(entry.id),
                    {"store":store,"participant_id":str(participant_id),
                     "procedure":procedure,"version":version,"step":step,
+                    "procedure_version_id":str(ver_id) if ver_id else None,
                     "signed":False})
         self.commit()
         person=self.db.get(User,participant_id)
         return self._training(entry,person.display_name)
+
+    def update_training(self,store:str,record_id:UUID,participant_id:UUID,
+                        procedure:str,version:str,title:str,instructor:str,
+                        happened_on:datetime,step:str,note:str,expected:int,
+                        procedure_id:UUID|None=None)->dict:
+        self.require(store,"training.edit")
+        row=self.db.scalar(select(TrainingRecord).where(
+            TrainingRecord.id==record_id,TrainingRecord.store_code==store,
+            TrainingRecord.deleted_at.is_(None)).with_for_update())
+        if row is None:
+            raise OperationError(404,"Registro não encontrado")
+        self.revision(row,expected)
+        if not self._seller_in_store(store,participant_id):
+            raise OperationError(422,"Colaborador não cadastrado na loja selecionada")
+        before={"participant_id":str(row.participant_id),"procedure":row.procedure,
+                "version":row.version,"step":row.step,"happened_on":row.happened_on.isoformat()}
+        # Mesma procedure mantida: preserva o vinculo historico com a versao usada.
+        if procedure_id is not None and procedure_id==row.procedure_id:
+            procedure,version=row.procedure,row.version
+        else:
+            proc_id,ver_id,p_code,p_label=self._procedure_snapshot(procedure_id)
+            if proc_id is not None:
+                procedure,version=p_code,p_label
+            row.procedure_id=proc_id;row.procedure_version_id=ver_id
+        row.participant_id=participant_id
+        row.procedure=procedure.strip();row.version=version.strip()
+        row.title=title;row.instructor=instructor.strip()
+        row.happened_on=happened_on;row.step=canon_step(step);row.note=note
+        row.revision+=1;row.updated_by=self.actor.id
+        row.updated_at=datetime.now(timezone.utc)
+        self.audit("training.updated","training_record",str(row.id),
+                   {"store":store,"before":before,
+                    "after":{"participant_id":str(participant_id),"procedure":procedure,
+                             "version":version,"step":step,"happened_on":happened_on.isoformat()}})
+        self.commit()
+        person=self.db.get(User,participant_id)
+        return self._training(row,person.display_name)
+
+    def delete_training(self,store:str,record_id:UUID,expected:int)->dict:
+        # Exclusao de treinamento e restrita ao SuperAdmin (admins editam, nao excluem).
+        if not self.principal.is_superadmin:
+            raise OperationError(403,"Somente o SuperAdmin pode excluir treinamentos")
+        self.require(store,"training.edit")
+        row=self.db.scalar(select(TrainingRecord).where(
+            TrainingRecord.id==record_id,TrainingRecord.store_code==store,
+            TrainingRecord.deleted_at.is_(None)).with_for_update())
+        if row is None:
+            raise OperationError(404,"Registro não encontrado")
+        self.revision(row,expected)
+        row.deleted_at=datetime.now(timezone.utc)
+        row.revision+=1;row.updated_by=self.actor.id
+        self.audit("training.deleted","training_record",str(row.id),
+                   {"store":store,"participant_id":str(row.participant_id),
+                    "procedure":row.procedure,"version":row.version,"step":row.step})
+        self.commit()
+        return {"id":str(record_id),"deleted":True}
+
+    def my_trainings(self,limit:int=200)->list[dict]:
+        """Somente os registros do proprio vendedor autenticado."""
+        viewable=self.allowed("training.view")
+        if not viewable:
+            raise OperationError(403,"Acesso negado")
+        rows=self.db.execute(
+            select(TrainingRecord,User.display_name)
+            .join(User,User.id==TrainingRecord.participant_id)
+            .where(TrainingRecord.participant_id==self.actor.id,
+                   TrainingRecord.deleted_at.is_(None),
+                   TrainingRecord.store_code.in_(viewable))
+            .order_by(TrainingRecord.happened_on.desc())
+            .limit(limit)
+        ).all()
+        document_data=self.db.execute(
+            select(TrainingDocument.training_id, TrainingDocument.original_name,
+                   TrainingDocument.media_type, TrainingDocument.byte_length,
+                   TrainingDocument.revision)
+            .where(TrainingDocument.training_id.in_([row.id for row,name in rows]))
+        ).all() if rows else []
+        documents={uid:{"name":name,"media_type":media,"size":size,"revision":revision}
+                   for uid,name,media,size,revision in document_data}
+        return [self._training(row,name,documents.get(row.id)) for row,name in rows]
