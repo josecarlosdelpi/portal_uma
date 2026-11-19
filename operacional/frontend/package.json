@@ -25,7 +25,8 @@
     "@tiptap/extension-table-row": "^2.10.0",
     "@tiptap/extension-table-cell": "^2.10.0",
     "@tiptap/extension-table-header": "^2.10.0",
-    "@tiptap/extension-text-style": "^2.10.0"
+    "@tiptap/extension-text-style": "^2.10.0",
+    "lucide-react": "^0.460.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
