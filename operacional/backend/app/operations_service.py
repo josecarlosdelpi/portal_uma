@@ -898,8 +898,9 @@ class OperationsService:
 
     def _expire_preview(self, session: ClientImportSession) -> None:
         """Descarta previa vencida, purgando dados brutos da planilha."""
-        if session.state == "preview" and (
-                session.created_at + IMPORT_PREVIEW_TTL < datetime.now()):
+        created = session.created_at
+        now = datetime.now(created.tzinfo) if created.tzinfo else datetime.now()
+        if session.state == "preview" and created + IMPORT_PREVIEW_TTL < now:
             session.state = "discarded"
             session.payload = {}
             self.audit("telemarketing.import.expired", "client_import_session",
