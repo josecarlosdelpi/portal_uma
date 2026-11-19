@@ -5,6 +5,15 @@
 **/.env
 **/.env.*
 !**/.env.example
+# Credenciais locais (conta de servico Google Drive, chaves, tokens)
+secrets/
+**/secrets/
+*service-account*.json
+*service_account*.json
+*credentials*.json
+*drive-sa*.json
+*.p12
+*.pem
 # Python
 .venv/
 __pycache__/

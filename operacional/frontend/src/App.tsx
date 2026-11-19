@@ -3,12 +3,13 @@ import {
   LayoutDashboard, Phone, Star, Package, ListChecks, CalendarCheck,
   Target, MessageCircle, GraduationCap, ClipboardCheck, Settings,
   Pin, PinOff, GripVertical, ChevronUp, ChevronDown, Menu, ChevronsRight,
-  Settings2, X,
+  Settings2, X, ShoppingCart,
 } from "lucide-react";
 import { api, type MyProfile, type PortalUser, type StoreGroup, type AuditEvent, type LocalResetPassword, ApiError } from "./api";
 import { labelStore, permissionGroups, readPermissionCodes } from "./catalog";
 import { TargetsPage } from "./TargetsPage";
 import { OverviewPage } from "./OverviewPage";
+import { SalesPage } from "./SalesPage";
 import { ClosingPage } from "./ClosingPage";
 import { UMA_LOGO_DATA_URI } from "./umaBrand";
 import { ReviewsPage } from "./ReviewsPage";
@@ -21,11 +22,12 @@ import { TrainingPage } from "./TrainingPage";
 import { AccountsManager, TemporaryPasswordNotice } from "./AccountsManager";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
-type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training";
+type Area = "access" | "targets" | "overview" | "closing" | "reviews" | "supplies" | "contacts" | "checklist" | "daily" | "whatsapp" | "training" | "sales";
 
 /** Identificadores estaveis dos modulos (mesmos chaves do backend /preferences). */
 const NAV_ITEMS: ReadonlyArray<{ key: Area; label: string; icon: typeof Star }> = [
   { key: "overview", label: "Visão geral", icon: LayoutDashboard },
+  { key: "sales", label: "Vendas", icon: ShoppingCart },
   { key: "contacts", label: "Telemarketing", icon: Phone },
   { key: "reviews", label: "Avaliações Google", icon: Star },
   { key: "supplies", label: "Materiais e insumos", icon: Package },
@@ -133,6 +135,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
     if (!profile) return;
     setArea(previous => {
       if (previous === "overview" && profile.features.overview) return previous;
+      if (previous === "sales" && profile.features.sales) return previous;
       if (previous === "targets" && profile.features.targets) return previous;
       if (previous === "closing" && profile.features.monthly_closing) return previous;
       if (previous === "reviews" && profile.features.reviews) return previous;
@@ -144,6 +147,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       if (previous === "training" && profile.features.training) return previous;
       if (previous === "access" && profile.profile === "superadmin") return previous;
       if (profile.features.overview) return "overview";
+      if (profile.features.sales) return "sales";
       if (profile.features.targets) return "targets";
       if (profile.features.monthly_closing) return "closing";
       if (profile.features.reviews) return "reviews";
@@ -162,6 +166,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   const isSuperAdmin = profile?.profile === "superadmin";
   const isSeller = user?.profile === "seller";
   const canViewTargets = profile?.features?.targets ?? false;
+  const canViewSales = profile?.features?.sales ?? false;
   const canViewOverview = profile?.features?.overview ?? false;
   const canViewClosing = profile?.features?.monthly_closing ?? false;
   const canViewReviews = profile?.features?.reviews ?? false;
@@ -258,6 +263,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
   if (canViewChecklist) allowedAreas.add("checklist");
   if (canViewDaily) allowedAreas.add("daily");
   if (canViewTargets) allowedAreas.add("targets");
+  if (canViewSales) allowedAreas.add("sales");
   if (canViewWhatsApp) allowedAreas.add("whatsapp");
   if (canViewTraining) allowedAreas.add("training");
   if (canViewClosing) allowedAreas.add("closing");
@@ -339,7 +345,6 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
             aria-pressed={favorites.includes(item.key)}
             onClick={() => toggleFav(item.key)}><Star size={14} fill={favorites.includes(item.key) ? "currentColor" : "none"}/></button>
         </div>)}
-        <div className="nav-item disabled"><span>Vendas</span><span className="soon">ERP pendente</span></div>
       </nav>
       <div className="side-spacer"/>
       <div className="sidebar-note"><strong>Ambiente operacional</strong><p>Sem dados demonstrativos. Acesso governado pela API segura.</p></div>
@@ -352,6 +357,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
       </header>
       <div className="workspace">
         {area === "overview" && profile ? <OverviewPage token={token} profile={profile} /> :
+         area === "sales" && profile ? <SalesPage token={token} profile={profile} /> :
          area === "closing" && profile ? <ClosingPage token={token} profile={profile} /> :
          area === "targets" && profile ? <TargetsPage token={token} profile={profile} /> :
          area === "reviews" && profile ? <ReviewsPage token={token} profile={profile} /> :

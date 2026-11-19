@@ -1,9 +1,9 @@
 """Modelo inicial de persistencia. Schema mantido por migrations Alembic."""
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, JSON, LargeBinary, Numeric, String, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -547,6 +547,7 @@ class UserPreference(Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     sidebar_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     favorites: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    ui_prefs: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
@@ -592,3 +593,98 @@ class ProcedureFile(Base):
     content: Mapped[bytes] = mapped_column(LargeBinary(), nullable=False)
     uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpImportBatch(Base):
+    """Snapshot de um arquivo ERP recebido; garante auditoria e idempotencia."""
+    __tablename__ = "erp_import_batches"
+    __table_args__ = (
+        CheckConstraint("kind IN ('VENDAS','DEVOLUCOES')", name="ck_erp_batch_kind"),
+        CheckConstraint("source IN ('MANUAL_UPLOAD','DRIVE_SYNC')", name="ck_erp_batch_source"),
+        CheckConstraint("status IN ('RECEIVED','APPLIED','DUPLICATE','FAILED')", name="ck_erp_batch_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(15), nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="RECEIVED")
+    file_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    drive_file_id: Mapped[str | None] = mapped_column(String(120))
+    rows_total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rows_applied: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rows_rejected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    period_start: Mapped[date | None] = mapped_column(Date)
+    period_end: Mapped[date | None] = mapped_column(Date)
+    coverage: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    error_summary: Mapped[dict | None] = mapped_column(JSON)
+    imported_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ErpSaleRow(Base):
+    """Linha comercial do snapshot vigente; substituida por cobertura loja+periodo."""
+    __tablename__ = "erp_sale_rows"
+    __table_args__ = (
+        Index("ix_erp_sale_rows_store_date", "store_code", "sale_date"),
+        Index("ix_erp_sale_rows_date", "sale_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(ForeignKey("erp_import_batches.id", ondelete="CASCADE"), nullable=False, index=True)
+    sale_date: Mapped[date] = mapped_column(Date, nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    seller_code: Mapped[str] = mapped_column(String(30), nullable=False)
+    customer_cnpj: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    customer_name: Mapped[str] = mapped_column(String(150), nullable=False, default="")
+    product_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpReturnRow(Base):
+    """Devolucao registrada pelo ERP; nunca abatida automaticamente das vendas."""
+    __tablename__ = "erp_return_rows"
+    __table_args__ = (
+        Index("ix_erp_return_rows_store_date", "store_code", "sale_date"),
+        Index("ix_erp_return_rows_date", "sale_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    batch_id: Mapped[UUID] = mapped_column(ForeignKey("erp_import_batches.id", ondelete="CASCADE"), nullable=False, index=True)
+    sale_date: Mapped[date] = mapped_column(Date, nullable=False)
+    store_code: Mapped[str] = mapped_column(ForeignKey("stores.code", ondelete="RESTRICT"), nullable=False)
+    seller_code: Mapped[str] = mapped_column(String(30), nullable=False, default="0")
+    customer_cnpj: Mapped[str] = mapped_column(String(20), nullable=False, default="")
+    customer_name: Mapped[str] = mapped_column(String(150), nullable=False, default="")
+    product_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ErpSourceFile(Base):
+    """Estado da aquisicao remota (Drive); contrato unico das frentes de integracao."""
+    __tablename__ = "erp_source_files"
+    __table_args__ = (
+        CheckConstraint("last_status IN ('PENDING','OK','SKIPPED','FAILED','DISABLED')",
+                        name="ck_erp_source_status"),
+    )
+
+    file_key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    drive_file_id: Mapped[str | None] = mapped_column(String(120))
+    drive_file_name: Mapped[str | None] = mapped_column(String(150))
+    drive_md5: Mapped[str | None] = mapped_column(String(64))
+    remote_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status: Mapped[str] = mapped_column(String(12), nullable=False, default="PENDING")
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
