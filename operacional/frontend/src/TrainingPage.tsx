@@ -40,6 +40,7 @@ function DocView({token,procId,versionId,onBack}:{token:string;procId:string;ver
 
 export function TrainingPage({token,profile}:Props){
   const canWrite=profile.profile!=="seller";
+  const isSuperAdmin=profile.profile==="superadmin";
   const [tab,setTab]=useState<"procedimentos"|"treinamentos"|"meus">("procedimentos");
   const [procs,setProcs]=useState<Procedure[]>([]);
   const [q,setQ]=useState("");
@@ -315,7 +316,7 @@ export function TrainingPage({token,profile}:Props){
             </div>:"—"}</td>
             <td><div className="routine-file-actions">
               <button className="btn-secondary" onClick={()=>startEdit(e)}>Editar</button>
-              <button className="btn-secondary" disabled={working} onClick={()=>void removeRec(e)}>Excluir</button>
+              {isSuperAdmin&&<button className="btn-secondary" disabled={working} onClick={()=>void removeRec(e)}>Excluir</button>}
             </div></td></tr>)}</tbody></table></div>
         {entries.length===0&&!loading&&<p className="empty">Nenhum treinamento nesta loja.</p>}
       </article>

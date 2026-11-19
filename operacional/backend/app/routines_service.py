@@ -461,6 +461,9 @@ class RoutinesService(OperationsService):
         return self._training(row,person.display_name)
 
     def delete_training(self,store:str,record_id:UUID,expected:int)->dict:
+        # Exclusao de treinamento e restrita ao SuperAdmin (admins editam, nao excluem).
+        if not self.principal.is_superadmin:
+            raise OperationError(403,"Somente o SuperAdmin pode excluir treinamentos")
         self.require(store,"training.edit")
         row=self.db.scalar(select(TrainingRecord).where(
             TrainingRecord.id==record_id,TrainingRecord.store_code==store,

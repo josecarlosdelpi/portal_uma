@@ -1,4 +1,4 @@
-﻿"""Regression tests: procedure versions, private files and training privacy."""
+"""Regression tests: procedure versions, private files and training privacy."""
 from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
@@ -161,7 +161,7 @@ def test_seller_cannot_read_others_trainings_or_documents(env):
 
 
 def test_logical_delete_hides_record_and_document(env):
-    c, _, _, admin, joi, *_ = env
+    c, actor, engine, admin, joi, *_ = env
     p = _proc(c); pid = p["id"]
     c.post(f"/api/v1/procedures/{pid}/publish", json={"expected_revision": 1})
     t = c.post("/api/v1/routines/trainings/JOINVILLE", json={
@@ -170,8 +170,15 @@ def test_logical_delete_hides_record_and_document(env):
         "step": "participou", "note": ""}).json()
     c.put(f"/api/v1/routines/trainings/JOINVILLE/{t['id']}/document?expected_revision=0",
           files={"file": ("doc.pdf", b"%PDF-1.4 x", "application/pdf")})
+    # exclusao de treinamento exige SuperAdmin desde a restricao por perfil
+    with Session(engine) as db:
+        root = User(id=uuid4(), auth_subject="root-del", display_name="Super",
+                    profile="administrator", is_superadmin=True, active=True)
+        db.add(root); db.commit(); db.refresh(root)
+        actor["user"] = root
     assert c.request("DELETE", f"/api/v1/routines/trainings/JOINVILLE/{t['id']}",
                      json={"expected_revision": t["revision"]}).status_code == 200
+    actor["user"] = admin
     assert not c.get("/api/v1/routines/trainings/JOINVILLE").json()
     assert c.get(f"/api/v1/routines/trainings/JOINVILLE/{t['id']}/document").status_code == 404
 
@@ -239,6 +246,39 @@ def test_delete_only_never_published(env):
     assert c.delete(f"/api/v1/procedures/{draft['id']}").status_code == 200
     assert draft["id"] not in {x["id"] for x in c.get("/api/v1/procedures").json()}
     assert c.get(f"/api/v1/procedures/{draft['id']}").status_code == 404
+
+
+def test_training_delete_superadmin_only(env):
+    """Somente o SuperAdmin exclui treinamentos; admin e vendedor recebem 403."""
+    c, actor, engine, admin, joi, *_ = env
+    p = _proc(c, "POP delete treinamento"); pid = p["id"]
+    c.post(f"/api/v1/procedures/{pid}/publish", json={"expected_revision": 1})
+    t = c.post("/api/v1/routines/trainings/JOINVILLE", json={
+        "participant_id": str(joi.id), "procedure_id": pid, "title": "",
+        "instructor": "X", "happened_on": "2026-11-01T10:00:00",
+        "step": "participou", "note": ""}).json()
+    rev = c.get("/api/v1/routines/trainings/JOINVILLE").json()[0]["revision"]
+    url = f"/api/v1/routines/trainings/JOINVILLE/{t['id']}"
+    body = {"expected_revision": rev}
+    # vendedor -> 403
+    actor["user"] = joi
+    assert c.request("DELETE", url, json=body).status_code == 403
+    # admin -> 403
+    actor["user"] = admin
+    assert c.request("DELETE", url, json=body).status_code == 403
+    assert c.get("/api/v1/routines/trainings/JOINVILLE").json() != []  # nao excluiu
+    # superadmin -> 200
+    with Session(engine) as db:
+        root = User(id=uuid4(), auth_subject="root", display_name="Super",
+                    profile="administrator", is_superadmin=True, active=True)
+        db.add(root); db.commit(); db.refresh(root)
+        actor["user"] = root
+    r = c.request("DELETE", url, json=body)
+    assert r.status_code == 200, r.text
+    assert r.json()["deleted"] is True
+    # some das consultas normais
+    assert t["id"] not in {x["id"] for x in c.get("/api/v1/routines/trainings/JOINVILLE").json()}
+    actor["user"] = admin
 
 
 def test_seller_sees_only_published_applicable(env):
