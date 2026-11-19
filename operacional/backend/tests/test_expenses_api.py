@@ -276,10 +276,14 @@ def test_classificacao_manual_prevalece_e_remove(env):
     assert res.status_code == 200
     line = line_by_doc(get_lines(c, page_size=200)["items"], "E1")[0]
     assert line["category_id"] == copa and line["origin"] == "manual"
-    # remover manual -> volta para a regra geral
+    # remover manual -> retorna e exibe a regra geral, nao "Sem categoria"
     res = c.put(f"/api/v1/expenses/lines/{fp}/category",
                 json={"category_id": None})
     assert res.status_code == 200
+    body = res.json()
+    assert body["category_id"] == limpeza
+    assert body["category_name"] == "Limpeza"
+    assert body["origin"] == "rule_general"
     line = line_by_doc(get_lines(c, page_size=200)["items"], "E1")[0]
     assert line["category_id"] == limpeza and line["origin"] == "rule_general"
 
@@ -689,7 +693,8 @@ def test_linhas_duplicadas_sinalizam_duplicate_count(env):
 
 def test_detalhe_reconcilia_com_analise(env):
     """A soma do detalhamento paginado reproduz os totais da analise
-    para cada combinacao de filtros."""
+    para cada combinacao de filtros (somente linhas elegiveis — sem
+    filtro de categoria, a lista ainda exibe naturezas separadas)."""
     c, *_ = env
     seed_all(c)
     limpeza = mk_cat(c, "Limpeza")
@@ -719,6 +724,34 @@ def test_detalhe_reconcilia_com_analise(env):
         analysis = c.get(f"/api/v1/expenses/analysis?{OUT}&{qs}").json()
         assert soma_detalhe(**params) == Decimal(
             analysis["totals"]["paid_total"])
+
+
+def test_drill_categoria_reconcilia_todas_as_linhas(env):
+    """Cada categoria da analise — inclusive 'Sem categoria' — detalha
+    exatamente os lancamentos que compoem valor E quantidade exibidos.
+    Nenhuma linha do detalhe pode ser ignorada na comparacao e
+    naturezas separadas (revenda/financiamento/imobilizado) nunca
+    entram, mesmo quando o fornecedor tem regra."""
+    c, *_ = env
+    seed_all(c)
+    limpeza = mk_cat(c, "Limpeza")
+    # regra no fornecedor de revenda: a linha D13 resolve categoria
+    # pela regra, mas nao pode entrar no detalhe operacional
+    c.post("/api/v1/expenses/supplier-rules", json={
+        "supplier_key": "doc:333", "supplier_label": "FORN PECAS",
+        "store_code": None, "category_id": limpeza})
+    analysis = c.get(f"/api/v1/expenses/analysis?{OUT}").json()
+    from decimal import Decimal
+    for cat in analysis["by_category"]:
+        cid = cat["category_id"] or "none"
+        items = get_lines(c, category_id=cid, page_size=200)["items"]
+        assert len(items) == cat["rows"], cat["name"]
+        assert sum(Decimal(i["amount"]) for i in items) == Decimal(
+            cat["total"]), cat["name"]
+        assert all(i["eligible"] for i in items), cat["name"]
+    # linhas nao elegiveis continuam visiveis sem filtro de categoria
+    todos = get_lines(c, page_size=200)["items"]
+    assert any(not i["eligible"] for i in todos)
 
 
 # ---------- perfil obrigatorio ----------

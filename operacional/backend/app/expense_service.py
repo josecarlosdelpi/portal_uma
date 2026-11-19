@@ -676,8 +676,16 @@ class ExpenseService:
                              "rows": len(matches)})
                 self.db.delete(existing)
                 self.db.commit()
-            return {"fingerprint": fingerprint, "category_id": None,
-                    "origin": "removed", "rows": len(matches)}
+            # re-resolve a categoria efetiva: regra da loja > regra UMA >
+            # sem categoria — para a UI refletir imediatamente
+            rules_map = self._rule_map()
+            resolved = self._resolve(matches[0], {}, rules_map, names)
+            return {"fingerprint": fingerprint,
+                    "category_id": (str(resolved["category_id"])
+                                    if resolved["category_id"] else None),
+                    "category_name": resolved["category_name"],
+                    "origin": resolved["origin"],
+                    "rows": len(matches)}
 
         cat = self._assert_category_active(category_id)
         if existing is None:
@@ -756,6 +764,11 @@ class ExpenseService:
             # fora da lista — mesma fronteira do total da analise (elas
             # aparecem como memo e na coluna propria do consolidado)
             if not consolidated and alloc == SHARED_COLUMN:
+                continue
+            # detalhe de categoria (analise) = universo operacional:
+            # revenda/financiamento/imobilizado nunca entram, nem em
+            # 'Sem categoria'; visiveis apenas sem filtro de categoria
+            if cat_filter is not None and not eligible:
                 continue
             if situation == "classified" and resolved["category_id"] is None:
                 continue

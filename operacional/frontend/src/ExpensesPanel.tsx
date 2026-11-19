@@ -419,7 +419,13 @@ function SupplierCatalog({ token, profile, canManage, activeCats, onChanged }:
               { id: res.id, category_id: categoryId, active: true,
                 category_name: catName(categoryId) } } }
           : i));
-      } else if (rule) {
+      }
+      // fornecedor categorizado sai da lista "somente sem categoria"
+      if (categoryId && withoutRule && !s.has_rule) {
+        setItems(cur => cur.filter(i => i.supplier_key !== s.supplier_key));
+        setTotal(t => t - 1);
+      }
+      if (!categoryId && rule) {
         await expensesApi.updateRule(token, rule.id, { active: false });
         setItems(cur => cur.map(i => {
           if (i.supplier_key !== s.supplier_key) return i;
@@ -472,9 +478,17 @@ function SupplierCatalog({ token, profile, canManage, activeCats, onChanged }:
         {items.map(s => {
           const scope = scopeOf(s);
           const rule = ruleOf(s);
+          const general = s.rules["general"];
           const st = saving[s.supplier_key + "|" +
             (scope === "uma" ? "general" : scope)];
           const stores = editableStores(s);
+          // no escopo de loja sem regra propria, o fornecedor herda a
+          // regra UMA — nunca indicar "Sem categoria" por engano
+          const emptyLabel = scope === "uma"
+            ? "Sem categoria"
+            : rule?.active || !general?.active
+              ? "Sem regra na loja"
+              : `Sem regra na loja (herda UMA: ${general.category_name})`;
           return <li key={s.supplier_key} className="exp-sup-item">
             <div className="exp-sup-info">
               <strong>{s.name}</strong>
@@ -497,7 +511,7 @@ function SupplierCatalog({ token, profile, canManage, activeCats, onChanged }:
                 disabled={!canManage || st === "saving"}
                 value={rule?.active ? rule.category_id : ""}
                 onChange={e => void saveRule(s, e.target.value)}>
-                <option value="">Sem categoria</option>
+                <option value="">{emptyLabel}</option>
                 {rule?.active &&
                   !activeCats.some(c => c.id === rule.category_id) &&
                   <option value={rule.category_id}>
