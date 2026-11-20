@@ -1,7 +1,7 @@
 import {useCallback,useState} from "react";
 import type {FormEvent} from "react";
 import {App} from "./App";
-import {ApiError,localLogin,localChangePassword,localLogout} from "./api";
+import {ApiError,MfaRequired,localLogin,localChangePassword,localLogout} from "./api";
 import {UMA_LOGO_DATA_URI} from "./umaBrand";
 
 const key="uma_operational_local_session";
@@ -14,6 +14,8 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
   const [password,setPassword]=useState("");
   const [newPassword,setNewPassword]=useState("");
   const [confirm,setConfirm]=useState("");
+  const [needsMfa,setNeedsMfa]=useState(false);
+  const [totp,setTotp]=useState("");
   const [displayName,setDisplayName]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -27,11 +29,15 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
   async function login(event:FormEvent<HTMLFormElement>){
     event.preventDefault();setBusy(true);setError("");
     try{
-      const result=await localLogin(username,password);
-      setPassword("");setDisplayName(result.display_name);
+      const result=await localLogin(username,password,totp||undefined);
+      setPassword("");setTotp("");setNeedsMfa(false);
+      setDisplayName(result.display_name);
       if(result.must_change_password)setTemporary(result.access_token);
       else{window.sessionStorage.setItem(key,result.access_token);setToken(result.access_token);}
-    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível acessar.");}
+    }catch(cause){
+      if(cause instanceof MfaRequired){setNeedsMfa(true);setError(cause.invalid?cause.message:"");}
+      else setError(cause instanceof Error?cause.message:"Não foi possível acessar.");
+    }
     finally{setBusy(false);}
   }
 
@@ -83,6 +89,10 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
           onChange={event=>setUsername(event.target.value)}/></label>
         <label>Senha<input type="password" required autoComplete="current-password"
           value={password} onChange={event=>setPassword(event.target.value)}/></label>
+        {needsMfa&&<label>Código do autenticador<input type="text" required
+          inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
+          autoComplete="one-time-code" placeholder="000000" value={totp}
+          onChange={event=>setTotp(event.target.value.replace(/\D/g,"").slice(0,6))}/></label>}
         <button type="submit" className="btn-primary" disabled={busy}>{
           busy?"Entrando…":"Entrar no Portal UMA"
         }</button>

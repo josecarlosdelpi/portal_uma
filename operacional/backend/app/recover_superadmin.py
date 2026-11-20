@@ -32,6 +32,8 @@ def recover_local_superadmin(db: Session, expected_username: str) -> str:
     cred.temporary_expires_at = now_utc() + TEMPORARY_VALIDITY
     cred.failed_attempts = 0
     cred.locked_until = None
+    cred.totp_secret = None
+    cred.totp_enabled = False
     revoke_sessions(db, user.id)
     AdminRepository(db).audit(
         user, "security.superadmin.local_recovery", "user", str(user.id),

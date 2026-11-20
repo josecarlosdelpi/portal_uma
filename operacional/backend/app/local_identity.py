@@ -3,10 +3,14 @@
 Nunca colocar senhas nos logs/auditoria. Sessoes de banco com token aleatorio
 armazenado somente como hash, revogadas ao trocar senha ou excluir usuario.
 """
+import base64
+import hmac
 from datetime import datetime, timedelta, timezone
-from hashlib import sha256
+from hashlib import sha1, sha256
 import re
 import secrets
+import struct
+import time
 from uuid import UUID, uuid4
 
 from argon2 import PasswordHasher, exceptions as argon_errors, Type
@@ -123,6 +127,35 @@ def new_password_allowed(value: str, username: str) -> None:
         raise LocalAuthError(
             422, "Use uma senha pessoal de 12 a 128 caracteres, diferente do nome de usuario"
         )
+
+
+def generate_totp_secret() -> str:
+    """Segredo TOTP RFC 6238 em base32 (160 bits)."""
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+
+
+def _totp(secret: str, counter: int) -> str:
+    padding = "=" * (-len(secret) % 8)
+    key = base64.b32decode(secret + padding)
+    digest = hmac.new(key, struct.pack(">Q", counter), sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF
+    return str(value % 1_000_000).zfill(6)
+
+
+def verify_totp(secret: str | None, code: str | None) -> bool:
+    """Verifica codigo TOTP aceitando o passo atual e os adjacentes (±30s)."""
+    if not secret or not code or not code.strip().isdigit():
+        return False
+    counter = int(time.time() // 30)
+    candidate = code.strip()[-6:]
+    try:
+        return any(
+            secrets.compare_digest(_totp(secret, counter + drift), candidate)
+            for drift in (-1, 0, 1)
+        )
+    except (ValueError, TypeError):
+        return False
 
 
 class LocalIdentityService:
@@ -244,7 +277,8 @@ class LocalIdentityService:
         self._commit()
         return {"user_id": str(user_id), "deleted": True}
 
-    def login(self, *, username: str, password: str) -> dict:
+    def login(self, *, username: str, password: str,
+              totp: str | None = None) -> dict:
         # Resposta generica: impede enumeracao e existencia de usuario.
         wrong = LocalAuthError(401, "Usuario ou senha invalida")
         key = username.strip().casefold()
@@ -274,11 +308,61 @@ class LocalIdentityService:
         if (cred.must_change_password and cred.temporary_expires_at is not None
                 and utc(cred.temporary_expires_at) <= now_utc()):
             raise wrong
+        if (user.is_superadmin and cred.totp_enabled and cred.totp_secret
+                and not verify_totp(cred.totp_secret, totp)):
+            # Senha correta, segundo fator ausente ou invalido: distingue a
+            # necessidade sem revelar nada alem do dono da credencial.
+            self.db.commit()
+            raise LocalAuthError(401, "mfa_required" if not totp else "mfa_invalid")
         cred.failed_attempts = 0
         cred.locked_until = None
         response = make_session(self.db, user, limited=cred.must_change_password)
         self.db.commit()
         return response
+
+    def mfa_setup(self, token: str) -> dict:
+        """Gera segredo TOTP pendente; so SuperAdmin pode ativar MFA."""
+        user, _session = valid_session(self.db, token)
+        if not user.is_superadmin:
+            raise LocalAuthError(403, "Somente o SuperAdmin pode configurar MFA")
+        cred = self.db.get(LocalCredential, user.id)
+        if cred.totp_enabled:
+            return {"secret": None, "otpauth_uri": None, "enabled": True}
+        cred.totp_secret = generate_totp_secret()
+        cred.totp_enabled = False
+        self.db.commit()
+        uri = ("otpauth://totp/PortalUMA:"
+               f"{cred.username_key}?secret={cred.totp_secret}"
+               "&issuer=PortalUMA")
+        return {"secret": cred.totp_secret, "otpauth_uri": uri,
+                "enabled": False}
+
+    def mfa_enable(self, token: str, code: str) -> dict:
+        user, _session = valid_session(self.db, token)
+        if not user.is_superadmin:
+            raise LocalAuthError(403, "Somente o SuperAdmin pode configurar MFA")
+        cred = self.db.get(LocalCredential, user.id)
+        if not cred.totp_secret:
+            raise LocalAuthError(409, "Gere o segredo antes de confirmar")
+        if not verify_totp(cred.totp_secret, code):
+            raise LocalAuthError(422, "Codigo do autenticador invalido")
+        cred.totp_enabled = True
+        self.repo.audit(user, "security.mfa.totp_enabled", "user",
+                        str(user.id), {})
+        self.db.commit()
+        return {"enabled": True}
+
+    def mfa_disable(self, token: str, password: str) -> dict:
+        user, _session = valid_session(self.db, token)
+        cred = self.db.get(LocalCredential, user.id)
+        if not password_matches(cred.password_hash, password):
+            raise LocalAuthError(403, "Senha incorreta")
+        cred.totp_secret = None
+        cred.totp_enabled = False
+        self.repo.audit(user, "security.mfa.totp_disabled", "user",
+                        str(user.id), {})
+        self.db.commit()
+        return {"enabled": False}
 
     def change_password(self, token: str, new_password: str) -> dict:
         user, current = valid_session(self.db, token, allow_limited=True)

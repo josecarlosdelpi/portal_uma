@@ -20,7 +20,7 @@ import { DailyTasksPage } from "./DailyTasksPage";
 import { WhatsAppPage } from "./WhatsAppPage";
 import { TrainingPage } from "./TrainingPage";
 import { FinancePage } from "./FinancePage";
-import { AccountsManager } from "./AccountsManager";
+import { AccountsManager, MfaPanel } from "./AccountsManager";
 import { UserDetailPanel, GroupEditor } from "./AccessAdmin";
 
 type Tab = "usuarios" | "grupos" | "auditoria";
@@ -365,6 +365,7 @@ export function App({ token, onLogout }: { token: string; onLogout: () => void }
           <button role="tab" aria-selected={tab === "grupos"} className={tab === "grupos" ? "tab active" : "tab"} onClick={() => setTab("grupos")}>Grupos e permissões</button>
           <button role="tab" aria-selected={tab === "auditoria"} className={tab === "auditoria" ? "tab active" : "tab"} onClick={() => {setAuditOffset(0); setTab("auditoria");}}>Auditoria</button>
         </div>}
+        {isSuperAdmin && tab === "usuarios" && <MfaPanel token={token}/>}
         {isSuperAdmin && tab === "usuarios" && <AccountsManager token={token} groups={groups}
           onCreated={async (userId) => { await refresh(); setSelectedUser(userId); }}/>}
         {isSuperAdmin && tab === "usuarios" && <div className="columns">

@@ -1,6 +1,69 @@
 import {useState} from "react";
-import {api,type AccessGroup,type LocalCreateAccount} from "./api";
+import {api,mfaSetup,mfaEnable,mfaDisable,type AccessGroup,
+        type LocalCreateAccount} from "./api";
 import {labelStore,permissionName} from "./catalog";
+
+export function MfaPanel({token}:{token:string}){
+  const [open,setOpen]=useState(false);
+  const [setup,setSetup]=useState<{secret:string;otpauth_uri:string}|null>(null);
+  const [code,setCode]=useState("");
+  const [offPw,setOffPw]=useState("");
+  const [enabled,setEnabled]=useState<boolean|null>(null);
+  const [error,setError]=useState("");
+  const [busy,setBusy]=useState(false);
+
+  async function begin(){
+    setBusy(true);setError("");
+    try{const r=await mfaSetup(token);
+      if(r.enabled)setEnabled(true);else setSetup(r);}
+    catch(cause){setError(cause instanceof Error?cause.message:"Falha ao gerar segredo.");}
+    finally{setBusy(false);}
+  }
+  async function confirm(){
+    setBusy(true);setError("");
+    try{await mfaEnable(token,code);setEnabled(true);setSetup(null);setCode("");}
+    catch{setError("Código inválido. Verifique o relógio do autenticador.");}
+    finally{setBusy(false);}
+  }
+  async function disable(){
+    setBusy(true);setError("");
+    try{await mfaDisable(token,offPw);setEnabled(false);setOffPw("");setOpen(false);}
+    catch{setError("Senha incorreta.");}
+    finally{setBusy(false);}
+  }
+  return <section className="panel">
+    <div className="panel-head"><div><h2>Autenticação em duas etapas (MFA)</h2>
+      <p>Proteção adicional obrigatória apenas para a sua conta de SuperAdmin.
+        Use um aplicativo autenticador (Google Authenticator, Aegis, 1Password).</p></div>
+      <button className="btn-secondary" disabled={busy}
+        onClick={()=>{setOpen(!open);setSetup(null);setError("");}}>
+        {open?"Fechar":enabled===true?"Gerenciar MFA":"Configurar MFA"}</button></div>
+    {error&&<div className="notice notice-error">{error}</div>}
+    {enabled===true&&<div className="notice notice-success">MFA ativo nesta conta.</div>}
+    {open&&!setup&&enabled!==true&&<div className="btn-row">
+      <button className="btn-primary" disabled={busy} onClick={()=>void begin()}>
+        Gerar segredo do autenticador</button>
+    </div>}
+    {open&&enabled===true&&!setup&&<div className="btn-row">
+      <label>Senha atual para desativar
+        <input type="password" value={offPw} autoComplete="current-password"
+          onChange={e=>setOffPw(e.target.value)}/></label>
+      <button className="btn-secondary" disabled={busy||!offPw}
+        onClick={()=>void disable()}>Desativar MFA</button>
+    </div>}
+    {setup&&<div className="routine-form-grid">
+      <div className="routine-wide">
+        <p>Escaneie no autenticador ou cadastre manualmente:</p>
+        <code style={{wordBreak:"break-all"}}>{setup.otpauth_uri}</code>
+        <p><small>Segredo: <code>{setup.secret}</code> — exibido uma única vez.</small></p>
+      </div>
+      <label>Código de 6 dígitos<input inputMode="numeric" maxLength={6}
+        value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))}/></label>
+      <div><button className="btn-primary" disabled={busy||code.length!==6}
+        onClick={()=>void confirm()}>Ativar MFA</button></div>
+    </div>}
+  </section>;
+}
 
 const ROLE_OPTIONS:Array<{value:"seller"|"administrator"|"staff";label:string}>=[
   {value:"seller",label:"Vendedor — aparece nos cadastros da loja"},
