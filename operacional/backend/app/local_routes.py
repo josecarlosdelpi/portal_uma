@@ -78,8 +78,10 @@ def require_token(credentials: HTTPAuthorizationCredentials | None) -> str:
 @router.post("/login")
 def login(payload: Login, request: Request,
           db: Session = Depends(get_db)) -> JSONResponse:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    client_ip = (forwarded.split(",")[0].strip()
+    # X-Real-IP e reescrito pelo nosso Nginx ($remote_addr) — confiavel.
+    # X-Forwarded-For NAO e usado: o cliente pode forja-lo para contornar
+    # o bloqueio por IP. Sem proxy (dev/teste), cai no peer TCP real.
+    client_ip = (request.headers.get("x-real-ip")
                  or (request.client.host if request.client else "unknown"))
     _check_login_rate(client_ip)
     return reply(lambda: LocalIdentityService(db).login(

@@ -1,6 +1,7 @@
 import {useCallback,useState} from "react";
 import type {FormEvent} from "react";
 import {App} from "./App";
+import {MfaPanel} from "./AccountsManager";
 import {ApiError,MfaRequired,localLogin,localChangePassword,localLogout} from "./api";
 import {UMA_LOGO_DATA_URI} from "./umaBrand";
 
@@ -16,6 +17,7 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
   const [confirm,setConfirm]=useState("");
   const [needsMfa,setNeedsMfa]=useState(false);
   const [totp,setTotp]=useState("");
+  const [mfaEnrollToken,setMfaEnrollToken]=useState("");
   const [displayName,setDisplayName]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -32,7 +34,9 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
       const result=await localLogin(username,password,totp||undefined);
       setPassword("");setTotp("");setNeedsMfa(false);
       setDisplayName(result.display_name);
-      if(result.must_change_password)setTemporary(result.access_token);
+      if(result.mfa_setup_required&&!result.must_change_password)
+        setMfaEnrollToken(result.access_token);
+      else if(result.must_change_password)setTemporary(result.access_token);
       else{window.sessionStorage.setItem(key,result.access_token);setToken(result.access_token);}
     }catch(cause){
       if(cause instanceof MfaRequired){setNeedsMfa(true);setError(cause.invalid?cause.message:"");}
@@ -48,7 +52,8 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
     try{
       const result=await localChangePassword(temporary,newPassword);
       setTemporary("");setNewPassword("");setConfirm("");
-      window.sessionStorage.setItem(key,result.access_token);setToken(result.access_token);
+      if(result.mfa_setup_required)setMfaEnrollToken(result.access_token);
+      else{window.sessionStorage.setItem(key,result.access_token);setToken(result.access_token);}
     }catch(cause){setError(cause instanceof ApiError&&cause.status===422?
       "Escolha uma senha diferente da provisória, com pelo menos 12 caracteres.":
       cause instanceof Error?cause.message:"Não foi possível trocar a senha.");}
@@ -56,6 +61,17 @@ export function LocalAccess({onUseExternalLogin,externalError}:Props){
   }
 
   if(token)return <App token={token} onLogout={logout}/>;
+
+  if(mfaEnrollToken)return <div className="login-stage">
+    <main className="login-panel local-login-panel" style={{maxWidth:"560px"}}>
+      <h1>Proteção obrigatória: MFA</h1>
+      <p>Olá, {displayName}. Sua conta de SuperAdmin exige autenticação em
+        duas etapas antes de acessar o portal. Configure o autenticador e,
+        depois, entre novamente com senha + código.</p>
+      <MfaPanel token={mfaEnrollToken}/>
+      <button className="btn-secondary" style={{marginTop:"12px"}}
+        onClick={()=>setMfaEnrollToken("")}>Voltar ao login</button>
+    </main></div>;
 
   return <div className="login-stage"><main className="login-panel local-login-panel">
     <img className="login-logo-original" src={UMA_LOGO_DATA_URI} alt="Universo das Mangueiras"/>

@@ -358,7 +358,8 @@ export async function request<T>(
 
 export type LocalLoginResult = {
   access_token: string; token_type: "bearer"; expires_at: string;
-  must_change_password: boolean; display_name: string;
+  must_change_password: boolean; mfa_setup_required: boolean;
+  display_name: string;
   profile: "superadmin" | "administrator" | "seller";
 };
 export type LocalCreateAccount = {

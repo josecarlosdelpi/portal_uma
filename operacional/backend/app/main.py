@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.admin_routes import router as admin_router
@@ -87,8 +88,9 @@ async def security_headers(request, call_next):
 
 
 @app.get("/health", tags=["system"])
-def health() -> dict[str, str]:
-    """Liveness only; nao revela contas, banco ou dados comerciais."""
+def health(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Readiness: so responde ok com o banco alcancavel (SELECT 1)."""
+    db.execute(text("SELECT 1"))
     return {"status": "ok"}
 
 

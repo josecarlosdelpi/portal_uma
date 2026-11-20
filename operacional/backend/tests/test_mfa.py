@@ -29,3 +29,4 @@ def test_totp_aceita_codigo_atual_e_vizinho():
 def test_verify_totp_segredo_invalido_nao_quebra():
     assert verify_totp("!!!", "123456") is False
     assert verify_totp("JBSWY3DPEHPK3PXP", "abc") is False
+

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.admin_repository import AdminRepository
 from app.admin_service import AdminError, AdminService
+from app.config import get_settings
 from app.models import AuditEvent, LocalCredential, LocalSession, User
 from app.policy import USER_PROFILES
 
@@ -77,7 +78,9 @@ def password_matches(digest: str, candidate: str) -> bool:
         return False
 
 
-def make_session(db: Session, user: User, limited: bool) -> dict:
+def make_session(db: Session, user: User, limited: bool,
+                 mfa_setup_required: bool = False,
+                 must_change_password: bool | None = None) -> dict:
     token = "uma_" + secrets.token_urlsafe(36)
     duration = LIMITED_SESSION_VALIDITY if limited else FULL_SESSION_VALIDITY
     expiry = now_utc() + duration
@@ -89,7 +92,9 @@ def make_session(db: Session, user: User, limited: bool) -> dict:
     return {
         "access_token": token, "token_type": "bearer",
         "expires_at": expiry.isoformat(),
-        "must_change_password": limited,
+        "must_change_password": limited if must_change_password is None
+        else must_change_password,
+        "mfa_setup_required": mfa_setup_required,
         "display_name": user.display_name,
         "profile": "superadmin" if user.is_superadmin else user.profile,
     }
@@ -316,13 +321,23 @@ class LocalIdentityService:
             raise LocalAuthError(401, "mfa_required" if not totp else "mfa_invalid")
         cred.failed_attempts = 0
         cred.locked_until = None
-        response = make_session(self.db, user, limited=cred.must_change_password)
+        mfa_setup_required = bool(
+            user.is_superadmin and not cred.totp_enabled
+            and get_settings().enforce_superadmin_mfa)
+        response = make_session(
+            self.db, user, limited=cred.must_change_password or mfa_setup_required,
+            mfa_setup_required=mfa_setup_required,
+            must_change_password=cred.must_change_password)
         self.db.commit()
         return response
 
     def mfa_setup(self, token: str) -> dict:
-        """Gera segredo TOTP pendente; so SuperAdmin pode ativar MFA."""
-        user, _session = valid_session(self.db, token)
+        """Gera segredo TOTP pendente; so SuperAdmin pode ativar MFA.
+
+        Aceita sessao limitada: o SuperAdmin recebe uma sessao limitada ate
+        concluir a troca de senha e/ou o enrolment de MFA.
+        """
+        user, _session = valid_session(self.db, token, allow_limited=True)
         if not user.is_superadmin:
             raise LocalAuthError(403, "Somente o SuperAdmin pode configurar MFA")
         cred = self.db.get(LocalCredential, user.id)
@@ -338,7 +353,8 @@ class LocalIdentityService:
                 "enabled": False}
 
     def mfa_enable(self, token: str, code: str) -> dict:
-        user, _session = valid_session(self.db, token)
+        # Sessao limitada permitida: enrolment obrigatorio no 1o acesso.
+        user, _session = valid_session(self.db, token, allow_limited=True)
         if not user.is_superadmin:
             raise LocalAuthError(403, "Somente o SuperAdmin pode configurar MFA")
         cred = self.db.get(LocalCredential, user.id)
@@ -381,7 +397,14 @@ class LocalIdentityService:
         cred.failed_attempts = 0
         cred.locked_until = None
         revoke_sessions(self.db, user.id)
-        response = make_session(self.db, user, limited=False)
+        # Se o SuperAdmin ainda precisa enrolar MFA, a sessao continua
+        # limitada ate a conclusao — troca de senha nao a libera sozinha.
+        mfa_setup_required = bool(
+            user.is_superadmin and not cred.totp_enabled
+            and get_settings().enforce_superadmin_mfa)
+        response = make_session(self.db, user, limited=mfa_setup_required,
+                                mfa_setup_required=mfa_setup_required,
+                                must_change_password=False)
         self.repo.audit(user, "user.password_changed_first_login", "user",
                         str(user.id), {"sessions_revoked": True})
         self._commit()

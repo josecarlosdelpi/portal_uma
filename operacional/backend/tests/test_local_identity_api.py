@@ -420,3 +420,99 @@ def test_superadmin_recovery_requires_correct_identity_and_revokes_old_password(
             ]
     finally:
         engine.dispose()
+
+
+def _totp_code(secret: str) -> str:
+    import base64, hashlib, hmac, struct, time
+    key = base64.b32decode(secret + "=" * (-len(secret) % 8))
+    counter = int(time.time() // 30)
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    off = digest[-1] & 0x0F
+    n = struct.unpack('>I', digest[off:off + 4])[0] & 0x7FFFFFFF
+    return f"{n % 1_000_000:06d}"
+
+
+def test_superadmin_mfa_enforcement_full_flow(env, monkeypatch):
+    """Fluxo completo: enrolment obrigatorio, login TOTP, falha e desativacao."""
+    client, _acting, engine, admin, _manager, _ao = env
+    from app.local_identity import password_digest
+    from app.config import get_settings
+    with Session(engine) as db:
+        db.add(LocalCredential(
+            user_id=admin.id, username_key="uma-admin",
+            password_hash=password_digest("senha-temporaria-123"),
+            must_change_password=True))
+        db.commit()
+
+    # Sem enforce: SuperAdmin sem TOTP entra com sessao normal (apos senha).
+    login = client.post("/api/v1/local-auth/login", json={
+        "username": "UMA-ADMIN", "password": "senha-temporaria-123"})
+    assert login.status_code == 200, login.text
+    assert login.json()["must_change_password"] is True
+    assert login.json()["mfa_setup_required"] is False
+
+    monkeypatch.setenv("ENFORCE_SUPERADMIN_MFA", "true")
+    get_settings.cache_clear()
+    try:
+        ch = client.post("/api/v1/local-auth/change-password",
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+            json={"new_password": "senha-pessoal-forte-456"})
+        assert ch.status_code == 200, ch.text
+        assert ch.json()["must_change_password"] is False
+        assert ch.json()["mfa_setup_required"] is True
+        limited = ch.json()["access_token"]
+
+        # Sessao limitada nao acessa dados do portal (auth real, sem override).
+        app.dependency_overrides.pop(current_user)
+        assert client.get("/api/v1/admin/users",
+            headers={"Authorization": f"Bearer {limited}"}).status_code == 403
+
+        # Enrolment TOTP com a sessao limitada.
+        setup = client.post("/api/v1/local-auth/mfa/setup",
+            headers={"Authorization": f"Bearer {limited}"})
+        assert setup.status_code == 200, setup.text
+        secret = setup.json()["secret"]
+        en = client.post("/api/v1/local-auth/mfa/enable",
+            headers={"Authorization": f"Bearer {limited}"},
+            json={"code": _totp_code(secret)})
+        assert en.status_code == 200, en.text
+
+        # Login agora exige o segundo fator; codigo errado = 401 mfa_invalid.
+        bad = client.post("/api/v1/local-auth/login", json={
+            "username": "uma-admin", "password": "senha-pessoal-forte-456",
+            "totp": "000000"})
+        assert bad.status_code == 401
+        ok = client.post("/api/v1/local-auth/login", json={
+            "username": "uma-admin", "password": "senha-pessoal-forte-456",
+            "totp": _totp_code(secret)})
+        assert ok.status_code == 200, ok.text
+        assert ok.json()["mfa_setup_required"] is False
+        full = ok.json()["access_token"]
+
+        # Desativacao exige senha; errada = 403, correta = 200.
+        assert client.post("/api/v1/local-auth/mfa/disable",
+            headers={"Authorization": f"Bearer {full}"},
+            json={"password": "errada"}).status_code == 403
+        assert client.post("/api/v1/local-auth/mfa/disable",
+            headers={"Authorization": f"Bearer {full}"},
+            json={"password": "senha-pessoal-forte-456"}).status_code == 200
+    finally:
+        get_settings.cache_clear()
+
+
+def test_login_rate_limit_nao_contornado_por_xff(env):
+    """X-Forwarded-For forjado nao contorna o bloqueio por IP (usa X-Real-IP/peer)."""
+    client, *_ = env
+    from app.local_routes import _login_attempts
+    _login_attempts.clear()
+    try:
+        for i in range(20):
+            client.post("/api/v1/local-auth/login",
+                json={"username": "nobody", "password": "x" * 14},
+                headers={"x-forwarded-for": f"10.{i}.0.1"})
+        resp = client.post("/api/v1/local-auth/login",
+            json={"username": "nobody", "password": "x" * 14},
+            headers={"x-forwarded-for": "203.0.113.9"})
+        assert resp.status_code == 429, resp.text
+    finally:
+        _login_attempts.clear()

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     database_url: str
     app_env: Literal["development", "production"] = "development"
     cors_origins: str = "http://localhost:5173"
+    # Exige enrolment de TOTP no 1o acesso do SuperAdmin (producao).
+    enforce_superadmin_mfa: bool = False
     oidc_issuer: str = ""
     oidc_audience: str = ""
     oidc_jwks_url: str = ""

@@ -17,3 +17,4 @@ secrets/
 deploy/.env
 deploy/secrets/
 deploy/backups/*.dump
+deploy/.env.test
