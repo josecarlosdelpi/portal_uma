@@ -12,3 +12,9 @@ secrets/
 .env
 .env.*
 !**/.env.example
+
+# Artefatos de producao (nunca versionar)
+deploy/.env
+deploy/secrets/
+deploy/backups/*.dump
+deploy/.env.test

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.admin_routes import router as admin_router
@@ -45,7 +46,12 @@ async def lifespan(app: FastAPI):
                 await task
 
 
-app = FastAPI(title="Portal UMA - API operacional", version="0.1.0", lifespan=lifespan)
+_production = get_settings().app_env == "production"
+app = FastAPI(title="Portal UMA - API operacional", version="0.1.0",
+              lifespan=lifespan,
+              docs_url=None if _production else "/docs",
+              redoc_url=None if _production else "/redoc",
+              openapi_url=None if _production else "/openapi.json")
 app.include_router(admin_router)
 app.include_router(targets_router)
 app.include_router(overview_router)
@@ -71,9 +77,20 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Cabecalhos basicos de endurecimento; HSTS fica no proxy TLS."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
 @app.get("/health", tags=["system"])
-def health() -> dict[str, str]:
-    """Liveness only; nao revela contas, banco ou dados comerciais."""
+def health(db: Session = Depends(get_db)) -> dict[str, str]:
+    """Readiness: so responde ok com o banco alcancavel (SELECT 1)."""
+    db.execute(text("SELECT 1"))
     return {"status": "ok"}
 
 

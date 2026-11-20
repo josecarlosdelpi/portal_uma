@@ -1,0 +1,53 @@
+# Stack isolada de validacao integrada (Etapa B) — feat/integracao-consolidada.
+# NAO e ambiente de homologacao nem producao. Credenciais exclusivamente de teste.
+# ERP sync desabilitado; sem montagem de segredos do Drive.
+name: uma-integracao
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: portal_uma_iso
+      POSTGRES_USER: portal_test
+      POSTGRES_PASSWORD: iso_test_only_123
+    ports:
+      - "127.0.0.1:5440:5432"
+    volumes:
+      - uma_iso_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal_test -d portal_uma_iso"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://portal_test:iso_test_only_123@db:5432/portal_uma_iso
+      APP_ENV: development
+      CORS_ORIGINS: http://localhost:8081
+      ERP_SYNC_ENABLED: "false"
+      GOOGLE_DRIVE_FOLDER_ID: ""
+      GOOGLE_SERVICE_ACCOUNT_JSON: ""
+    ports:
+      - "127.0.0.1:8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:8081:80"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  uma_iso_postgres:

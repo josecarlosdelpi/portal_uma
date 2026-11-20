@@ -1,0 +1,18 @@
+# Portal UMA — HTTPS automatico (Let's Encrypt) via Caddy.
+# O dominio vem de deploy/.env (variavel DOMAIN).
+
+{$DOMAIN} {
+    encode zstd gzip
+
+    reverse_proxy frontend:80 {
+        header_up X-Real-IP {remote_host}
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        -Server
+    }
+}

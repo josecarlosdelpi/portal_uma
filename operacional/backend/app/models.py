@@ -534,6 +534,8 @@ class LocalCredential(Base):
     temporary_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     failed_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    totp_secret: Mapped[str | None] = mapped_column(String(64))
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

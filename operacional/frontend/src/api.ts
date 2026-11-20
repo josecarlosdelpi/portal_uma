@@ -358,7 +358,8 @@ export async function request<T>(
 
 export type LocalLoginResult = {
   access_token: string; token_type: "bearer"; expires_at: string;
-  must_change_password: boolean; display_name: string;
+  must_change_password: boolean; mfa_setup_required: boolean;
+  display_name: string;
   profile: "superadmin" | "administrator" | "seller";
 };
 export type LocalCreateAccount = {
@@ -375,18 +376,48 @@ export type LocalResetPassword = {
   must_change_password: true;
 };
 
-export async function localLogin(username: string, password: string): Promise<LocalLoginResult> {
+export class MfaRequired extends Error {
+  invalid: boolean;
+  constructor(invalid: boolean) {
+    super(invalid ? "Código do autenticador inválido." : "mfa_required");
+    this.invalid = invalid;
+  }
+}
+
+export async function localLogin(username: string, password: string,
+                                 totp?: string): Promise<LocalLoginResult> {
   const response = await fetch(baseUrl + "/api/v1/local-auth/login", {
     method: "POST", cache: "no-store",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, totp: totp || undefined }),
   });
-  if (!response.ok) throw new ApiError(
-    response.status,
-    response.status === 401 ? "Usuário ou senha inválidos, expirados ou temporariamente bloqueados." :
-      "Não foi possível entrar. Verifique a conexão.",
-  );
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({})) as { detail?: string };
+    if (response.status === 401 && detail.detail === "mfa_required")
+      throw new MfaRequired(false);
+    if (response.status === 401 && detail.detail === "mfa_invalid")
+      throw new MfaRequired(true);
+    throw new ApiError(
+      response.status,
+      response.status === 401 ? "Usuário ou senha inválidos, expirados ou temporariamente bloqueados." :
+        response.status === 429 ? "Muitas tentativas de acesso. Aguarde alguns minutos." :
+          "Não foi possível entrar. Verifique a conexão.",
+    );
+  }
   return response.json() as Promise<LocalLoginResult>;
+}
+
+export function mfaSetup(token: string) {
+  return request<{ secret: string; otpauth_uri: string; enabled: boolean }>(
+    token, "/api/v1/local-auth/mfa/setup", "POST");
+}
+export function mfaEnable(token: string, code: string) {
+  return request<{ enabled: boolean }>(
+    token, "/api/v1/local-auth/mfa/enable", "POST", { code });
+}
+export function mfaDisable(token: string, password: string) {
+  return request<{ enabled: boolean }>(
+    token, "/api/v1/local-auth/mfa/disable", "POST", { password });
 }
 export function localChangePassword(token: string, newPassword: string) {
   return request<LocalLoginResult>(
