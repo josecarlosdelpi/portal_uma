@@ -9,10 +9,14 @@ COMPOSE="docker compose -p ${PROJECT} -f docker-compose.vps.yml --env-file "${EN
 DUMP="${1:?informe o dump do portal_uma_dev}"
 set -a; . "./${ENV_FILE:-.env}"; set +a
 
-echo ">> restore do dump homologado"
-echo "$POSTGRES_DB" | bash scripts/restore.sh "$DUMP"
+echo ">> restore do dump homologado (aplicacao permanece parada)"
+echo "$POSTGRES_DB" | KEEP_APP_DOWN=true bash scripts/restore.sh "$DUMP"
 echo ">> migrations pendentes (ex.: 0029_superadmin_totp)"
-$COMPOSE --profile migrate run --rm migrate
+if ! $COMPOSE --profile migrate run --rm migrate; then
+  echo "!! MIGRATION FALHOU — aplicacao mantida parada." >&2
+  echo "!! Banco restaurado; verifique o erro antes de subir a stack." >&2
+  exit 1
+fi
 echo ">> verificacao pos-migracao"
 $COMPOSE exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   -c "SELECT version_num FROM alembic_version;" \
@@ -20,4 +24,7 @@ $COMPOSE exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   -c "SELECT count(*) AS credenciais FROM local_credentials;" \
   -c "SELECT count(*) AS clientes_televendas FROM contact_clients;" \
   -c "SELECT count(*) AS categorias_despesa FROM expense_categories;"
+echo ">> banco validado — subindo a stack completa"
+$COMPOSE up -d
+bash scripts/health.sh
 echo ">> concluido — confira as contagens contra o ambiente de origem"

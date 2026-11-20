@@ -44,10 +44,16 @@ $COMPOSE exec -T db psql -U "$POSTGRES_USER" -d postgres \
 
 echo ">> restaurando $DUMP"
 if ! $COMPOSE exec -T db sh -c 'cat > /tmp/in.dump && pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error /tmp/in.dump' < "$DUMP"; then
-  echo "!! RESTORE FALHOU — o banco pode estar parcialmente restaurado." >&2
-  echo "!! Recupere o ponto de retorno: bash scripts/restore.sh $PRE" >&2
-  $COMPOSE up -d || true
+  echo "!! RESTORE FALHOU — a aplicacao permanece PARADA (banco possivelmente parcial)." >&2
+  echo "!! O banco atual pode estar inconsistente. Recupere o ponto de retorno:" >&2
+  echo "!!   bash scripts/restore.sh $PRE" >&2
+  echo "!! Nada foi reiniciado — nenhuma versao parcial esta sendo servida." >&2
   exit 1
+fi
+if [ "${KEEP_APP_DOWN:-false}" = "true" ]; then
+  echo ">> restore concluido — aplicacao MANTIDA parada (KEEP_APP_DOWN)."
+  echo ">> prossiga com migrations/validacao e depois: $COMPOSE up -d"
+  exit 0
 fi
 echo ">> restore concluido — subindo a stack"
 $COMPOSE up -d

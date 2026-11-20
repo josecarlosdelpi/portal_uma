@@ -489,15 +489,23 @@ def test_superadmin_mfa_enforcement_full_flow(env, monkeypatch):
         assert ok.json()["mfa_setup_required"] is False
         full = ok.json()["access_token"]
 
-        # Desativacao exige senha; errada = 403, correta = 200.
+        # Desativacao bloqueada enquanto MFA e obrigatorio (enforcement).
         assert client.post("/api/v1/local-auth/mfa/disable",
             headers={"Authorization": f"Bearer {full}"},
-            json={"password": "errada"}).status_code == 403
-        assert client.post("/api/v1/local-auth/mfa/disable",
-            headers={"Authorization": f"Bearer {full}"},
-            json={"password": "senha-pessoal-forte-456"}).status_code == 200
+            json={"password": "senha-pessoal-forte-456"}).status_code == 403
     finally:
+        monkeypatch.delenv("ENFORCE_SUPERADMIN_MFA", raising=False)
         get_settings.cache_clear()
+
+    # Sem enforcement, a desativacao volta a exigir apenas a senha.
+    off = client.post("/api/v1/local-auth/mfa/disable",
+        headers={"Authorization": f"Bearer {full}"},
+        json={"password": "errada"})
+    assert off.status_code == 403
+    ok_off = client.post("/api/v1/local-auth/mfa/disable",
+        headers={"Authorization": f"Bearer {full}"},
+        json={"password": "senha-pessoal-forte-456"})
+    assert ok_off.status_code == 200, ok_off.text
 
 
 def test_login_rate_limit_nao_contornado_por_xff(env):

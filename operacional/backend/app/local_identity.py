@@ -370,6 +370,11 @@ class LocalIdentityService:
 
     def mfa_disable(self, token: str, password: str) -> dict:
         user, _session = valid_session(self.db, token)
+        if (user.is_superadmin and get_settings().enforce_superadmin_mfa):
+            # MFA obrigatorio nao pode ser desligado pela propria conta;
+            # a recuperacao segue via recover_superadmin (fora de banda).
+            raise LocalAuthError(
+                403, "MFA obrigatorio para SuperAdmin neste ambiente")
         cred = self.db.get(LocalCredential, user.id)
         if not password_matches(cred.password_hash, password):
             raise LocalAuthError(403, "Senha incorreta")

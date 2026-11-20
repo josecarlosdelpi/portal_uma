@@ -101,15 +101,19 @@ proprio banco (`bytea`) — o dump ja os cobre.
   backend (pelo proxy caem no SPA e nao expoem a API).
 - Somente HTTP/HTTPS publicas; Postgres/FastAPI sem porta no host.
 - HSTS + headers de seguranca (Caddy + Nginx + backend).
-- Rate limit por IP (20 tentativas/5min): usa `X-Real-IP` reescrito pelo
-  nosso Nginx (`$remote_addr`) — **`X-Forwarded-For` forjado nao contorna**,
-  testado ponta a ponta pelo proxy.
+- Rate limit por IP (20 tentativas/5min): o Caddy reescreve `X-Real-IP`
+  com o IP real do cliente (`{remote_host}`) e o Nginx o repassa
+  (`$trusted_client_ip`). **`X-Forwarded-For`/`X-Real-IP` forjados nao
+  contornam** e clientes distintos tem buckets independentes — testado
+  ponta a ponta pelo proxy.
 - `/health` executa `SELECT 1`: 200 com banco, 500 sem banco — o
   healthcheck do Compose reflete a disponibilidade real.
-- MFA TOTP obrigatorio p/ SuperAdmin (enrolment, login, falha, desativacao
-  e recuperacao testados). Recuperacao: `python -m app.recover_superadmin`
-  com `UMA_CONFIRM_SUPERADMIN_RESET=I_UNDERSTAND_ONE_TIME` — gera senha
-  temporaria, revoga sessoes e limpa o TOTP.
+- MFA TOTP obrigatorio p/ SuperAdmin (enrolment, login, falha e recuperacao
+  testados). Com `ENFORCE_SUPERADMIN_MFA=true` o SuperAdmin **nao consegue
+  desativar o MFA pela propria conta** (403). Recuperacao:
+  `python -m app.recover_superadmin` com
+  `UMA_CONFIRM_SUPERADMIN_RESET=I_UNDERSTAND_ONE_TIME` — gera senha
+  temporaria, revoga sessoes e limpa o TOTP (permitindo re-enrolment).
 
 ## Teste descartavel da stack (sem DNS/publico)
 
